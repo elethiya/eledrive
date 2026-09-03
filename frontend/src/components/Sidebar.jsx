@@ -13,6 +13,7 @@ import {
   ChevronDown,
   User,
   ShieldCheck,
+  Crown,
   X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -34,7 +35,7 @@ export default function Sidebar({
 
   const used = user?.storage_used || 0;
   const limit = user?.storage_limit || 10 * 1024 * 1024 * 1024;
-  const percent = Math.min(100, Math.round((used / limit) * 100));
+  const percent = Math.min(Math.round((used / limit) * 100), 100);
 
   const navItems = [
     { id: 'drive', label: 'My Drive', icon: HardDrive },
@@ -67,39 +68,31 @@ export default function Sidebar({
 
   return (
     <>
-      {/* Backdrop for mobile */}
+      {/* Mobile Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-xs z-40 md:hidden animate-in fade-in duration-200"
+          className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-xs md:hidden"
           onClick={onClose}
         />
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 border-r border-slate-800 flex flex-col h-screen select-none shrink-0 text-slate-200 transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${
-          isOpen ? 'translate-x-0 shadow-2xl shadow-black/80' : '-translate-x-full'
+        className={`fixed md:static inset-y-0 left-0 z-50 w-64 bg-slate-900 border-r border-slate-800 flex flex-col h-screen select-none shrink-0 transition-transform duration-300 ease-in-out md:translate-x-0 ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Brand Header */}
-        <div className="h-16 px-6 flex items-center justify-between border-b border-slate-800/80">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
-              <HardDrive className="w-5 h-5" />
+        <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-500/20">
+              E
             </div>
-            <div>
-              <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-                EleDrive
-              </span>
-              <span className="text-[10px] font-semibold tracking-wider block text-slate-400 uppercase">
-                Team Workspace
-              </span>
-            </div>
+            <span className="text-base font-bold tracking-tight text-slate-100">EleDrive</span>
           </div>
 
-          {/* Mobile close button */}
           <button
             onClick={onClose}
-            className="md:hidden p-1.5 text-slate-400 hover:text-slate-100 rounded-xl hover:bg-slate-800 transition-colors"
+            className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -109,22 +102,25 @@ export default function Sidebar({
         <div className="p-4 relative">
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl shadow-lg shadow-blue-600/30 transition-all duration-150 font-medium text-sm group"
+            className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-2xl shadow-lg shadow-blue-600/20 font-semibold text-xs tracking-wide transition-all transform hover:-translate-y-0.5"
           >
             <div className="flex items-center gap-2.5">
-              <Plus className="w-5 h-5 transition-transform group-hover:rotate-90 duration-200" />
-              <span>New Item</span>
+              <Plus className="w-4 h-4" />
+              <span>New</span>
             </div>
             <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
           </button>
 
+          {/* Action Dropdown Menu */}
           {dropdownOpen && (
             <>
               <div
                 className="fixed inset-0 z-20"
                 onClick={() => setDropdownOpen(false)}
               />
-              <div className="absolute left-4 right-4 top-20 bg-slate-800 rounded-2xl shadow-2xl border border-slate-700/80 p-1.5 z-30 animate-in fade-in zoom-in-95 duration-100">
+              <div
+                className="absolute left-4 right-4 top-18 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
+              >
                 <button
                   onClick={() => {
                     setDropdownOpen(false);
@@ -230,21 +226,28 @@ export default function Sidebar({
           {/* Admin / Owner Panel */}
           {(user?.role === 'admin' || user?.role === 'owner') && (
             <button
-              onClick={() => {
-                onNavigate('admin');
-                onCloseMobile?.();
-              }}
+              onClick={() => handleNavClick('admin')}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                 currentView === 'admin'
-                  ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30 shadow-xs'
+                  ? user?.role === 'owner'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-xs'
+                    : 'bg-purple-600/20 text-purple-300 border border-purple-500/30 shadow-xs'
                   : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Shield className="w-4 h-4 text-purple-400" />
+                {user?.role === 'owner' ? (
+                  <Crown className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <ShieldCheck className="w-4 h-4 text-purple-400" />
+                )}
                 <span>{user?.role === 'owner' ? 'Owner Panel' : 'Admin Panel'}</span>
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+              <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                user?.role === 'owner'
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                  : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+              }`}>
                 {user?.role === 'owner' ? 'Owner' : 'Admin'}
               </span>
             </button>
