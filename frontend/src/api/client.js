@@ -37,6 +37,7 @@ export const authAPI = {
 
 export const folderAPI = {
   getContents: (folderId = '') => api.get(`/folders?folder_id=${folderId}`),
+  getFolder: (folderId = '') => api.get(`/folders?folder_id=${folderId}`),
   createFolder: (name, parentId = null, color = null) =>
     api.post('/folders', { name, parent_id: parentId, color }),
   updateFolder: (id, data) => api.put(`/folders/${id}`, data),

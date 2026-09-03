@@ -22,8 +22,13 @@ import {
   Sparkles,
   ChevronDown,
   Users,
+  Image as ImageIcon,
+  Film,
+  Code2,
+  Archive,
+  Layers,
 } from 'lucide-react';
-import { formatBytes, formatDate } from '../utils/formatters';
+import { formatBytes, formatDate, getFileTypeCategory } from '../utils/formatters';
 
 export default function DrivePage({
   viewMode: propViewMode,
@@ -39,83 +44,122 @@ export default function DrivePage({
 }) {
   const [folderData, setFolderData] = useState({
     folder: null,
-    breadcrumbs: [{ id: '', name: 'My Drive' }],
+    breadcrumbs: [],
     subfolders: [],
     files: [],
-    permission: 'owner',
   });
   const [loading, setLoading] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
 
-  // Content listing system controls
-  const [viewMode, setViewMode] = useState(propViewMode || 'grid');
-  const [sortField, setSortField] = useState('name'); // 'name' | 'size' | 'updated_at' | 'type'
-  const [sortOrder, setSortOrder] = useState('asc'); // 'asc' | 'desc'
+  // Modern Content Listing System States
   const [contentFilter, setContentFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [sortField, setSortField] = useState('name'); // 'name', 'size', 'updated_at', 'type'
+  const [sortOrder, setSortOrder] = useState('asc'); // 'asc', 'desc'
+  const [viewMode, setViewMode] = useState(propViewMode || 'grid');
 
-  // Synchronize viewMode from props if changed externally
   useEffect(() => {
     if (propViewMode) setViewMode(propViewMode);
   }, [propViewMode]);
 
+  // Load Folder Contents
   useEffect(() => {
-    loadFolder(currentFolderId);
-    setContentFilter('');
+    let isMounted = true;
+    setLoading(true);
+
+    const loadContent = async () => {
+      try {
+        const fetchFolder = folderAPI.getFolder || folderAPI.getContents;
+        const res = await fetchFolder(currentFolderId || '');
+        if (isMounted && res.data) {
+          setFolderData({
+            folder: res.data.folder,
+            breadcrumbs: res.data.breadcrumbs || [],
+            subfolders: res.data.subfolders || [],
+            files: res.data.files || [],
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load drive content:', err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadContent();
+    return () => {
+      isMounted = false;
+    };
   }, [currentFolderId]);
 
-  const loadFolder = async (folderId) => {
-    setLoading(true);
-    try {
-      const res = await folderAPI.getContents(folderId);
-      if (res.data) {
-        setFolderData(res.data);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Navigation handlers
   const handleOpenItem = (item) => {
     if (item.mime_type === undefined) {
+      // It's a folder
       setCurrentFolderId(item.id);
+      setContentFilter('');
+      setCategoryFilter('all');
     } else {
+      // It's a file
       onOpenPreview(item);
     }
   };
 
   const handleDownload = (item) => {
     if (item.mime_type === undefined) {
+      // Download folder ZIP
       window.location.href = folderAPI.getDownloadZipUrl(item.id);
     } else {
+      // Download single file
       window.location.href = fileAPI.getDownloadUrl(item.id);
     }
   };
 
   const handleToggleStar = async (item) => {
+    const isFolder = item.mime_type === undefined;
     try {
-      if (item.mime_type === undefined) {
-        await folderAPI.toggleStar(item.id);
+      if (isFolder) {
+        await folderAPI.toggleStar(item.id, !item.is_starred);
+        setFolderData((prev) => ({
+          ...prev,
+          subfolders: prev.subfolders.map((sf) =>
+            sf.id === item.id ? { ...sf, is_starred: !item.is_starred } : sf
+          ),
+        }));
       } else {
-        await fileAPI.toggleStar(item.id);
+        await fileAPI.toggleStar(item.id, !item.is_starred);
+        setFolderData((prev) => ({
+          ...prev,
+          files: prev.files.map((fl) =>
+            fl.id === item.id ? { ...fl, is_starred: !item.is_starred } : fl
+          ),
+        }));
       }
-      loadFolder(currentFolderId);
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error(err);
     }
   };
 
   const handleTrash = async (item) => {
+    const isFolder = item.mime_type === undefined;
+    if (!confirm(`Are you sure you want to move "${item.name}" to trash?`)) return;
+
     try {
-      if (item.mime_type === undefined) {
+      if (isFolder) {
         await folderAPI.trashFolder(item.id);
+        setFolderData((prev) => ({
+          ...prev,
+          subfolders: prev.subfolders.filter((sf) => sf.id !== item.id),
+        }));
       } else {
         await fileAPI.trashFile(item.id);
+        setFolderData((prev) => ({
+          ...prev,
+          files: prev.files.filter((fl) => fl.id !== item.id),
+        }));
       }
-      loadFolder(currentFolderId);
-    } catch (e) {
-      alert(e.message);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -149,6 +193,25 @@ export default function DrivePage({
 
   const { folder, breadcrumbs, subfolders, files } = folderData;
 
+  // Calculate Category Counts dynamically
+  const categoryCounts = useMemo(() => {
+    const counts = {
+      all: (subfolders?.length || 0) + (files?.length || 0),
+      folder: subfolders?.length || 0,
+      image: 0,
+      video: 0,
+      document: 0,
+      code: 0,
+      archive: 0,
+    };
+    (files || []).forEach((f) => {
+      const cat = getFileTypeCategory(f.mime_type, f.extension);
+      if (counts[cat] !== undefined) counts[cat]++;
+      else counts.document++;
+    });
+    return counts;
+  }, [subfolders, files]);
+
   // Filter and sort subfolders and files
   const { filteredFolders, filteredFiles, totalBytes } = useMemo(() => {
     let fList = [...(subfolders || [])];
@@ -161,7 +224,18 @@ export default function DrivePage({
       fileList = fileList.filter((fl) => fl.name.toLowerCase().includes(q));
     }
 
-    // 2. Sort function
+    // 2. Category filter
+    if (categoryFilter === 'folder') {
+      fileList = [];
+    } else if (categoryFilter !== 'all') {
+      fList = [];
+      fileList = fileList.filter((fl) => {
+        const cat = getFileTypeCategory(fl.mime_type, fl.extension);
+        return cat === categoryFilter;
+      });
+    }
+
+    // 3. Sort function
     const sorter = (a, b) => {
       let comparison = 0;
       if (sortField === 'name') {
@@ -187,7 +261,7 @@ export default function DrivePage({
     const bytes = fileList.reduce((acc, f) => acc + (f.size || 0), 0);
 
     return { filteredFolders: fList, filteredFiles: fileList, totalBytes: bytes };
-  }, [subfolders, files, contentFilter, sortField, sortOrder]);
+  }, [subfolders, files, contentFilter, categoryFilter, sortField, sortOrder]);
 
   const isEmpty = (subfolders?.length === 0 && files?.length === 0);
   const isFilterEmpty = !isEmpty && filteredFolders.length === 0 && filteredFiles.length === 0;
@@ -199,7 +273,7 @@ export default function DrivePage({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Breadcrumbs Path */}
+      {/* Breadcrumbs Navigation Header */}
       <Breadcrumbs
         breadcrumbs={breadcrumbs}
         currentFolder={folder}
@@ -209,99 +283,201 @@ export default function DrivePage({
 
       {/* Modern Content Listing Toolbar */}
       {!isEmpty && (
-        <div className="px-3.5 sm:px-6 py-2.5 border-b border-slate-800/80 bg-slate-900/40 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-3 flex-1 min-w-[200px] max-w-md">
-            {/* Live Filter Input */}
-            <div className="relative w-full">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500" />
-              <input
-                type="text"
-                placeholder="Filter files in this folder..."
-                value={contentFilter}
-                onChange={(e) => setContentFilter(e.target.value)}
-                className="w-full pl-8 pr-8 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-hidden focus:border-blue-500 transition-colors"
-              />
-              {contentFilter && (
-                <button
-                  onClick={() => setContentFilter('')}
-                  className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
+        <div className="border-b border-slate-800/80 bg-slate-900/40 backdrop-blur-md shrink-0">
+          <div className="px-3.5 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
+            {/* Search filter input & Metrics Pill */}
+            <div className="flex items-center gap-3 flex-1 min-w-[200px] max-w-md">
+              <div className="relative w-full">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Filter files & folders..."
+                  value={contentFilter}
+                  onChange={(e) => setContentFilter(e.target.value)}
+                  className="w-full pl-8 pr-8 py-1.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-hidden focus:border-blue-500 transition-colors shadow-inner"
+                />
+                {contentFilter && (
+                  <button
+                    onClick={() => setContentFilter('')}
+                    className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Folder Content Stats Pill */}
+              <span className="hidden lg:inline-block text-[11px] text-slate-400 font-mono whitespace-nowrap bg-slate-950/60 border border-slate-800/80 px-2.5 py-1 rounded-lg">
+                {filteredFolders.length} {filteredFolders.length === 1 ? 'folder' : 'folders'}, {filteredFiles.length} {filteredFiles.length === 1 ? 'file' : 'files'}
+                {totalBytes > 0 && ` · ${formatBytes(totalBytes)}`}
+              </span>
             </div>
 
-            {/* Folder Metrics Pill */}
-            <span className="hidden md:inline-block text-[11px] text-slate-400 font-mono whitespace-nowrap">
-              {filteredFolders.length} {filteredFolders.length === 1 ? 'folder' : 'folders'}, {filteredFiles.length} {filteredFiles.length === 1 ? 'file' : 'files'}
-              {totalBytes > 0 && ` (${formatBytes(totalBytes)})`}
-            </span>
+            {/* Controls: Share Drive, Sort, View Toggle */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Share Drive with Team button (when in root My Drive) */}
+              {!currentFolderId && (
+                <button
+                  onClick={() => onOpenShare({ id: 'root', name: 'My Drive' }, 'drive')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded-xl text-xs font-semibold transition-colors shadow-xs"
+                  title="Share entire My Drive with a team"
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Share Drive</span>
+                </button>
+              )}
+
+              {/* Sort Controls */}
+              <div className="flex items-center bg-slate-950/80 border border-slate-800 rounded-xl p-0.5">
+                <select
+                  value={sortField}
+                  onChange={(e) => setSortField(e.target.value)}
+                  className="bg-transparent text-xs text-slate-300 px-2 py-1 outline-none cursor-pointer"
+                >
+                  <option value="name" className="bg-slate-900">Name</option>
+                  <option value="updated_at" className="bg-slate-900">Modified</option>
+                  <option value="size" className="bg-slate-900">Size</option>
+                  <option value="type" className="bg-slate-900">Type</option>
+                </select>
+
+                <button
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition-colors"
+                  title={`Sort ${sortOrder === 'asc' ? 'Ascending' : 'Descending'}`}
+                >
+                  {sortOrder === 'asc' ? (
+                    <ArrowUp className="w-3.5 h-3.5 text-blue-400" />
+                  ) : (
+                    <ArrowDown className="w-3.5 h-3.5 text-blue-400" />
+                  )}
+                </button>
+              </div>
+
+              {/* View Mode Toggle */}
+              <div className="flex items-center bg-slate-950/80 border border-slate-800 rounded-xl p-0.5">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    viewMode === 'grid'
+                      ? 'bg-slate-800 text-blue-400 shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Grid View"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-slate-800 text-blue-400 shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Table List View"
+                >
+                  <List className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Share Drive with Team button (when in root My Drive) */}
-            {!currentFolderId && (
+          {/* Quick Category Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto px-3.5 sm:px-6 pb-2 pt-0 text-xs no-scrollbar">
+            <button
+              onClick={() => setCategoryFilter('all')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors shrink-0 flex items-center gap-1.5 ${
+                categoryFilter === 'all'
+                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
+            >
+              <Layers className="w-3 h-3" />
+              <span>All ({categoryCounts.all})</span>
+            </button>
+
+            {categoryCounts.folder > 0 && (
               <button
-                onClick={() => onOpenShare({ id: 'root', name: 'My Drive' }, 'drive')}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded-xl text-xs font-semibold transition-colors"
-                title="Share entire My Drive with a team"
+                onClick={() => setCategoryFilter('folder')}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors shrink-0 flex items-center gap-1.5 ${
+                  categoryFilter === 'folder'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
               >
-                <Users className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Share Drive</span>
+                <Folder className="w-3 h-3 text-amber-400" />
+                <span>Folders ({categoryCounts.folder})</span>
               </button>
             )}
 
-            {/* Sort Controls */}
-            <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-0.5">
-              <select
-                value={sortField}
-                onChange={(e) => setSortField(e.target.value)}
-                className="bg-transparent text-xs text-slate-300 px-2 py-1 outline-none cursor-pointer"
-              >
-                <option value="name" className="bg-slate-900">Name</option>
-                <option value="updated_at" className="bg-slate-900">Last Modified</option>
-                <option value="size" className="bg-slate-900">Size</option>
-                <option value="type" className="bg-slate-900">Type</option>
-              </select>
-
+            {categoryCounts.document > 0 && (
               <button
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition-colors"
-                title={`Sort ${sortOrder === 'asc' ? 'Ascending' : 'Descending'}`}
-              >
-                {sortOrder === 'asc' ? (
-                  <ArrowUp className="w-3.5 h-3.5 text-blue-400" />
-                ) : (
-                  <ArrowDown className="w-3.5 h-3.5 text-blue-400" />
-                )}
-              </button>
-            </div>
-
-            {/* View Mode Toggle */}
-            <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-0.5">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  viewMode === 'grid'
-                    ? 'bg-slate-800 text-blue-400 shadow-xs'
-                    : 'text-slate-400 hover:text-slate-200'
+                onClick={() => setCategoryFilter('document')}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors shrink-0 flex items-center gap-1.5 ${
+                  categoryFilter === 'document'
+                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                 }`}
-                title="Grid View"
               >
-                <LayoutGrid className="w-3.5 h-3.5" />
+                <FileText className="w-3 h-3 text-blue-400" />
+                <span>Documents ({categoryCounts.document})</span>
               </button>
+            )}
+
+            {categoryCounts.image > 0 && (
               <button
-                onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  viewMode === 'list'
-                    ? 'bg-slate-800 text-blue-400 shadow-xs'
-                    : 'text-slate-400 hover:text-slate-200'
+                onClick={() => setCategoryFilter('image')}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors shrink-0 flex items-center gap-1.5 ${
+                  categoryFilter === 'image'
+                    ? 'bg-pink-500/20 text-pink-300 border border-pink-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                 }`}
-                title="Table List View"
               >
-                <List className="w-3.5 h-3.5" />
+                <ImageIcon className="w-3 h-3 text-pink-400" />
+                <span>Images ({categoryCounts.image})</span>
               </button>
-            </div>
+            )}
+
+            {categoryCounts.video > 0 && (
+              <button
+                onClick={() => setCategoryFilter('video')}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors shrink-0 flex items-center gap-1.5 ${
+                  categoryFilter === 'video'
+                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
+              >
+                <Film className="w-3 h-3 text-rose-400" />
+                <span>Videos ({categoryCounts.video})</span>
+              </button>
+            )}
+
+            {categoryCounts.code > 0 && (
+              <button
+                onClick={() => setCategoryFilter('code')}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors shrink-0 flex items-center gap-1.5 ${
+                  categoryFilter === 'code'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
+              >
+                <Code2 className="w-3 h-3 text-emerald-400" />
+                <span>Code ({categoryCounts.code})</span>
+              </button>
+            )}
+
+            {categoryCounts.archive > 0 && (
+              <button
+                onClick={() => setCategoryFilter('archive')}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors shrink-0 flex items-center gap-1.5 ${
+                  categoryFilter === 'archive'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
+              >
+                <Archive className="w-3 h-3 text-amber-500" />
+                <span>Archives ({categoryCounts.archive})</span>
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -319,12 +495,13 @@ export default function DrivePage({
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-3.5 sm:p-6">
         {loading ? (
-          <div className="h-64 flex items-center justify-center text-slate-500 text-xs">
-            Loading drive contents...
+          <div className="h-64 flex flex-col items-center justify-center text-slate-500 text-xs gap-3">
+            <div className="w-8 h-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+            <span>Loading drive contents...</span>
           </div>
         ) : isEmpty ? (
           <div className="h-96 flex flex-col items-center justify-center text-center max-w-sm mx-auto">
-            <div className="w-16 h-16 rounded-3xl bg-slate-900 border border-slate-800 text-blue-400 flex items-center justify-center mb-4 shadow-xl">
+            <div className="w-16 h-16 rounded-3xl bg-slate-900 border border-slate-800 text-blue-400 flex items-center justify-center mb-4 shadow-xl shadow-blue-500/5">
               <HardDrive className="w-8 h-8" />
             </div>
             <h3 className="text-base font-bold text-slate-100 mb-1">This folder is empty</h3>
@@ -343,18 +520,21 @@ export default function DrivePage({
           </div>
         ) : isFilterEmpty ? (
           <div className="h-64 flex flex-col items-center justify-center text-center max-w-sm mx-auto">
-            <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 text-slate-500 flex items-center justify-center mb-3">
+            <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 text-slate-500 flex items-center justify-center mb-3 shadow-inner">
               <Search className="w-6 h-6" />
             </div>
             <h4 className="text-sm font-bold text-slate-200 mb-1">No matches found</h4>
             <p className="text-xs text-slate-500 mb-3">
-              No items matching "{contentFilter}" in this folder.
+              No items matching your filter in this folder.
             </p>
             <button
-              onClick={() => setContentFilter('')}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+              onClick={() => {
+                setContentFilter('');
+                setCategoryFilter('all');
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
             >
-              Clear Filter
+              Reset Filters
             </button>
           </div>
         ) : (
@@ -401,7 +581,7 @@ export default function DrivePage({
             {/* Folders Section */}
             {filteredFolders.length > 0 && (
               <div>
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-2.5">
                   <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
                     <Folder className="w-3.5 h-3.5 text-amber-400" />
                     <span>Folders ({filteredFolders.length})</span>
@@ -410,8 +590,8 @@ export default function DrivePage({
                 <div
                   className={
                     viewMode === 'grid'
-                      ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-3.5'
-                      : 'space-y-1.5'
+                      ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-3'
+                      : 'space-y-1'
                   }
                 >
                   {filteredFolders.map((sf) => (
@@ -436,8 +616,8 @@ export default function DrivePage({
 
             {/* Files Section */}
             {filteredFiles.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-3">
+              <div className="pt-2">
+                <div className="flex items-center justify-between mb-2.5">
                   <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
                     <FileText className="w-3.5 h-3.5 text-blue-400" />
                     <span>Files ({filteredFiles.length})</span>
@@ -446,8 +626,8 @@ export default function DrivePage({
                 <div
                   className={
                     viewMode === 'grid'
-                      ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-3.5'
-                      : 'space-y-1.5'
+                      ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4'
+                      : 'space-y-1'
                   }
                 >
                   {filteredFiles.map((fl) => (
