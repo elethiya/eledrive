@@ -23,6 +23,8 @@ import PreviewModal from './components/Modals/PreviewModal';
 import DetailsModal from './components/Modals/DetailsModal';
 import UploadModal from './components/Modals/UploadModal';
 
+import { Search, X } from 'lucide-react';
+import FileCard from './components/FileCard';
 import { folderAPI, fileAPI } from './api/client';
 
 function AppContent() {
@@ -34,7 +36,6 @@ function AppContent() {
   const [currentView, setCurrentView] = useState(isInitialAdmin ? 'admin' : 'drive'); // 'drive' | 'shared' | 'recent' | 'starred' | 'trash' | 'profile' | 'admin'
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentFolderId, setCurrentFolderId] = useState('');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
   const [authView, setAuthView] = useState('login'); // 'login' | 'register'
 
   // Search state
@@ -256,127 +257,221 @@ function AppContent() {
           setSearchQuery={setSearchQuery}
           searchType={searchType}
           setSearchType={setSearchType}
-          viewMode={viewMode}
-          setViewMode={setViewMode}
           onSearch={handleSearch}
-          onNavigateProfile={() => setCurrentView('profile')}
-          onNavigateAdmin={() => setCurrentView('admin')}
+          onNavigateProfile={() => {
+            setCurrentView('profile');
+            setSearchResults(null);
+          }}
+          onNavigateAdmin={() => {
+            setCurrentView('admin');
+            setSearchResults(null);
+          }}
         />
 
         {/* View Pages */}
         <div className="flex-1 overflow-hidden flex flex-col">
-          {currentView === 'drive' && (
-            <DrivePage
-              viewMode={viewMode}
-              currentFolderId={currentFolderId === '__temp' ? '' : currentFolderId}
-              setCurrentFolderId={setCurrentFolderId}
-              onOpenPreview={(file) => setPreviewModalFile(file)}
-              onOpenShare={(item, type) => {
-                setShareModalItem(item);
-                setShareModalType(type);
-              }}
-              onOpenRename={(item, isFolder) => {
-                setRenameModalItem(item);
-                setIsRenameFolder(isFolder);
-              }}
-              onOpenMove={(item, isFolder) => {
-                setMoveModalItem(item);
-                setIsMoveFolder(isFolder);
-              }}
-              onOpenDetails={(item, isFolder) => {
-                setDetailsModalItem(item);
-                setIsDetailsFolder(isFolder);
-              }}
-              onUploadFiles={handleUploadFiles}
-              onOpenNewFolder={() => setNewFolderOpen(true)}
-            />
-          )}
+          {searchResults !== null ? (
+            <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950 text-slate-100">
+              {/* Search Results Header */}
+              <div className="h-14 px-4 sm:px-6 border-b border-slate-800 bg-slate-900/60 backdrop-blur-md flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2.5 text-xs font-bold text-slate-100">
+                  <Search className="w-4 h-4 text-blue-400" />
+                  <span>Search results for: <span className="text-blue-400 font-mono">"{searchQuery}"</span></span>
+                  <span className="text-slate-500 font-normal">({searchResults.length} {searchResults.length === 1 ? 'file' : 'files'} found)</span>
+                </div>
 
-          {currentView === 'teams' && <TeamsPage />}
+                <button
+                  onClick={() => {
+                    setSearchResults(null);
+                    setSearchQuery('');
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-750 active:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition-colors shadow-xs"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Exit Search</span>
+                </button>
+              </div>
 
-          {currentView === 'shared' && (
-            <SharedWithMePage
-              viewMode={viewMode}
-              onOpenFolder={(folderId) => {
-                setCurrentView('drive');
-                setCurrentFolderId(folderId);
-              }}
-              onOpenPreview={(file) => setPreviewModalFile(file)}
-              onOpenShare={(item, type) => {
-                setShareModalItem(item);
-                setShareModalType(type);
-              }}
-              onOpenRename={(item, isFolder) => {
-                setRenameModalItem(item);
-                setIsRenameFolder(isFolder);
-              }}
-              onOpenMove={(item, isFolder) => {
-                setMoveModalItem(item);
-                setIsMoveFolder(isFolder);
-              }}
-              onOpenDetails={(item, isFolder) => {
-                setDetailsModalItem(item);
-                setIsDetailsFolder(isFolder);
-              }}
-            />
-          )}
+              {/* Search Results Content */}
+              <div className="flex-1 overflow-y-auto p-3.5 sm:p-6">
+                {searchResults.length === 0 ? (
+                  <div className="h-96 flex flex-col items-center justify-center text-center max-w-sm mx-auto">
+                    <div className="w-16 h-16 rounded-3xl bg-slate-900 border border-slate-800 text-slate-500 flex items-center justify-center mb-4 shadow-xl">
+                      <Search className="w-8 h-8" />
+                    </div>
+                    <h3 className="text-base font-bold text-slate-100 mb-1">No matching files found</h3>
+                    <p className="text-xs text-slate-400 mb-4">No files matched your search query across all folders.</p>
+                    <button
+                      onClick={() => {
+                        setSearchResults(null);
+                        setSearchQuery('');
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl transition-colors shadow-md shadow-blue-600/20"
+                    >
+                      Return to Drive
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="hidden sm:flex items-center justify-between px-4 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800/80 select-none bg-slate-900/30 rounded-xl">
+                      <span className="flex-1">Name</span>
+                      <div className="flex items-center gap-3 sm:gap-6 shrink-0">
+                        <span className="w-20 sm:w-24 text-right">Size</span>
+                        <span className="w-24 sm:w-28 text-right hidden md:inline">Modified</span>
+                        <span className="w-20 text-right pr-2">Actions</span>
+                      </div>
+                    </div>
 
-          {currentView === 'recent' && (
-            <RecentPage
-              viewMode={viewMode}
-              onOpenPreview={(file) => setPreviewModalFile(file)}
-              onOpenShare={(item, type) => {
-                setShareModalItem(item);
-                setShareModalType(type);
-              }}
-              onOpenRename={(item, isFolder) => {
-                setRenameModalItem(item);
-                setIsRenameFolder(isFolder);
-              }}
-              onOpenMove={(item, isFolder) => {
-                setMoveModalItem(item);
-                setIsMoveFolder(isFolder);
-              }}
-              onOpenDetails={(item, isFolder) => {
-                setDetailsModalItem(item);
-                setIsDetailsFolder(isFolder);
-              }}
-            />
-          )}
+                    <div className="space-y-1">
+                      {searchResults.map((fl) => (
+                        <FileCard
+                          key={fl.id}
+                          item={fl}
+                          isFolder={false}
+                          onOpen={(file) => setPreviewModalFile(file)}
+                          onDownload={(file) => {
+                            window.location.href = fileAPI.getDownloadUrl(file.id);
+                          }}
+                          onShare={(file) => {
+                            setShareModalItem(file);
+                            setShareModalType('file');
+                          }}
+                          onRename={(file) => {
+                            setRenameModalItem(file);
+                            setIsRenameFolder(false);
+                          }}
+                          onMove={(file) => {
+                            setMoveModalItem(file);
+                            setIsMoveFolder(false);
+                          }}
+                          onShowDetails={(file) => {
+                            setDetailsModalItem(file);
+                            setIsDetailsFolder(false);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              {currentView === 'drive' && (
+                <DrivePage
+                  searchQuery={searchQuery}
+                  onClearSearch={() => {
+                    setSearchQuery('');
+                    setSearchResults(null);
+                  }}
+                  currentFolderId={currentFolderId === '__temp' ? '' : currentFolderId}
+                  setCurrentFolderId={setCurrentFolderId}
+                  onOpenPreview={(file) => setPreviewModalFile(file)}
+                  onOpenShare={(item, type) => {
+                    setShareModalItem(item);
+                    setShareModalType(type);
+                  }}
+                  onOpenRename={(item, isFolder) => {
+                    setRenameModalItem(item);
+                    setIsRenameFolder(isFolder);
+                  }}
+                  onOpenMove={(item, isFolder) => {
+                    setMoveModalItem(item);
+                    setIsMoveFolder(isFolder);
+                  }}
+                  onOpenDetails={(item, isFolder) => {
+                    setDetailsModalItem(item);
+                    setIsDetailsFolder(isFolder);
+                  }}
+                  onUploadFiles={handleUploadFiles}
+                  onOpenNewFolder={() => setNewFolderOpen(true)}
+                />
+              )}
 
-          {currentView === 'starred' && (
-            <StarredPage
-              viewMode={viewMode}
-              onOpenFolder={(folderId) => {
-                setCurrentView('drive');
-                setCurrentFolderId(folderId);
-              }}
-              onOpenPreview={(file) => setPreviewModalFile(file)}
-              onOpenShare={(item, type) => {
-                setShareModalItem(item);
-                setShareModalType(type);
-              }}
-              onOpenRename={(item, isFolder) => {
-                setRenameModalItem(item);
-                setIsRenameFolder(isFolder);
-              }}
-              onOpenMove={(item, isFolder) => {
-                setMoveModalItem(item);
-                setIsMoveFolder(isFolder);
-              }}
-              onOpenDetails={(item, isFolder) => {
-                setDetailsModalItem(item);
-                setIsDetailsFolder(isFolder);
-              }}
-            />
-          )}
+              {currentView === 'teams' && <TeamsPage />}
 
-          {currentView === 'trash' && <TrashPage />}
+              {currentView === 'shared' && (
+                <SharedWithMePage
+                  onOpenFolder={(folderId) => {
+                    setCurrentView('drive');
+                    setCurrentFolderId(folderId);
+                  }}
+                  onOpenPreview={(file) => setPreviewModalFile(file)}
+                  onOpenShare={(item, type) => {
+                    setShareModalItem(item);
+                    setShareModalType(type);
+                  }}
+                  onOpenRename={(item, isFolder) => {
+                    setRenameModalItem(item);
+                    setIsRenameFolder(isFolder);
+                  }}
+                  onOpenMove={(item, isFolder) => {
+                    setMoveModalItem(item);
+                    setIsMoveFolder(isFolder);
+                  }}
+                  onOpenDetails={(item, isFolder) => {
+                    setDetailsModalItem(item);
+                    setIsDetailsFolder(isFolder);
+                  }}
+                />
+              )}
 
-          {currentView === 'profile' && <ProfilePage />}
+              {currentView === 'recent' && (
+                <RecentPage
+                  onOpenPreview={(file) => setPreviewModalFile(file)}
+                  onOpenShare={(item, type) => {
+                    setShareModalItem(item);
+                    setShareModalType(type);
+                  }}
+                  onOpenRename={(item, isFolder) => {
+                    setRenameModalItem(item);
+                    setIsRenameFolder(isFolder);
+                  }}
+                  onOpenMove={(item, isFolder) => {
+                    setMoveModalItem(item);
+                    setIsMoveFolder(isFolder);
+                  }}
+                  onOpenDetails={(item, isFolder) => {
+                    setDetailsModalItem(item);
+                    setIsDetailsFolder(isFolder);
+                  }}
+                />
+              )}
 
-          {currentView === 'admin' && (
-            <AdminPage onBackToDrive={() => setCurrentView('drive')} />
+              {currentView === 'starred' && (
+                <StarredPage
+                  onOpenFolder={(folderId) => {
+                    setCurrentView('drive');
+                    setCurrentFolderId(folderId);
+                  }}
+                  onOpenPreview={(file) => setPreviewModalFile(file)}
+                  onOpenShare={(item, type) => {
+                    setShareModalItem(item);
+                    setShareModalType(type);
+                  }}
+                  onOpenRename={(item, isFolder) => {
+                    setRenameModalItem(item);
+                    setIsRenameFolder(isFolder);
+                  }}
+                  onOpenMove={(item, isFolder) => {
+                    setMoveModalItem(item);
+                    setIsMoveFolder(isFolder);
+                  }}
+                  onOpenDetails={(item, isFolder) => {
+                    setDetailsModalItem(item);
+                    setIsDetailsFolder(isFolder);
+                  }}
+                />
+              )}
+
+              {currentView === 'trash' && <TrashPage />}
+
+              {currentView === 'profile' && <ProfilePage />}
+
+              {currentView === 'admin' && (
+                <AdminPage onBackToDrive={() => setCurrentView('drive')} />
+              )}
+            </>
           )}
         </div>
       </div>

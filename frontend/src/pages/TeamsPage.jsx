@@ -222,14 +222,22 @@ export default function TeamsPage() {
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Search Bar */}
         <div className="max-w-md relative">
-          <Search className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
+          <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
           <input
             type="text"
             placeholder="Search teams by name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-hidden focus:border-blue-500"
+            className="w-full pl-9 pr-8 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-hidden focus:border-blue-500 transition-colors shadow-inner"
           />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Loading State */}
@@ -257,70 +265,98 @@ export default function TeamsPage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTeams.map((t) => {
-              const isLeader = t.user_role === 'leader' || t.created_by_user_id === user?.id;
-              return (
-                <div
-                  key={t.id}
-                  onClick={() => handleOpenTeam(t.id)}
-                  className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 shadow-sm hover:shadow-xl transition-all cursor-pointer flex flex-col justify-between group"
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-base shadow-md shrink-0"
-                          style={{ backgroundColor: t.avatar_color || '#3b82f6' }}
-                        >
-                          {t.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-bold text-slate-100 group-hover:text-blue-400 transition-colors">
-                            {t.name}
-                          </h3>
-                          <span className="text-[10px] text-slate-400">
-                            Created by {t.creator_name || 'Team Leader'}
-                          </span>
-                        </div>
+          <div className="space-y-3">
+            {/* Table Header */}
+            <div className="hidden sm:flex items-center justify-between px-4 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800/80 select-none bg-slate-900/30 rounded-xl">
+              <span className="flex-1">Team Workspace & Details</span>
+              <div className="flex items-center gap-4 sm:gap-6 shrink-0">
+                <span className="w-24 text-center hidden sm:inline">Role</span>
+                <span className="w-24 text-center">Members</span>
+                <span className="w-28 text-right hidden md:inline">Created</span>
+                <span className="w-20 text-right pr-2">Actions</span>
+              </div>
+            </div>
+
+            {/* List Rows */}
+            <div className="space-y-1.5">
+              {filteredTeams.map((t) => {
+                const isLeader = t.user_role === 'leader' || t.created_by_user_id === user?.id;
+                return (
+                  <div
+                    key={t.id}
+                    onClick={() => handleOpenTeam(t.id)}
+                    className="group flex items-center justify-between px-4 py-3 bg-slate-900/70 hover:bg-slate-850 active:bg-slate-800 rounded-xl border border-slate-800/80 hover:border-slate-700 hover:shadow-xs transition-all select-none cursor-pointer text-xs text-slate-200"
+                  >
+                    {/* Team info: Avatar + Name + Description */}
+                    <div className="flex items-center gap-3.5 flex-1 min-w-0 pr-4">
+                      <div
+                        className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-sm shadow-md shrink-0 ring-1 ring-white/10"
+                        style={{ backgroundColor: t.avatar_color || '#3b82f6' }}
+                      >
+                        {t.name.charAt(0).toUpperCase()}
                       </div>
 
-                      <span
-                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-                          isLeader
-                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                            : 'bg-slate-800 text-slate-400 border-slate-700'
-                        }`}
-                      >
-                        {isLeader ? 'Leader' : 'Member'}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-100 group-hover:text-blue-400 transition-colors truncate">
+                            {t.name}
+                          </span>
+                          {t.creator_name && (
+                            <span className="text-[10px] text-slate-500 hidden lg:inline">
+                              by {t.creator_name}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5 max-w-xl">
+                          {t.description || 'No description provided.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Meta and actions */}
+                    <div className="flex items-center gap-4 sm:gap-6 shrink-0 text-slate-400">
+                      {/* Role Pill */}
+                      <div className="w-24 justify-center hidden sm:flex">
+                        <span
+                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                            isLeader
+                              ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                              : 'bg-slate-800 text-slate-400 border-slate-700'
+                          }`}
+                        >
+                          {isLeader ? 'Leader' : 'Member'}
+                        </span>
+                      </div>
+
+                      {/* Members Count */}
+                      <div className="w-24 flex items-center justify-center gap-1.5 text-xs text-slate-300">
+                        <Users className="w-3.5 h-3.5 text-slate-500" />
+                        <span>{t.members_count || 0}</span>
+                      </div>
+
+                      {/* Created Date */}
+                      <span className="w-28 text-right hidden md:inline text-[11px] text-slate-500 font-mono">
+                        {formatDate(t.created_at)}
                       </span>
+
+                      {/* Action Button */}
+                      <div className="w-20 text-right">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenTeam(t.id);
+                          }}
+                          className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shadow-xs"
+                        >
+                          Manage
+                        </button>
+                      </div>
                     </div>
-
-                    <p className="text-xs text-slate-400 line-clamp-2 min-h-[32px]">
-                      {t.description || 'No description provided.'}
-                    </p>
                   </div>
-
-                  <div className="pt-4 mt-4 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-1.5 text-slate-400">
-                      <Users className="w-3.5 h-3.5 text-slate-500" />
-                      <span>{t.members_count} {t.members_count === 1 ? 'member' : 'members'}</span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenTeam(t.id);
-                      }}
-                      className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold transition-colors"
-                    >
-                      Manage
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

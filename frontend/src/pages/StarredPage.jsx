@@ -4,7 +4,6 @@ import FileCard from '../components/FileCard';
 import { Star } from 'lucide-react';
 
 export default function StarredPage({
-  viewMode,
   onOpenFolder,
   onOpenPreview,
   onOpenShare,
@@ -81,24 +80,26 @@ export default function StarredPage({
           </div>
         ) : (
           <div className="space-y-6">
+            <div className="hidden sm:flex items-center justify-between px-4 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800/80 select-none bg-slate-900/30 rounded-xl">
+              <span className="flex-1">Name</span>
+              <div className="flex items-center gap-3 sm:gap-6 shrink-0">
+                <span className="w-20 sm:w-24 text-right">Size</span>
+                <span className="w-24 sm:w-28 text-right hidden md:inline">Modified</span>
+                <span className="w-20 text-right pr-2">Actions</span>
+              </div>
+            </div>
+
             {data.folders.length > 0 && (
-              <div>
-                <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+              <div className="space-y-1.5">
+                <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
                   Folders ({data.folders.length})
                 </h3>
-                <div
-                  className={
-                    viewMode === 'grid'
-                      ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-3.5'
-                      : 'space-y-1.5'
-                  }
-                >
+                <div className="space-y-1">
                   {data.folders.map((sf) => (
                     <FileCard
                       key={sf.id}
                       item={sf}
                       isFolder={true}
-                      viewMode={viewMode}
                       onOpen={() => onOpenFolder(sf.id)}
                       onDownload={handleDownload}
                       onShare={(item) => onOpenShare(item, 'folder')}
@@ -113,23 +114,16 @@ export default function StarredPage({
             )}
 
             {data.files.length > 0 && (
-              <div>
-                <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+              <div className="space-y-1.5 pt-2">
+                <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
                   Files ({data.files.length})
                 </h3>
-                <div
-                  className={
-                    viewMode === 'grid'
-                      ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-3.5'
-                      : 'space-y-1.5'
-                  }
-                >
+                <div className="space-y-1">
                   {data.files.map((fl) => (
                     <FileCard
                       key={fl.id}
                       item={fl}
                       isFolder={false}
-                      viewMode={viewMode}
                       onOpen={onOpenPreview}
                       onDownload={handleDownload}
                       onShare={(item) => onOpenShare(item, 'file')}

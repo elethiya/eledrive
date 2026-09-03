@@ -102,7 +102,45 @@ export default function LoginPage({ onNavigateRegister }) {
           </button>
         </form>
 
-        <div className="mt-6 text-center text-xs text-slate-400">
+        <div className="mt-5 pt-4 border-t border-slate-800">
+          <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-2 text-center">
+            Quick demo credentials
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setEmailOrUser('admin@eledrive.local');
+                setPassword('password123');
+              }}
+              className="py-1.5 px-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-lg text-[10px] text-slate-300 font-medium transition-colors text-center truncate"
+            >
+              Admin
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEmailOrUser('alex@eledrive.local');
+                setPassword('password123');
+              }}
+              className="py-1.5 px-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-lg text-[10px] text-slate-300 font-medium transition-colors text-center truncate"
+            >
+              Alex
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEmailOrUser('sarah@eledrive.local');
+                setPassword('password123');
+              }}
+              className="py-1.5 px-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-lg text-[10px] text-slate-300 font-medium transition-colors text-center truncate"
+            >
+              Sarah
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 text-center text-xs text-slate-400">
           Don't have an account?{' '}
           <button
             onClick={onNavigateRegister}
