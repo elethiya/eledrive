@@ -39,11 +39,11 @@ export default function PreviewModal({ isOpen, onClose, file }) {
   const inlineUrl = fileAPI.getDownloadUrl(file.id, true);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-8 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
-      <div className="bg-slate-900 rounded-2xl sm:rounded-3xl max-w-4xl w-full h-[92vh] sm:h-[85vh] shadow-2xl shadow-black/80 border border-slate-800 flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-1.5 sm:p-4 md:p-8 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
+      <div className="bg-slate-900 rounded-2xl sm:rounded-3xl max-w-4xl w-full h-[96vh] sm:h-[85vh] shadow-2xl shadow-black/80 border border-slate-800 flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 text-slate-100">
         {/* Header */}
-        <div className="h-14 sm:h-16 px-4 sm:px-6 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-950/60">
-          <div className="flex items-center gap-2.5 sm:gap-3 truncate pr-2 sm:pr-4">
+        <div className="h-13 sm:h-16 px-3 sm:px-6 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-950/60 gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 truncate pr-1 sm:pr-4 min-w-0">
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
               {category === 'code' ? (
                 <Code2 className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -53,9 +53,9 @@ export default function PreviewModal({ isOpen, onClose, file }) {
                 <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
             </div>
-            <div className="truncate">
+            <div className="truncate min-w-0">
               <h3 className="text-xs sm:text-sm font-bold text-slate-100 truncate">{file.name}</h3>
-              <p className="text-[10px] sm:text-xs text-slate-400">
+              <p className="text-[10px] sm:text-xs text-slate-400 truncate">
                 {formatBytes(file.size)} • {file.mime_type || 'Unknown type'}
               </p>
             </div>
@@ -65,14 +65,16 @@ export default function PreviewModal({ isOpen, onClose, file }) {
             <a
               href={downloadUrl}
               download={file.name}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-xs transition-all"
+              className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-xs transition-all"
+              title="Download file"
             >
               <Download className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Download</span>
             </a>
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-800 transition-colors"
+              className="p-2 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-800 transition-colors"
+              title="Close preview"
             >
               <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
@@ -86,7 +88,7 @@ export default function PreviewModal({ isOpen, onClose, file }) {
           )}
 
           {error && (
-            <div className="text-center text-red-400 text-xs p-6 max-w-md">
+            <div className="text-center text-red-400 text-xs p-4 sm:p-6 max-w-md">
               <p className="font-semibold mb-1">Preview unavailable</p>
               <p className="text-[11px] text-slate-400 mb-4">{error}</p>
               <a
@@ -103,14 +105,14 @@ export default function PreviewModal({ isOpen, onClose, file }) {
             <>
               {/* Code / Text Preview */}
               {(category === 'code' || file.mime_type?.startsWith('text/')) && previewData && (
-                <div className="w-full h-full p-4 overflow-auto bg-slate-950 text-slate-200 font-mono text-xs leading-relaxed selection:bg-blue-600 selection:text-white">
+                <div className="w-full h-full p-2.5 sm:p-4 overflow-auto bg-slate-950 text-slate-200 font-mono text-[11px] sm:text-xs leading-relaxed selection:bg-blue-600 selection:text-white">
                   <pre className="whitespace-pre">
                     {previewData.content.split('\n').map((line, idx) => (
                       <div key={idx} className="table-row hover:bg-slate-900/60">
-                        <span className="table-cell select-none pr-4 text-slate-600 text-right w-10">
+                        <span className="table-cell select-none pr-2 sm:pr-4 text-slate-600 text-right w-7 sm:w-10 text-[10px] sm:text-xs">
                           {idx + 1}
                         </span>
-                        <span className="table-cell">{line || ' '}</span>
+                        <span className="table-cell break-all sm:break-normal">{line || ' '}</span>
                       </div>
                     ))}
                   </pre>
@@ -119,30 +121,32 @@ export default function PreviewModal({ isOpen, onClose, file }) {
 
               {/* Image Preview */}
               {category === 'image' && (
-                <div className="p-4 max-h-full flex items-center justify-center">
+                <div className="p-2 sm:p-4 w-full h-full flex items-center justify-center overflow-auto">
                   <img
                     src={inlineUrl}
                     alt={file.name}
-                    className="max-h-[70vh] max-w-full object-contain rounded-lg shadow-2xl"
+                    className="max-h-[82vh] sm:max-h-[70vh] max-w-full object-contain rounded-lg shadow-2xl"
                   />
                 </div>
               )}
 
               {/* Video Preview */}
               {category === 'video' && (
-                <video
-                  src={inlineUrl}
-                  controls
-                  autoPlay={false}
-                  className="max-h-[70vh] max-w-full rounded-xl shadow-2xl"
-                />
+                <div className="p-2 sm:p-4 w-full h-full flex items-center justify-center">
+                  <video
+                    src={inlineUrl}
+                    controls
+                    autoPlay={false}
+                    className="max-h-[82vh] sm:max-h-[70vh] max-w-full rounded-xl shadow-2xl"
+                  />
+                </div>
               )}
 
               {/* Audio Preview */}
               {category === 'audio' && (
-                <div className="p-8 bg-slate-900 rounded-3xl border border-slate-800 shadow-xl flex flex-col items-center gap-4">
-                  <p className="text-sm font-semibold text-white">{file.name}</p>
-                  <audio src={inlineUrl} controls className="w-80" />
+                <div className="p-4 sm:p-8 bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-800 shadow-xl flex flex-col items-center gap-3 sm:gap-4 max-w-sm w-full mx-3">
+                  <p className="text-xs sm:text-sm font-semibold text-white truncate max-w-full">{file.name}</p>
+                  <audio src={inlineUrl} controls className="w-full max-w-xs" />
                 </div>
               )}
 
@@ -162,10 +166,10 @@ export default function PreviewModal({ isOpen, onClose, file }) {
                 category !== 'audio' &&
                 category !== 'pdf' &&
                 !file.mime_type?.startsWith('text/') && (
-                  <div className="text-center p-8">
-                    <File className="w-16 h-16 text-slate-600 mx-auto mb-3" />
-                    <h4 className="text-sm font-bold text-white mb-1">No instant preview for this file type</h4>
-                    <p className="text-xs text-slate-400 mb-4 max-w-xs mx-auto">
+                  <div className="text-center p-4 sm:p-8 max-w-sm mx-auto">
+                    <File className="w-12 h-12 sm:w-16 sm:h-16 text-slate-600 mx-auto mb-3" />
+                    <h4 className="text-xs sm:text-sm font-bold text-white mb-1">No instant preview for this file type</h4>
+                    <p className="text-[11px] sm:text-xs text-slate-400 mb-4">
                       Download the file to open it with your system's native application.
                     </p>
                     <a

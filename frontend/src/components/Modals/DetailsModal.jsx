@@ -15,8 +15,8 @@ export default function DetailsModal({ isOpen, onClose, item, isFolder }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
-      <div className="relative bg-slate-900 rounded-3xl max-w-md w-full shadow-2xl shadow-black/80 border border-slate-800 p-5 sm:p-6 animate-in zoom-in-95 duration-150 text-slate-100 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
+      <div className="relative bg-slate-900 rounded-2xl sm:rounded-3xl max-w-md w-full shadow-2xl shadow-black/80 border border-slate-800 p-4 sm:p-6 animate-in zoom-in-95 duration-150 text-slate-100 overflow-hidden">
         {/* Ambient Top Glow */}
         <div className="absolute -top-16 -left-16 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
