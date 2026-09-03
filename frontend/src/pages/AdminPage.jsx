@@ -723,10 +723,10 @@ export default function AdminPage({ onBackToDrive }) {
 
                 <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
                   <div className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5 mb-1">
-                    <Eye className="w-3.5 h-3.5" /> Dynamic Visual Overlay
+                    <Lock className="w-3.5 h-3.5" /> 100% Invisible Digital Trap
                   </div>
                   <p className="text-[10px] text-slate-400">
-                    Diagonal viewer watermark exposing viewer credentials to defeat screenshots.
+                    Completely hidden from users during normal browsing; only revealed when scanned by admin.
                   </p>
                 </div>
               </div>
@@ -1297,7 +1297,7 @@ export default function AdminPage({ onBackToDrive }) {
                     <span className="text-emerald-400 font-bold font-mono">ENABLED</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span>Dynamic Screen-Recording Defense Watermark</span>
+                    <span>Invisible Steganographic Digital Canary (Hidden)</span>
                     <span className="text-emerald-400 font-bold font-mono">ENABLED</span>
                   </div>
                 </div>
