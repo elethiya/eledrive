@@ -153,6 +153,7 @@ type UpdateUserAdminRequest struct {
 	Name         string  `json:"name"`
 	Email        string  `json:"email"`
 	Role         string  `json:"role"`
+	AvatarColor  string  `json:"avatar_color"`
 	Status       *string `json:"status,omitempty"`
 	StorageLimit *int64  `json:"storage_limit"`
 	Password     *string `json:"password,omitempty"`
@@ -172,8 +173,8 @@ func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
 
 	// Fetch current target user
-	var currentTargetRole, currentTargetName, currentTargetEmail string
-	err := db.DB.QueryRow("SELECT role, name, email FROM users WHERE id = ?", targetUserID).Scan(&currentTargetRole, &currentTargetName, &currentTargetEmail)
+	var currentTargetRole, currentTargetName, currentTargetEmail, currentTargetColor string
+	err := db.DB.QueryRow("SELECT role, name, email, avatar_color FROM users WHERE id = ?", targetUserID).Scan(&currentTargetRole, &currentTargetName, &currentTargetEmail, &currentTargetColor)
 	if err != nil {
 		utils.RespondError(w, http.StatusNotFound, "User not found")
 		return
@@ -217,13 +218,17 @@ func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	if req.Email != "" {
 		targetEmail = req.Email
 	}
+	targetColor := currentTargetColor
+	if req.AvatarColor != "" {
+		targetColor = req.AvatarColor
+	}
 
 	// Update base fields
 	_, err = db.DB.Exec(`
 		UPDATE users 
-		SET name = ?, email = ?, role = ?, updated_at = CURRENT_TIMESTAMP 
+		SET name = ?, email = ?, role = ?, avatar_color = ?, updated_at = CURRENT_TIMESTAMP 
 		WHERE id = ?
-	`, targetName, targetEmail, targetRole, targetUserID)
+	`, targetName, targetEmail, targetRole, targetColor, targetUserID)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, "Failed to update user profile: "+err.Error())
 		return

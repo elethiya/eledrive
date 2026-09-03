@@ -412,27 +412,45 @@ export default function ProfilePage() {
                     As Workspace Owner, you have exclusive authority to adjust your personal storage quota.
                   </p>
                 </div>
-                <form onSubmit={handleUpdateSelfStorage} className="flex items-center gap-2">
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min="1"
-                      max="100000"
-                      value={selfLimitGB}
-                      onChange={(e) => setSelfLimitGB(e.target.value)}
-                      className="w-28 px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-100 font-semibold focus:outline-hidden focus:border-amber-400 pr-9"
-                    />
-                    <span className="absolute right-2.5 top-1.5 text-[11px] text-slate-400 font-bold pointer-events-none">GB</span>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[10, 25, 50, 100, 250].map((gb) => (
+                      <button
+                        key={gb}
+                        type="button"
+                        onClick={() => setSelfLimitGB(gb.toString())}
+                        className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                          parseInt(selfLimitGB) === gb
+                            ? 'bg-amber-500 text-slate-950 shadow-xs'
+                            : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-700'
+                        }`}
+                      >
+                        {gb} GB
+                      </button>
+                    ))}
                   </div>
-                  <button
-                    type="submit"
-                    disabled={savingSelfLimit}
-                    className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-all shadow-md disabled:opacity-50 flex items-center gap-1.5"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>{savingSelfLimit ? 'Saving...' : 'Update Limit'}</span>
-                  </button>
-                </form>
+                  <form onSubmit={handleUpdateSelfStorage} className="flex items-center gap-2">
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="1"
+                        max="100000"
+                        value={selfLimitGB}
+                        onChange={(e) => setSelfLimitGB(e.target.value)}
+                        className="w-24 px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-100 font-semibold focus:outline-hidden focus:border-amber-400 pr-8"
+                      />
+                      <span className="absolute right-2.5 top-1.5 text-[11px] text-slate-400 font-bold pointer-events-none">GB</span>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={savingSelfLimit}
+                      className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-all shadow-md disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{savingSelfLimit ? 'Saving...' : 'Update'}</span>
+                    </button>
+                  </form>
+                </div>
               </div>
             </div>
           )}

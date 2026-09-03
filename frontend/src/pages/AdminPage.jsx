@@ -32,8 +32,26 @@ import {
   FileCode,
   Archive,
   Eye,
+  EyeOff,
+  KeyRound,
+  Mail,
+  User,
+  Palette,
 } from 'lucide-react';
 import { adminAPI } from '../api/client';
+
+const AVATAR_COLORS = [
+  '#3b82f6', // Blue
+  '#10b981', // Emerald
+  '#8b5cf6', // Purple
+  '#f59e0b', // Amber
+  '#ef4444', // Red
+  '#ec4899', // Pink
+  '#06b6d4', // Cyan
+  '#6366f1', // Indigo
+];
+
+const QUOTA_PRESETS = [5, 10, 25, 50, 100, 250];
 import { useAuth } from '../context/AuthContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { useToast } from '../context/ToastContext';
@@ -67,6 +85,9 @@ export default function AdminPage({ onBackToDrive }) {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [editUserModal, setEditUserModal] = useState(null);
   const [viewUserModal, setViewUserModal] = useState(null);
+  const [resetPasswordInput, setResetPasswordInput] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [savingUserEdit, setSavingUserEdit] = useState(false);
 
   // Logs Tab
   const [logs, setLogs] = useState([]);
@@ -1404,127 +1425,322 @@ export default function AdminPage({ onBackToDrive }) {
         )}
       </div>
 
-      {/* Edit User Modal */}
+      {/* Edit User Profile Window (Enhanced with extensive options) */}
       {editUserModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-slate-900 rounded-3xl max-w-md w-full border border-slate-800 p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-100">Edit User Account</h3>
-              <button
-                onClick={() => setEditUserModal(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-200"
-              >
-                <X className="w-4 h-4" />
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
+          <div className="relative bg-slate-900 rounded-3xl max-w-xl w-full border border-slate-800 p-5 sm:p-7 shadow-2xl shadow-black/80 space-y-5 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[90vh] overflow-y-auto">
+            {/* Ambient Glow */}
+            <div className="absolute -top-16 -right-16 w-44 h-44 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 relative z-10">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                  <Edit className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100">Edit User Profile</h3>
+                  <p className="text-[11px] text-slate-400">Configure account identity, credentials, roles & quotas</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const u = editUserModal;
+                    setEditUserModal(null);
+                    setViewUserModal(u);
+                  }}
+                  className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-400 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  title="View Full Profile Details"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">View Details</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setEditUserModal(null);
+                    setResetPasswordInput('');
+                  }}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Full Name</label>
-                <input
-                  type="text"
-                  value={editUserModal.name}
-                  onChange={(e) => setEditUserModal({ ...editUserModal, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Role</label>
-                <select
-                  value={editUserModal.role}
-                  disabled={editUserModal.role === 'owner' || !isOwner}
-                  onChange={(e) => setEditUserModal({ ...editUserModal, role: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 disabled:opacity-50"
+            {/* User Identity Visual & Color Customization */}
+            <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/80 space-y-3 relative z-10">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-white text-lg shadow-md ring-2 ring-slate-800 shrink-0"
+                  style={{ backgroundColor: editUserModal.avatar_color || '#3b82f6' }}
                 >
-                  <option value="member">Member</option>
-                  <option value="admin">Admin</option>
-                  {editUserModal.role === 'owner' && <option value="owner">Owner</option>}
-                </select>
-                {!isOwner && (
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Only the Workspace Owner can promote or demote administrators.
-                  </p>
-                )}
+                  {editUserModal.name?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold text-slate-200 text-xs truncate">{editUserModal.name || 'User'}</span>
+                    {editUserModal.role === 'owner' && <Crown className="w-3 h-3 text-amber-400 shrink-0" />}
+                  </div>
+                  <div className="text-[11px] text-slate-400 flex items-center gap-1 font-mono">
+                    <Lock className="w-3 h-3 text-slate-500" />
+                    <span>@{editUserModal.username}</span>
+                  </div>
+                </div>
               </div>
 
+              {/* Avatar Accent Color Picker */}
               <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Account Status</label>
-                <select
-                  value={editUserModal.status}
-                  disabled={editUserModal.role === 'owner'}
-                  onChange={(e) => setEditUserModal({ ...editUserModal, status: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 disabled:opacity-50"
-                >
-                  <option value="approved">Approved</option>
-                  <option value="pending">Pending</option>
-                  <option value="rejected">Rejected</option>
-                </select>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
+                  <Palette className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Avatar Accent Theme</span>
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {AVATAR_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setEditUserModal({ ...editUserModal, avatar_color: color })}
+                      className={`w-6 h-6 rounded-full transition-all ${
+                        editUserModal.avatar_color === color
+                          ? 'ring-2 ring-offset-2 ring-offset-slate-900 ring-blue-500 scale-110 shadow-sm'
+                          : 'hover:scale-105 opacity-80 hover:opacity-100'
+                      }`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Profile Fields */}
+            <div className="space-y-3.5 relative z-10">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Full Name</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editUserModal.name}
+                    onChange={(e) => setEditUserModal({ ...editUserModal, name: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Email Address</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={editUserModal.email || ''}
+                    onChange={(e) => setEditUserModal({ ...editUserModal, email: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-blue-500"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center justify-between">
-                  <span>Storage Limit (GB)</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Role Privilege</label>
+                  <select
+                    value={editUserModal.role}
+                    disabled={editUserModal.role === 'owner' || !isOwner}
+                    onChange={(e) => setEditUserModal({ ...editUserModal, role: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 disabled:opacity-50"
+                  >
+                    <option value="member">Member</option>
+                    <option value="admin">Admin</option>
+                    {editUserModal.role === 'owner' && <option value="owner">Owner</option>}
+                  </select>
+                  {!isOwner && (
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Only Workspace Owner can assign or revoke Admin roles.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Account Status</label>
+                  <select
+                    value={editUserModal.status}
+                    disabled={editUserModal.role === 'owner'}
+                    onChange={(e) => setEditUserModal({ ...editUserModal, status: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 disabled:opacity-50"
+                  >
+                    <option value="approved">Approved (Active)</option>
+                    <option value="pending">Pending Review</option>
+                    <option value="rejected">Rejected (Suspended)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Storage Quota Section with Presets */}
+              <div className="p-3.5 bg-slate-950/60 border border-slate-800 rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+                    <HardDrive className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Allocated Storage Quota</span>
+                  </label>
                   {editUserModal.role === 'owner' && (
                     <span className="text-amber-400 font-bold text-[10px]">Owner Quota</span>
                   )}
-                </label>
+                </div>
+
                 {editUserModal.role === 'owner' && user?.role !== 'owner' ? (
-                  <div className="p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-[11px] text-amber-400/90 flex items-center gap-2">
+                  <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-[11px] text-amber-400 flex items-center gap-2">
                     <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                     <span>Admins cannot change the Owner's storage limit</span>
                   </div>
                 ) : (
-                  <input
-                    type="number"
-                    min="1"
-                    max="100000"
-                    value={Math.round((editUserModal.storage_limit || 10737418240) / (1024 * 1024 * 1024))}
-                    onChange={(e) =>
-                      setEditUserModal({
-                        ...editUserModal,
-                        storage_limit: (parseInt(e.target.value) || 10) * 1024 * 1024 * 1024,
-                      })
-                    }
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-blue-500"
-                  />
+                  <>
+                    {/* Quick Quota Presets */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] text-slate-500 font-semibold mr-1">Presets:</span>
+                      {QUOTA_PRESETS.map((gb) => {
+                        const currentGB = Math.round((editUserModal.storage_limit || 10737418240) / (1024 * 1024 * 1024));
+                        return (
+                          <button
+                            key={gb}
+                            type="button"
+                            onClick={() =>
+                              setEditUserModal({
+                                ...editUserModal,
+                                storage_limit: gb * 1024 * 1024 * 1024,
+                              })
+                            }
+                            className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all ${
+                              currentGB === gb
+                                ? 'bg-blue-600 text-white shadow-xs'
+                                : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200 border border-slate-800'
+                            }`}
+                          >
+                            {gb} GB
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex items-center gap-3 pt-1">
+                      <div className="relative flex-1">
+                        <input
+                          type="number"
+                          min="1"
+                          max="100000"
+                          value={Math.round((editUserModal.storage_limit || 10737418240) / (1024 * 1024 * 1024))}
+                          onChange={(e) =>
+                            setEditUserModal({
+                              ...editUserModal,
+                              storage_limit: (parseInt(e.target.value) || 10) * 1024 * 1024 * 1024,
+                            })
+                          }
+                          className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 font-semibold focus:outline-hidden focus:border-blue-500 pr-9"
+                        />
+                        <span className="absolute right-3 top-2 text-[11px] text-slate-500 font-bold pointer-events-none">GB</span>
+                      </div>
+                      <span className="text-[11px] text-slate-400 shrink-0">
+                        {formatBytes(editUserModal.storage_used || 0)} consumed
+                      </span>
+                    </div>
+                  </>
                 )}
+              </div>
+
+              {/* Password Reset Option */}
+              <div className="p-3.5 bg-slate-950/60 border border-slate-800 rounded-2xl space-y-2">
+                <label className="block text-[11px] font-semibold text-slate-300 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <KeyRound className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Reset User Password</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500">Optional</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showResetPassword ? 'text' : 'password'}
+                    value={resetPasswordInput}
+                    onChange={(e) => setResetPasswordInput(e.target.value)}
+                    placeholder="Leave empty to keep current password"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-purple-500 pr-9"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPassword(!showResetPassword)}
+                    className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-200"
+                    title={showResetPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showResetPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500">
+                  Minimum 6 characters. Enter a new password to immediately force an account credential update.
+                </p>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800 relative z-10">
               <button
                 type="button"
-                onClick={() => setEditUserModal(null)}
-                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold"
+                onClick={() => {
+                  setEditUserModal(null);
+                  setResetPasswordInput('');
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="button"
+                disabled={savingUserEdit}
                 onClick={async () => {
                   if (editUserModal.role === 'owner' && user?.role !== 'owner') {
                     toast.error("Admins cannot change the Owner's storage limit");
                     return;
                   }
+                  if (resetPasswordInput && resetPasswordInput.trim().length < 6) {
+                    toast.error("New password must be at least 6 characters");
+                    return;
+                  }
+
+                  setSavingUserEdit(true);
                   try {
-                    await adminAPI.updateUser(editUserModal.id, {
+                    const payload = {
                       name: editUserModal.name,
                       email: editUserModal.email,
                       role: editUserModal.role,
+                      avatar_color: editUserModal.avatar_color,
                       status: editUserModal.status,
                       storage_limit: editUserModal.storage_limit,
-                    });
+                    };
+                    if (resetPasswordInput && resetPasswordInput.trim().length >= 6) {
+                      payload.password = resetPasswordInput.trim();
+                    }
+
+                    await adminAPI.updateUser(editUserModal.id, payload);
                     setEditUserModal(null);
+                    setResetPasswordInput('');
                     loadUsers();
-                    toast.success(editUserModal.id === user?.id ? 'Self profile & storage limit updated!' : 'User updated successfully');
+                    toast.success(
+                      editUserModal.id === user?.id
+                        ? 'Self profile & storage limit updated!'
+                        : `User "${editUserModal.name}" updated successfully!`
+                    );
                   } catch (err) {
                     toast.error(err.response?.data?.error || 'Failed to update user');
+                  } finally {
+                    setSavingUserEdit(false);
                   }
                 }}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold"
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors shadow-md disabled:opacity-50 flex items-center gap-1.5"
               >
-                Save Changes
+                <Save className="w-3.5 h-3.5" />
+                <span>{savingUserEdit ? 'Saving...' : 'Save Profile Changes'}</span>
               </button>
             </div>
           </div>
