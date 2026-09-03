@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"eledrive/config"
+	"eledrive/utils"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	_ "modernc.org/sqlite"
@@ -17,21 +18,33 @@ import (
 var DB *sql.DB
 
 func InitDB(cfg *config.Config) (*sql.DB, error) {
-	// Ensure directory exists
-	dir := filepath.Dir(cfg.DBPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create db directory: %w", err)
+	// Ensure directories exist
+	if err := os.MkdirAll(cfg.DatabaseDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create database directory: %w", err)
+	}
+	if err := os.MkdirAll(cfg.StorageDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create storage directory: %w", err)
 	}
 
-	database, err := sql.Open("sqlite", cfg.DBPath+"?_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	// Auto-migrate legacy data/eledrive.db if database/account.db does not exist
+	migrateLegacyData(cfg)
+
+	// 1. Open account.db as primary database
+	database, err := sql.Open("sqlite", cfg.AccountDBPath+"?_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
 	if err != nil {
-		return nil, fmt.Errorf("failed to open sqlite database: %w", err)
+		return nil, fmt.Errorf("failed to open account sqlite database: %w", err)
 	}
 
-	database.SetMaxOpenConns(1) // SQLite works best with 1 writer or managed pool
+	database.SetMaxOpenConns(1) // SQLite works best with 1 writer
 
 	if err := database.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping sqlite database: %w", err)
+		return nil, fmt.Errorf("failed to ping account sqlite database: %w", err)
+	}
+
+	// 2. Attach drive.db to allow seamless joins between users and drive assets
+	attachQuery := fmt.Sprintf("ATTACH DATABASE '%s' AS drive;", cfg.DriveDBPath)
+	if _, err := database.Exec(attachQuery); err != nil {
+		return nil, fmt.Errorf("failed to attach drive database: %w", err)
 	}
 
 	DB = database
@@ -49,9 +62,62 @@ func InitDB(cfg *config.Config) (*sql.DB, error) {
 	return DB, nil
 }
 
+func migrateLegacyData(cfg *config.Config) {
+	oldDBPath := filepath.Join("data", "eledrive.db")
+	oldUploads := filepath.Join("data", "uploads")
+
+	// If legacy database exists and new account.db doesn't exist yet:
+	if _, err := os.Stat(oldDBPath); err == nil {
+		if _, err := os.Stat(cfg.AccountDBPath); os.IsNotExist(err) {
+			log.Printf("\033[1;34m[MIGRATE]\033[0m Migrating legacy data/eledrive.db to database/account.db and database/drive.db...")
+			oldDB, err := sql.Open("sqlite", oldDBPath)
+			if err == nil {
+				defer oldDB.Close()
+
+				// 1. Migrate account.db tables: users, activity_logs, system_settings
+				accDB, err := sql.Open("sqlite", cfg.AccountDBPath)
+				if err == nil {
+					_, _ = accDB.Exec(fmt.Sprintf("ATTACH DATABASE '%s' AS old;", oldDBPath))
+					_, _ = accDB.Exec("CREATE TABLE IF NOT EXISTS users AS SELECT * FROM old.users WHERE 1=1;")
+					_, _ = accDB.Exec("CREATE TABLE IF NOT EXISTS activity_logs AS SELECT * FROM old.activity_logs WHERE 1=1;")
+					_, _ = accDB.Exec("CREATE TABLE IF NOT EXISTS system_settings AS SELECT * FROM old.system_settings WHERE 1=1;")
+					accDB.Close()
+				}
+
+				// 2. Migrate drive.db tables: folders, files, shares, share_links
+				drvDB, err := sql.Open("sqlite", cfg.DriveDBPath)
+				if err == nil {
+					_, _ = drvDB.Exec(fmt.Sprintf("ATTACH DATABASE '%s' AS old;", oldDBPath))
+					_, _ = drvDB.Exec("CREATE TABLE IF NOT EXISTS folders AS SELECT * FROM old.folders WHERE 1=1;")
+					_, _ = drvDB.Exec("CREATE TABLE IF NOT EXISTS files AS SELECT * FROM old.files WHERE 1=1;")
+					_, _ = drvDB.Exec("CREATE TABLE IF NOT EXISTS shares AS SELECT * FROM old.shares WHERE 1=1;")
+					_, _ = drvDB.Exec("CREATE TABLE IF NOT EXISTS share_links AS SELECT * FROM old.share_links WHERE 1=1;")
+					drvDB.Close()
+				}
+				log.Printf("\033[1;32m[SUCCESS]\033[0m Legacy database successfully migrated into separate account.db and drive.db!")
+			}
+		}
+	}
+
+	// Move/copy uploads from data/uploads to database/uploads if needed
+	if _, err := os.Stat(oldUploads); err == nil {
+		entries, err := os.ReadDir(oldUploads)
+		if err == nil {
+			for _, entry := range entries {
+				src := filepath.Join(oldUploads, entry.Name())
+				dst := filepath.Join(cfg.StorageDir, entry.Name())
+				if _, err := os.Stat(dst); os.IsNotExist(err) {
+					_ = os.Rename(src, dst)
+				}
+			}
+		}
+	}
+}
+
 func migrate() error {
-	schema := `
-	CREATE TABLE IF NOT EXISTS users (
+	// Account tables in account.db (main)
+	accountSchema := `
+	CREATE TABLE IF NOT EXISTS main.users (
 		id TEXT PRIMARY KEY,
 		email TEXT UNIQUE NOT NULL,
 		username TEXT UNIQUE NOT NULL,
@@ -66,7 +132,34 @@ func migrate() error {
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
-	CREATE TABLE IF NOT EXISTS folders (
+	CREATE TABLE IF NOT EXISTS main.activity_logs (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL,
+		user_name TEXT NOT NULL,
+		action TEXT NOT NULL,
+		item_type TEXT NOT NULL,
+		item_id TEXT NOT NULL,
+		item_name TEXT NOT NULL,
+		details TEXT,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS main.system_settings (
+		key TEXT PRIMARY KEY,
+		value TEXT NOT NULL,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE INDEX IF NOT EXISTS main.idx_activity_logs_created ON activity_logs(created_at DESC);
+	`
+
+	if _, err := DB.Exec(accountSchema); err != nil {
+		return fmt.Errorf("failed to create account tables: %w", err)
+	}
+
+	// Drive tables in drive.db (drive)
+	driveSchema := `
+	CREATE TABLE IF NOT EXISTS drive.folders (
 		id TEXT PRIMARY KEY,
 		name TEXT NOT NULL,
 		parent_id TEXT NULL,
@@ -77,11 +170,10 @@ func migrate() error {
 		color TEXT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY(parent_id) REFERENCES folders(id) ON DELETE CASCADE,
-		FOREIGN KEY(owner_id) REFERENCES users(id) ON DELETE CASCADE
+		FOREIGN KEY(parent_id) REFERENCES folders(id) ON DELETE CASCADE
 	);
 
-	CREATE TABLE IF NOT EXISTS files (
+	CREATE TABLE IF NOT EXISTS drive.files (
 		id TEXT PRIMARY KEY,
 		name TEXT NOT NULL,
 		original_name TEXT NOT NULL,
@@ -96,11 +188,10 @@ func migrate() error {
 		trashed_at DATETIME NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY(folder_id) REFERENCES folders(id) ON DELETE CASCADE,
-		FOREIGN KEY(owner_id) REFERENCES users(id) ON DELETE CASCADE
+		FOREIGN KEY(folder_id) REFERENCES folders(id) ON DELETE CASCADE
 	);
 
-	CREATE TABLE IF NOT EXISTS shares (
+	CREATE TABLE IF NOT EXISTS drive.shares (
 		id TEXT PRIMARY KEY,
 		target_type TEXT NOT NULL, -- 'folder' or 'file'
 		target_id TEXT NOT NULL,
@@ -108,12 +199,10 @@ func migrate() error {
 		shared_with_user_id TEXT NOT NULL,
 		permission TEXT NOT NULL DEFAULT 'viewer', -- 'viewer' or 'editor'
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY(shared_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
-		FOREIGN KEY(shared_with_user_id) REFERENCES users(id) ON DELETE CASCADE,
 		UNIQUE(target_type, target_id, shared_with_user_id)
 	);
 
-	CREATE TABLE IF NOT EXISTS share_links (
+	CREATE TABLE IF NOT EXISTS drive.share_links (
 		id TEXT PRIMARY KEY,
 		token TEXT UNIQUE NOT NULL,
 		target_type TEXT NOT NULL, -- 'folder' or 'file'
@@ -123,57 +212,36 @@ func migrate() error {
 		password_hash TEXT NULL,
 		expires_at DATETIME NULL,
 		download_count INTEGER DEFAULT 0,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY(created_by_user_id) REFERENCES users(id) ON DELETE CASCADE
-	);
-
-	CREATE TABLE IF NOT EXISTS activity_logs (
-		id TEXT PRIMARY KEY,
-		user_id TEXT NOT NULL,
-		user_name TEXT NOT NULL,
-		action TEXT NOT NULL,
-		item_type TEXT NOT NULL,
-		item_id TEXT NOT NULL,
-		item_name TEXT NOT NULL,
-		details TEXT,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
-	CREATE TABLE IF NOT EXISTS system_settings (
-		key TEXT PRIMARY KEY,
-		value TEXT NOT NULL,
-		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	);
-
-	CREATE INDEX IF NOT EXISTS idx_folders_owner ON folders(owner_id, parent_id, is_trashed);
-	CREATE INDEX IF NOT EXISTS idx_files_owner ON files(owner_id, folder_id, is_trashed);
-	CREATE INDEX IF NOT EXISTS idx_shares_user ON shares(shared_with_user_id);
-	CREATE INDEX IF NOT EXISTS idx_share_links_token ON share_links(token);
-	CREATE INDEX IF NOT EXISTS idx_activity_logs_created ON activity_logs(created_at DESC);
+	CREATE INDEX IF NOT EXISTS drive.idx_folders_owner ON folders(owner_id, parent_id, is_trashed);
+	CREATE INDEX IF NOT EXISTS drive.idx_files_owner ON files(owner_id, folder_id, is_trashed);
+	CREATE INDEX IF NOT EXISTS drive.idx_shares_user ON shares(shared_with_user_id);
+	CREATE INDEX IF NOT EXISTS drive.idx_share_links_token ON share_links(token);
 	`
 
-	_, err := DB.Exec(schema)
-	if err != nil {
-		return err
+	if _, err := DB.Exec(driveSchema); err != nil {
+		return fmt.Errorf("failed to create drive tables: %w", err)
 	}
 
 	// Ensure status column exists for users
 	var colCount int
 	_ = DB.QueryRow("SELECT COUNT(*) FROM pragma_table_info('users') WHERE name='status'").Scan(&colCount)
 	if colCount == 0 {
-		_, _ = DB.Exec("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'pending'")
+		_, _ = DB.Exec("ALTER TABLE main.users ADD COLUMN status TEXT DEFAULT 'pending'")
 	}
 	// Existing users and admins are set to approved
-	_, _ = DB.Exec("UPDATE users SET status = 'approved' WHERE status IS NULL OR status = '' OR role = 'admin' OR role = 'owner'")
+	_, _ = DB.Exec("UPDATE main.users SET status = 'approved' WHERE status IS NULL OR status = '' OR role = 'admin' OR role = 'owner'")
 
 	// Ensure exactly one owner exists: if no owner exists, promote the first admin
 	var ownerCount int
-	_ = DB.QueryRow("SELECT COUNT(*) FROM users WHERE role = 'owner'").Scan(&ownerCount)
+	_ = DB.QueryRow("SELECT COUNT(*) FROM main.users WHERE role = 'owner'").Scan(&ownerCount)
 	if ownerCount == 0 {
 		_, _ = DB.Exec(`
-			UPDATE users 
+			UPDATE main.users 
 			SET role = 'owner', status = 'approved' 
-			WHERE id = (SELECT id FROM users WHERE role = 'admin' ORDER BY created_at ASC LIMIT 1)
+			WHERE id = (SELECT id FROM main.users WHERE role = 'admin' ORDER BY created_at ASC LIMIT 1)
 		`)
 	}
 
@@ -182,7 +250,7 @@ func migrate() error {
 
 func seedDefaultData() error {
 	var count int
-	err := DB.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
+	err := DB.QueryRow("SELECT COUNT(*) FROM main.users").Scan(&count)
 	if err != nil {
 		return err
 	}
@@ -199,7 +267,7 @@ func seedDefaultData() error {
 
 	adminID := uuid.New().String()
 	_, err = DB.Exec(`
-		INSERT INTO users (id, email, username, password_hash, name, avatar_color, role, status, storage_limit, created_at, updated_at)
+		INSERT INTO main.users (id, email, username, password_hash, name, avatar_color, role, status, storage_limit, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, 'owner', 'approved', ?, ?, ?)
 	`, adminID, "admin@eledrive.local", "admin", string(hashedPw), "Admin User", "#3b82f6", int64(20*1024*1024*1024), time.Now(), time.Now())
 	if err != nil {
@@ -208,26 +276,26 @@ func seedDefaultData() error {
 
 	alexID := uuid.New().String()
 	_, err = DB.Exec(`
-		INSERT INTO users (id, email, username, password_hash, name, avatar_color, role, status, storage_limit, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?, ?)
-	`, alexID, "alex@eledrive.local", "alex", string(hashedPw), "Alex Miller", "#10b981", "member", int64(10*1024*1024*1024), time.Now(), time.Now())
+		INSERT INTO main.users (id, email, username, password_hash, name, avatar_color, role, status, storage_limit, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, 'member', 'approved', ?, ?, ?)
+	`, alexID, "alex@eledrive.local", "alex", string(hashedPw), "Alex Miller", "#10b981", int64(10*1024*1024*1024), time.Now(), time.Now())
 	if err != nil {
 		return err
 	}
 
 	sarahID := uuid.New().String()
 	_, err = DB.Exec(`
-		INSERT INTO users (id, email, username, password_hash, name, avatar_color, role, status, storage_limit, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?, ?)
-	`, sarahID, "sarah@eledrive.local", "sarah", string(hashedPw), "Sarah Connor", "#8b5cf6", "member", int64(10*1024*1024*1024), time.Now(), time.Now())
+		INSERT INTO main.users (id, email, username, password_hash, name, avatar_color, role, status, storage_limit, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, 'member', 'approved', ?, ?, ?)
+	`, sarahID, "sarah@eledrive.local", "sarah", string(hashedPw), "Sarah Connor", "#8b5cf6", int64(10*1024*1024*1024), time.Now(), time.Now())
 	if err != nil {
 		return err
 	}
 
-	// Create sample project folders for Admin
+	// Create starter project folder in drive.db
 	projectFolderID := uuid.New().String()
 	_, err = DB.Exec(`
-		INSERT INTO folders (id, name, parent_id, owner_id, color, created_at, updated_at)
+		INSERT INTO drive.folders (id, name, parent_id, owner_id, color, created_at, updated_at)
 		VALUES (?, ?, NULL, ?, ?, ?, ?)
 	`, projectFolderID, "Alpha Web Project", adminID, "#3b82f6", time.Now(), time.Now())
 	if err != nil {
@@ -236,17 +304,17 @@ func seedDefaultData() error {
 
 	docsFolderID := uuid.New().String()
 	_, err = DB.Exec(`
-		INSERT INTO folders (id, name, parent_id, owner_id, color, created_at, updated_at)
+		INSERT INTO drive.folders (id, name, parent_id, owner_id, color, created_at, updated_at)
 		VALUES (?, ?, NULL, ?, ?, ?, ?)
 	`, docsFolderID, "Team Documentation", adminID, "#10b981", time.Now(), time.Now())
 	if err != nil {
 		return err
 	}
 
-	// Share "Alpha Web Project" with Alex as Editor so collaboration works right away
+	// Share "Alpha Web Project" with Alex as Editor
 	shareID := uuid.New().String()
 	_, _ = DB.Exec(`
-		INSERT INTO shares (id, target_type, target_id, shared_by_user_id, shared_with_user_id, permission, created_at)
+		INSERT INTO drive.shares (id, target_type, target_id, shared_by_user_id, shared_with_user_id, permission, created_at)
 		VALUES (?, 'folder', ?, ?, ?, 'editor', ?)
 	`, shareID, projectFolderID, adminID, alexID, time.Now())
 
@@ -265,7 +333,7 @@ func EnsureDefaultSettings() {
 
 	for k, v := range defaults {
 		_, _ = DB.Exec(`
-			INSERT OR IGNORE INTO system_settings (key, value, updated_at)
+			INSERT OR IGNORE INTO main.system_settings (key, value, updated_at)
 			VALUES (?, ?, CURRENT_TIMESTAMP)
 		`, k, v)
 	}
@@ -277,8 +345,9 @@ func LogActivity(userID, userName, action, itemType, itemID, itemName, details s
 	}
 	id := uuid.New().String()
 	_, _ = DB.Exec(`
-		INSERT INTO activity_logs (id, user_id, user_name, action, item_type, item_id, item_name, details, created_at)
+		INSERT INTO main.activity_logs (id, user_id, user_name, action, item_type, item_id, item_name, details, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, id, userID, userName, action, itemType, itemID, itemName, details, time.Now())
-}
 
+	utils.LogActivityToFile(userID, userName, action, itemType, itemID, itemName, details)
+}

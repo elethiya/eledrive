@@ -107,10 +107,12 @@ A modern, high-performance, self-hosted team cloud drive built with **Golang**, 
 ```
 eledrive/
 ├── config/              # Server configuration and environment variable loading
-├── data/                # SQLite database and stored file assets (git-ignored)
-│   ├── eledrive.db      # SQLite database with WAL mode
-│   └── storage/         # Physical files stored on disk
-├── db/                  # SQLite schema initialization and migration logic
+├── database/            # Databases, storage assets, and hierarchical logs (git-ignored)
+│   ├── account.db       # Users, permissions, settings, and activity logs
+│   ├── drive.db         # Folders, files, shares, and public link tokens
+│   ├── uploads/         # Physical files stored on disk
+│   └── logs/            # Hierarchical logs (<date>/<time>/ folders)
+├── db/                  # Dual SQLite schema initialization and migration logic
 ├── handlers/            # HTTP handlers
 │   ├── admin.go         # Admin stats, user management, audit logs, and settings
 │   ├── auth.go          # User registration, login, and team lookup
@@ -273,9 +275,10 @@ EleDrive can be configured using environment variables:
 | Variable | Default | Description |
 |---|---|---|
 | `PORT` | `8080` | Port for the HTTP server |
-| `DB_PATH` | `data/eledrive.db` | Path to the SQLite database file |
-| `STORAGE_DIR` | `data/storage` | Path to directory where files are stored |
+| `DATABASE_DIR` | `database` | Root directory for databases, uploads, and logs |
+| `ACCOUNT_DB_PATH` | `database/account.db` | Path to the user accounts & settings SQLite database |
+| `DRIVE_DB_PATH` | `database/drive.db` | Path to the files & folders SQLite database |
+| `STORAGE_DIR` | `database/uploads` | Path to directory where files are stored |
+| `LOGS_DIR` | `database/logs` | Path to directory where dated/timed logs are stored |
 | `JWT_SECRET` | `eledrive-secret-key-...` | Secret key used for signing JWT tokens |
-| `JWT_EXPIRY_HOURS` | `168` (7 days) | Token expiration duration in hours |
 | `MAX_UPLOAD_SIZE_MB`| `1024` (1 GB) | Maximum allowed file upload size in MB |
-| `DEFAULT_STORAGE_LIMIT_GB` | `10` (10 GB) | Storage quota for newly registered users |

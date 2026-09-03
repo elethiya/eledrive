@@ -16,7 +16,12 @@ RED="\033[0;31m"
 RESET="\033[0m"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DB_PATH="${ROOT_DIR}/data/eledrive.db"
+DB_PATH="${ROOT_DIR}/database/account.db"
+
+# Fallback to legacy path if database/account.db not yet generated
+if [ ! -f "$DB_PATH" ] && [ -f "${ROOT_DIR}/data/eledrive.db" ]; then
+    DB_PATH="${ROOT_DIR}/data/eledrive.db"
+fi
 
 # Check if sqlite3 is installed
 if ! command -v sqlite3 &> /dev/null; then

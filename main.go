@@ -7,12 +7,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"eledrive/config"
 	"eledrive/db"
 	"eledrive/handlers"
 	"eledrive/middleware"
 	"eledrive/storage"
+	"eledrive/utils"
+
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -20,6 +23,12 @@ import (
 
 func main() {
 	cfg := config.LoadConfig()
+
+	// Initialize file & folder logger in database/logs/<date>/<time>.log/
+	sessionDir, err := utils.InitLogger(cfg.LogsDir)
+	if err != nil {
+		log.Printf("\033[1;33m[WARN]\033[0m Failed to initialize log folder: %v", err)
+	}
 
 	// Initialize Database
 	database, err := db.InitDB(cfg)
@@ -47,6 +56,16 @@ func main() {
 	// Global Middleware
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			ww := chimw.NewWrapResponseWriter(w, r.ProtoMajor)
+			next.ServeHTTP(ww, r)
+			duration := time.Since(start).String()
+			status := fmt.Sprintf("%d", ww.Status())
+			utils.LogRequestToFile(r.Method, r.URL.Path, status, duration, r.RemoteAddr)
+		})
+	})
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:3000", "http://localhost:8080", "*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
@@ -159,9 +178,11 @@ func main() {
 
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("\033[1;34m==================================================\033[0m")
-	log.Printf("\033[1;32m[SERVER]\033[0m  EleDrive running on http://localhost%s", addr)
-	log.Printf("\033[1;34m[STORAGE]\033[0m Storage dir: %s", cfg.StorageDir)
-	log.Printf("\033[1;35m[DB]\033[0m      Database:    %s", cfg.DBPath)
+	log.Printf("\033[1;32m[SERVER]\033[0m   EleDrive running on http://localhost%s", addr)
+	log.Printf("\033[1;34m[STORAGE]\033[0m  Storage dir: %s", cfg.StorageDir)
+	log.Printf("\033[1;35m[ACCOUNT]\033[0m  Account DB:  %s", cfg.AccountDBPath)
+	log.Printf("\033[1;35m[DRIVE]\033[0m    Drive DB:    %s", cfg.DriveDBPath)
+	log.Printf("\033[1;36m[LOGS]\033[0m     Logs dir:    %s", sessionDir)
 	log.Printf("\033[1;34m==================================================\033[0m")
 
 	if err := http.ListenAndServe(addr, r); err != nil {

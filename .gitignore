@@ -10,6 +10,7 @@ eledrive-app
 *.out
 
 # Data & Storage
+database/
 data/
 *.db
 *.db-wal
