@@ -173,6 +173,33 @@ make clean       # Remove build output
 
 ---
 
+## 👑 Workspace Roles & Ownership Management
+
+EleDrive features a strict 3-tier hierarchy:
+
+| Role | Authority | Key Capabilities |
+| :--- | :--- | :--- |
+| **`owner`** | **Supreme Authority** | Full system control. **Exclusively authorized to assign or revoke Administrator privileges.** Cannot be deleted or downgraded. Exactly **one** account can be Owner at a time. |
+| **`admin`** | **Operational Authority** | Accesses the Admin Console (`/admin`) to approve new users, adjust storage quotas, manage system settings, and review audit logs. **Cannot** promote/demote other admins or edit the Owner. |
+| **`member`** | **Standard Team User** | Personal cloud drive, upload folders/projects, share with teammates, download ZIP archives. |
+
+### Transferring Ownership (`set-owner.sh`)
+
+Ownership transfers are executed via the dedicated CLI script to guarantee that **exactly one account is Owner at any time**:
+
+```bash
+# 1. View current owner & list registered accounts
+./set-owner.sh
+
+# 2. Transfer ownership to a specific teammate (by username or email)
+./set-owner.sh alex@eledrive.local
+# or
+./set-owner.sh alex
+```
+*Note: When ownership is transferred, the previous Owner is automatically reassigned to Administrator, and the new Owner is marked as approved.*
+
+---
+
 ## 🚀 Quick Start
 
 ### 1. Run the Startup Script

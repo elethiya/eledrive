@@ -25,11 +25,11 @@ func NewAdminHandler(storage *storage.StorageService) *AdminHandler {
 	return &AdminHandler{storage: storage}
 }
 
-// RequireAdmin verifies that the authenticated user has role == "admin"
+// RequireAdmin verifies that the authenticated user has role == "admin" or role == "owner"
 func (h *AdminHandler) RequireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		claims := middleware.GetUserClaims(r.Context())
-		if claims == nil || claims.Role != "admin" {
+		if claims == nil || (claims.Role != "admin" && claims.Role != "owner") {
 			utils.RespondError(w, http.StatusForbidden, "Admin access required")
 			return
 		}
@@ -165,23 +165,61 @@ func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	req.Name = strings.TrimSpace(req.Name)
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
-	if req.Role != "admin" && req.Role != "member" {
-		req.Role = "member"
+
+	// Fetch current target user
+	var currentTargetRole, currentTargetName string
+	err := db.DB.QueryRow("SELECT role, name FROM users WHERE id = ?", targetUserID).Scan(&currentTargetRole, &currentTargetName)
+	if err != nil {
+		utils.RespondError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	// 1. Workspace Owner protection: non-owners cannot edit the Owner account
+	if currentTargetRole == "owner" && claims.Role != "owner" {
+		utils.RespondError(w, http.StatusForbidden, "Only the workspace Owner can modify their account")
+		return
+	}
+
+	// 2. Ownership transfer protection: cannot assign 'owner' role via web API
+	if req.Role == "owner" && currentTargetRole != "owner" {
+		utils.RespondError(w, http.StatusBadRequest, "Ownership can only be transferred using the set-owner.sh script")
+		return
+	}
+
+	// 3. Admin role assignment rule: "owner only can only make and remove any body from admin roll"
+	targetRole := currentTargetRole
+	if currentTargetRole == "owner" {
+		targetRole = "owner"
+	} else if claims.Role == "owner" {
+		// The Owner has full authority to promote to admin or demote to member
+		if req.Role == "admin" || req.Role == "member" {
+			targetRole = req.Role
+		}
+	} else {
+		// Regular admin cannot change anyone's role
+		if req.Role != "" && req.Role != currentTargetRole {
+			utils.RespondError(w, http.StatusForbidden, "Only the workspace Owner can assign or remove Administrator roles")
+			return
+		}
+		targetRole = currentTargetRole
 	}
 
 	// Update base fields
-	_, err := db.DB.Exec(`
+	_, err = db.DB.Exec(`
 		UPDATE users 
 		SET name = ?, email = ?, role = ?, updated_at = CURRENT_TIMESTAMP 
 		WHERE id = ?
-	`, req.Name, req.Email, req.Role, targetUserID)
+	`, req.Name, req.Email, targetRole, targetUserID)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, "Failed to update user profile")
 		return
 	}
 
 	if req.Status != nil && (*req.Status == "approved" || *req.Status == "pending" || *req.Status == "rejected") {
-		_, _ = db.DB.Exec("UPDATE users SET status = ? WHERE id = ?", *req.Status, targetUserID)
+		// Cannot reject or set owner to pending
+		if currentTargetRole != "owner" {
+			_, _ = db.DB.Exec("UPDATE users SET status = ? WHERE id = ?", *req.Status, targetUserID)
+		}
 	}
 
 	if req.StorageLimit != nil && *req.StorageLimit > 0 {
@@ -195,7 +233,7 @@ func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	db.LogActivity(claims.UserID, claims.Username, "admin_user_update", "user", targetUserID, req.Name, "Admin modified user profile/quota/status")
+	db.LogActivity(claims.UserID, claims.Username, "admin_user_update", "user", targetUserID, req.Name, "Modified user profile/role/quota")
 
 	utils.RespondSuccess(w, http.StatusOK, "User updated successfully", nil)
 }
@@ -249,7 +287,26 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	targetUserID := chi.URLParam(r, "id")
 
 	if targetUserID == claims.UserID {
-		utils.RespondError(w, http.StatusBadRequest, "Cannot delete your own admin account")
+		utils.RespondError(w, http.StatusBadRequest, "Cannot delete your own account")
+		return
+	}
+
+	var targetRole, targetName string
+	err := db.DB.QueryRow("SELECT role, name FROM users WHERE id = ?", targetUserID).Scan(&targetRole, &targetName)
+	if err != nil {
+		utils.RespondError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	// 1. Owner cannot be deleted
+	if targetRole == "owner" {
+		utils.RespondError(w, http.StatusForbidden, "The workspace Owner account cannot be deleted")
+		return
+	}
+
+	// 2. Only Owner can delete Administrator accounts
+	if targetRole == "admin" && claims.Role != "owner" {
+		utils.RespondError(w, http.StatusForbidden, "Only the workspace Owner can delete Administrator accounts")
 		return
 	}
 
@@ -271,7 +328,7 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db.LogActivity(claims.UserID, claims.Username, "admin_user_delete", "user", targetUserID, targetUserID, "Admin deleted user account")
+	db.LogActivity(claims.UserID, claims.Username, "admin_user_delete", "user", targetUserID, targetName, fmt.Sprintf("Deleted user account (%s)", targetRole))
 
 	utils.RespondSuccess(w, http.StatusOK, "User deleted successfully", nil)
 }

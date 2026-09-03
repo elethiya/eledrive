@@ -164,7 +164,18 @@ func migrate() error {
 		_, _ = DB.Exec("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'pending'")
 	}
 	// Existing users and admins are set to approved
-	_, _ = DB.Exec("UPDATE users SET status = 'approved' WHERE status IS NULL OR status = '' OR role = 'admin'")
+	_, _ = DB.Exec("UPDATE users SET status = 'approved' WHERE status IS NULL OR status = '' OR role = 'admin' OR role = 'owner'")
+
+	// Ensure exactly one owner exists: if no owner exists, promote the first admin
+	var ownerCount int
+	_ = DB.QueryRow("SELECT COUNT(*) FROM users WHERE role = 'owner'").Scan(&ownerCount)
+	if ownerCount == 0 {
+		_, _ = DB.Exec(`
+			UPDATE users 
+			SET role = 'owner', status = 'approved' 
+			WHERE id = (SELECT id FROM users WHERE role = 'admin' ORDER BY created_at ASC LIMIT 1)
+		`)
+	}
 
 	return nil
 }
@@ -179,7 +190,7 @@ func seedDefaultData() error {
 		return nil
 	}
 
-	// Create a default team admin user: admin@eledrive.local / password123
+	// Create a default team owner user: admin@eledrive.local / password123
 	// and a teammate user: alex@eledrive.local / password123
 	hashedPw, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
 	if err != nil {
@@ -189,8 +200,8 @@ func seedDefaultData() error {
 	adminID := uuid.New().String()
 	_, err = DB.Exec(`
 		INSERT INTO users (id, email, username, password_hash, name, avatar_color, role, status, storage_limit, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?, ?)
-	`, adminID, "admin@eledrive.local", "admin", string(hashedPw), "Admin User", "#3b82f6", "admin", int64(20*1024*1024*1024), time.Now(), time.Now())
+		VALUES (?, ?, ?, ?, ?, ?, 'owner', 'approved', ?, ?, ?)
+	`, adminID, "admin@eledrive.local", "admin", string(hashedPw), "Admin User", "#3b82f6", int64(20*1024*1024*1024), time.Now(), time.Now())
 	if err != nil {
 		return err
 	}

@@ -227,22 +227,25 @@ export default function Sidebar({
             <span>My Profile</span>
           </button>
 
-          {/* Admin Panel (If user.role === 'admin') */}
-          {user?.role === 'admin' && (
+          {/* Admin / Owner Panel */}
+          {(user?.role === 'admin' || user?.role === 'owner') && (
             <button
-              onClick={() => handleNavClick('admin')}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-colors ${
+              onClick={() => {
+                onNavigate('admin');
+                onCloseMobile?.();
+              }}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                 currentView === 'admin'
-                  ? 'bg-purple-600/20 text-purple-400 font-semibold border border-purple-500/20 shadow-xs'
-                  : 'text-slate-400 hover:bg-slate-800/80 hover:text-purple-300'
+                  ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30 shadow-xs'
+                  : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
               }`}
             >
               <div className="flex items-center gap-3">
-                <ShieldCheck className={`w-4 h-4 ${currentView === 'admin' ? 'text-purple-400' : 'text-purple-500'}`} />
-                <span>Admin Panel</span>
+                <Shield className="w-4 h-4 text-purple-400" />
+                <span>{user?.role === 'owner' ? 'Owner Panel' : 'Admin Panel'}</span>
               </div>
-              <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-purple-500/20 text-purple-300 rounded-md border border-purple-500/30">
-                Admin
+              <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                {user?.role === 'owner' ? 'Owner' : 'Admin'}
               </span>
             </button>
           )}

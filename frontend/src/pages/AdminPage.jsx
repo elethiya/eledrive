@@ -22,6 +22,7 @@ import {
   XCircle,
   Clock,
   UserCheck,
+  Crown,
 } from 'lucide-react';
 import { adminAPI } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -60,8 +61,8 @@ export default function AdminPage({ onBackToDrive }) {
   const [settingsSuccess, setSettingsSuccess] = useState('');
   const [settingsError, setSettingsError] = useState('');
 
-  // Check admin privileges
-  if (user?.role !== 'admin') {
+  // Check admin/owner privileges
+  if (user?.role !== 'admin' && user?.role !== 'owner') {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-slate-950 p-6 text-center text-slate-100">
         <div className="w-16 h-16 rounded-3xl bg-red-500/20 text-red-400 flex items-center justify-center mb-4">
@@ -215,12 +216,29 @@ export default function AdminPage({ onBackToDrive }) {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-4 h-4" />
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+              user?.role === 'owner' ? 'bg-amber-500/20 text-amber-400' : 'bg-purple-500/20 text-purple-400'
+            }`}>
+              {user?.role === 'owner' ? <Crown className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
             </div>
             <div>
-              <h1 className="text-sm font-bold text-slate-100">EleDrive Admin Console</h1>
-              <p className="text-[10px] text-slate-400">Team settings, logs, and user profile management</p>
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm font-bold text-slate-100">
+                  {user?.role === 'owner' ? 'EleDrive Owner Console' : 'EleDrive Admin Console'}
+                </h1>
+                <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded-full border ${
+                  user?.role === 'owner'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                    : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                }`}>
+                  {user?.role === 'owner' ? 'Owner' : 'Admin'}
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400">
+                {user?.role === 'owner'
+                  ? 'Highest workspace authority, administrator roles, security, and quotas'
+                  : 'Team settings, user profile management, and audit logs'}
+              </p>
             </div>
           </div>
         </div>
@@ -436,15 +454,20 @@ export default function AdminPage({ onBackToDrive }) {
                         </td>
 
                         <td className="py-3.5 px-3">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                              u.role === 'admin'
-                                ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-                                : 'bg-slate-800 text-slate-300 border-slate-700'
-                            }`}
-                          >
-                            {u.role}
-                          </span>
+                          {u.role === 'owner' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                              <Crown className="w-3 h-3 text-amber-400" />
+                              <span>Owner</span>
+                            </span>
+                          ) : u.role === 'admin' ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                              Admin
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
+                              Member
+                            </span>
+                          )}
                         </td>
 
                         <td className="py-3.5 px-3">
@@ -781,15 +804,16 @@ export default function AdminPage({ onBackToDrive }) {
           </div>
         )}
       </div>
-
       {/* Modal: Edit User Settings by Admin */}
       {editUserModal && (
         <EditUserAdminModal
           user={editUserModal}
+          currentUserRole={user?.role}
           onClose={() => setEditUserModal(null)}
           onUpdated={() => {
             setEditUserModal(null);
             loadUsers();
+            loadStats();
           }}
         />
       )}
@@ -797,7 +821,7 @@ export default function AdminPage({ onBackToDrive }) {
   );
 }
 
-function EditUserAdminModal({ user, onClose, onUpdated }) {
+function EditUserAdminModal({ user, currentUserRole, onClose, onUpdated }) {
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
   const [role, setRole] = useState(user.role);
@@ -807,6 +831,9 @@ function EditUserAdminModal({ user, onClose, onUpdated }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const isTargetOwner = user.role === 'owner';
+  const isCallerOwner = currentUserRole === 'owner';
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -815,7 +842,7 @@ function EditUserAdminModal({ user, onClose, onUpdated }) {
     const payload = {
       name: name.trim(),
       email: email.trim(),
-      role: role,
+      role: isTargetOwner ? 'owner' : role,
       status: status,
       storage_limit: quotaGB * 1024 * 1024 * 1024,
     };
@@ -834,6 +861,14 @@ function EditUserAdminModal({ user, onClose, onUpdated }) {
   };
 
   const handleDelete = async () => {
+    if (isTargetOwner) {
+      alert('The workspace Owner account cannot be deleted.');
+      return;
+    }
+    if (user.role === 'admin' && !isCallerOwner) {
+      alert('Only the workspace Owner can delete Administrator accounts.');
+      return;
+    }
     if (!confirm(`Delete user "${user.name}"? All their files and folders will be removed.`)) {
       return;
     }
@@ -852,11 +887,20 @@ function EditUserAdminModal({ user, onClose, onUpdated }) {
       <div className="bg-slate-900 rounded-3xl max-w-md w-full shadow-2xl border border-slate-800 p-4 sm:p-6 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
-              <Edit className="w-5 h-5" />
+            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
+              isTargetOwner ? 'bg-amber-500/20 text-amber-400' : 'bg-purple-500/20 text-purple-400'
+            }`}>
+              {isTargetOwner ? <Crown className="w-5 h-5" /> : <Edit className="w-5 h-5" />}
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-100">Edit User Settings</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-100">Edit User Settings</h3>
+                {isTargetOwner && (
+                  <span className="text-[9px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded border border-amber-500/30">
+                    Owner
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate-400">@{user.username}</p>
             </div>
           </div>
@@ -897,23 +941,57 @@ function EditUserAdminModal({ user, onClose, onUpdated }) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">System Role</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 outline-none font-medium"
-              >
-                <option value="member">Member</option>
-                <option value="admin">Administrator</option>
-              </select>
+              <label className="block text-slate-300 font-semibold mb-1 flex items-center justify-between">
+                <span>System Role</span>
+                {isCallerOwner && !isTargetOwner && (
+                  <span className="text-[9px] text-amber-400 font-semibold">Owner Authority</span>
+                )}
+              </label>
+              {isTargetOwner ? (
+                <div>
+                  <div className="w-full px-3 py-2 bg-amber-950/30 border border-amber-500/40 rounded-xl text-amber-300 font-bold flex items-center gap-1.5">
+                    <Crown className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Workspace Owner</span>
+                  </div>
+                  <p className="text-[9px] text-slate-400 mt-1">
+                    Change owner with <code className="text-amber-300 font-mono">./set-owner.sh</code>
+                  </p>
+                </div>
+              ) : isCallerOwner ? (
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 outline-none font-medium"
+                >
+                  <option value="member">Member</option>
+                  <option value="admin">Administrator</option>
+                </select>
+              ) : (
+                <div>
+                  <select
+                    disabled
+                    value={role}
+                    className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800/80 rounded-xl text-slate-500 outline-none font-medium cursor-not-allowed"
+                  >
+                    <option value="member">Member</option>
+                    <option value="admin">Administrator</option>
+                  </select>
+                  <p className="text-[9px] text-amber-400/90 mt-1">
+                    Only Owner can change Admin role
+                  </p>
+                </div>
+              )}
             </div>
 
             <div>
               <label className="block text-slate-300 font-semibold mb-1">Approval Status</label>
               <select
                 value={status}
+                disabled={isTargetOwner}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 outline-none font-medium"
+                className={`w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 outline-none font-medium ${
+                  isTargetOwner ? 'cursor-not-allowed opacity-70' : ''
+                }`}
               >
                 <option value="approved">Approved & Active</option>
                 <option value="pending">Pending Review</option>
@@ -948,14 +1026,20 @@ function EditUserAdminModal({ user, onClose, onUpdated }) {
           </div>
 
           <div className="flex items-center justify-between pt-4 border-t border-slate-800">
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="text-xs font-semibold text-rose-400 hover:text-rose-300 flex items-center gap-1.5"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Delete User</span>
-            </button>
+            {!isTargetOwner && (user.role !== 'admin' || isCallerOwner) ? (
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="text-xs font-semibold text-rose-400 hover:text-rose-300 flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete User</span>
+              </button>
+            ) : (
+              <span className="text-[10px] text-slate-500 italic">
+                {isTargetOwner ? 'Owner cannot be deleted' : 'Only Owner can delete Admins'}
+              </span>
+            )}
 
             <div className="flex items-center gap-2">
               <button

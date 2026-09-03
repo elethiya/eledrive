@@ -214,8 +214,14 @@ export default function Navbar({
                 <div className="px-3 py-2.5 border-b border-slate-800">
                   <p className="text-xs font-bold text-slate-100 truncate">{user?.name}</p>
                   <p className="text-[11px] text-slate-400 truncate">{user?.email}</p>
-                  <span className="mt-1.5 inline-block px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-300 rounded-full border border-blue-500/30">
-                    {user?.role === 'admin' ? 'Team Lead' : 'Team Member'}
+                  <span className={`mt-1.5 inline-block px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full border ${
+                    user?.role === 'owner'
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                      : user?.role === 'admin'
+                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                      : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                  }`}>
+                    {user?.role === 'owner' ? 'Workspace Owner' : user?.role === 'admin' ? 'Administrator' : 'Team Member'}
                   </span>
                 </div>
 
@@ -232,7 +238,7 @@ export default function Navbar({
                     <span>My Profile & Settings</span>
                   </button>
 
-                  {user?.role === 'admin' && (
+                  {(user?.role === 'admin' || user?.role === 'owner') && (
                     <button
                       onClick={() => {
                         setProfileOpen(false);
@@ -242,10 +248,10 @@ export default function Navbar({
                     >
                       <div className="flex items-center gap-2.5">
                         <ShieldCheck className="w-4 h-4 text-purple-400" />
-                        <span>Admin Panel</span>
+                        <span>{user?.role === 'owner' ? 'Owner Console' : 'Admin Panel'}</span>
                       </div>
                       <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded border border-purple-500/30 font-bold uppercase">
-                        Admin
+                        {user?.role === 'owner' ? 'Owner' : 'Admin'}
                       </span>
                     </button>
                   )}

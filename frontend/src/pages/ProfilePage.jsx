@@ -142,8 +142,14 @@ export default function ProfilePage() {
           <div className="flex-1 text-center sm:text-left">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
               <h1 className="text-xl md:text-2xl font-bold text-slate-100">{user?.name}</h1>
-              <span className="self-center sm:self-auto px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">
-                {user?.role === 'admin' ? 'Team Lead' : 'Team Member'}
+              <span className={`self-center sm:self-auto px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full border ${
+                user?.role === 'owner'
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                  : user?.role === 'admin'
+                  ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                  : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+              }`}>
+                {user?.role === 'owner' ? 'Workspace Owner' : user?.role === 'admin' ? 'Administrator' : 'Team Member'}
               </span>
             </div>
 

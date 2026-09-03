@@ -172,7 +172,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify account status
-	if user.Role != "admin" {
+	if user.Role != "admin" && user.Role != "owner" {
 		if user.Status == "pending" {
 			utils.RespondError(w, http.StatusForbidden, "Your account is pending administrator verification and approval. Please wait for an administrator to approve your account.")
 			return
