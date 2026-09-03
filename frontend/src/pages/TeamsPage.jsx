@@ -20,6 +20,7 @@ import {
 import { teamAPI } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useConfirm } from '../context/ConfirmContext';
+import { useRealtimeEvent } from '../context/RealtimeContext';
 import { formatDate } from '../utils/formatters';
 
 const TEAM_COLORS = [
@@ -59,6 +60,11 @@ export default function TeamsPage() {
     loadTeams();
     loadAvailableUsers();
   }, []);
+
+  // Real-time Event Subscription for teams and members
+  useRealtimeEvent(['team', 'sync'], () => {
+    loadTeams();
+  });
 
   const loadTeams = async () => {
     setLoading(true);

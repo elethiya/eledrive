@@ -9,6 +9,7 @@ import (
 
 	"eledrive/config"
 	"eledrive/db"
+	"eledrive/events"
 	"eledrive/middleware"
 	"eledrive/models"
 	"eledrive/storage"
@@ -165,6 +166,12 @@ func (h *UploadHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Update user storage
 	_, _ = h.storage.UpdateUserStorage(targetOwnerID)
+
+	// Broadcast real-time event
+	events.Broadcast("file:create", "file", "upload", "", targetFolderID, claims.UserID, map[string]interface{}{
+		"count": len(uploadedFiles),
+		"folder_id": targetFolderID,
+	})
 
 	utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"count": len(uploadedFiles),

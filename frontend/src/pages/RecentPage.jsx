@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { statsAPI, fileAPI } from '../api/client';
+import { useRealtimeEvent } from '../context/RealtimeContext';
 import FileCard from '../components/FileCard';
 import { Clock } from 'lucide-react';
 
@@ -16,6 +17,11 @@ export default function RecentPage({
   useEffect(() => {
     loadRecent();
   }, []);
+
+  // Real-time Event Subscription for Recent files
+  useRealtimeEvent(['file', 'sync'], () => {
+    loadRecent();
+  });
 
   const loadRecent = async () => {
     setLoading(true);

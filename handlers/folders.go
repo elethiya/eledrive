@@ -10,6 +10,7 @@ import (
 
 	"eledrive/config"
 	"eledrive/db"
+	"eledrive/events"
 	"eledrive/middleware"
 	"eledrive/models"
 	"eledrive/storage"
@@ -330,6 +331,11 @@ func (h *FolderHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	db.LogActivity(claims.UserID, claims.Username, "create_folder", "folder", folderID, req.Name, fmt.Sprintf("Created folder '%s' [Secret UUID: %s]", req.Name, secretUUID))
 
+	parentIDStr := ""
+	if req.ParentID != nil {
+		parentIDStr = *req.ParentID
+	}
+	events.Broadcast("folder:create", "folder", "create", folderID, parentIDStr, claims.UserID, folder)
 	utils.RespondJSON(w, http.StatusCreated, folder)
 }
 
@@ -372,6 +378,11 @@ func (h *FolderHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	parentIDStr := ""
+	if f.ParentID != nil {
+		parentIDStr = *f.ParentID
+	}
+	events.Broadcast("folder:update", "folder", "update", folderID, parentIDStr, claims.UserID, f)
 	utils.RespondJSON(w, http.StatusOK, f)
 }
 
@@ -391,6 +402,11 @@ func (h *FolderHandler) ToggleStar(w http.ResponseWriter, r *http.Request) {
 		utils.RespondError(w, http.StatusInternalServerError, "Failed to update star")
 		return
 	}
+
+	events.Broadcast("folder:star", "folder", "star", folderID, "", claims.UserID, map[string]interface{}{
+		"id":         folderID,
+		"is_starred": newStarred,
+	})
 
 	utils.RespondSuccess(w, http.StatusOK, "Updated", map[string]interface{}{
 		"id":         folderID,
@@ -434,6 +450,7 @@ func (h *FolderHandler) Move(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	events.Broadcast("folder:update", "folder", "move", folderID, "", claims.UserID, map[string]interface{}{"target_parent_id": req.TargetParentID})
 	utils.RespondSuccess(w, http.StatusOK, "Folder moved successfully", nil)
 }
 
@@ -458,6 +475,7 @@ func (h *FolderHandler) Trash(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	events.Broadcast("folder:trash", "folder", "trash", folderID, "", claims.UserID, nil)
 	utils.RespondSuccess(w, http.StatusOK, "Folder moved to trash", nil)
 }
 
@@ -476,6 +494,7 @@ func (h *FolderHandler) Restore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	events.Broadcast("folder:restore", "folder", "restore", folderID, "", claims.UserID, nil)
 	utils.RespondSuccess(w, http.StatusOK, "Folder restored", nil)
 }
 
@@ -499,6 +518,7 @@ func (h *FolderHandler) PermanentDelete(w http.ResponseWriter, r *http.Request) 
 	}
 
 	_, _ = h.storage.UpdateUserStorage(claims.UserID)
+	events.Broadcast("folder:delete", "folder", "delete", folderID, "", claims.UserID, nil)
 	utils.RespondSuccess(w, http.StatusOK, "Folder permanently deleted", nil)
 }
 

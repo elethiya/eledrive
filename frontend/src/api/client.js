@@ -150,4 +150,8 @@ export const teamAPI = {
   getAvailableUsers: () => api.get('/team-members/available'),
 };
 
+export const webhookAPI = {
+  trigger: (data) => api.post('/webhook', data),
+};
+
 export default api;

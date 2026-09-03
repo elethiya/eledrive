@@ -4,6 +4,7 @@ import { Trash2, RotateCcw, AlertTriangle, Folder, File } from 'lucide-react';
 import { formatBytes, formatDate } from '../utils/formatters';
 
 import { useConfirm } from '../context/ConfirmContext';
+import { useRealtimeEvent } from '../context/RealtimeContext';
 
 export default function TrashPage() {
   const [data, setData] = useState({ folders: [], files: [] });
@@ -13,6 +14,11 @@ export default function TrashPage() {
   useEffect(() => {
     loadTrash();
   }, []);
+
+  // Real-time Event Subscription for Trash
+  useRealtimeEvent(['trash', 'file', 'folder', 'sync'], () => {
+    loadTrash();
+  });
 
   const loadTrash = async () => {
     setLoading(true);

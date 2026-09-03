@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useRealtime } from '../context/RealtimeContext';
 
 export default function Navbar({
   onToggleSidebar,
@@ -28,6 +29,7 @@ export default function Navbar({
   onNavigateAdmin,
 }) {
   const { user, logout, login } = useAuth();
+  const { isConnected } = useRealtime();
   const [profileOpen, setProfileOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
@@ -192,8 +194,18 @@ export default function Navbar({
         )}
       </div>
 
-      {/* Right Controls: Profile */}
+      {/* Right Controls: Realtime Status + Profile */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Real-time Webhook/SSE Live Sync indicator */}
+        <div
+          className="hidden xs:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950/80 border border-slate-800 text-[11px] font-mono select-none"
+          title={isConnected ? 'Real-time sync connected' : 'Connecting to real-time events...'}
+        >
+          <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+          <span className={isConnected ? 'text-emerald-400 font-medium' : 'text-slate-400'}>
+            {isConnected ? 'Live' : 'Sync'}
+          </span>
+        </div>
 
         {/* Profile Avatar & Menu */}
         <div className="relative shrink-0">

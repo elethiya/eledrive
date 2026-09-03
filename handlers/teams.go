@@ -10,6 +10,7 @@ import (
 
 	"eledrive/config"
 	"eledrive/db"
+	"eledrive/events"
 	"eledrive/middleware"
 	"eledrive/models"
 	"eledrive/utils"
@@ -135,6 +136,7 @@ func (h *TeamHandler) CreateTeam(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:       now,
 	}
 
+	events.Broadcast("team:create", "team", "create", teamID, "", claims.UserID, team)
 	utils.RespondJSON(w, http.StatusCreated, team)
 }
 
@@ -269,6 +271,8 @@ func (h *TeamHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 
 	db.LogActivity(claims.UserID, claims.Username, "add_team_member", "team", teamID, targetUser.Name, fmt.Sprintf("Added %s to team", targetUser.Name))
 
+	events.Broadcast("team:member_add", "team", "member_add", teamID, "", claims.UserID, map[string]interface{}{"user_id": targetUser.ID})
+
 	utils.RespondSuccess(w, http.StatusOK, "Member added to team", models.TeamMember{
 		ID:          memberID,
 		TeamID:      teamID,
@@ -306,6 +310,7 @@ func (h *TeamHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, _ = db.DB.Exec("UPDATE main.teams SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", teamID)
+	events.Broadcast("team:member_remove", "team", "member_remove", teamID, "", claims.UserID, map[string]interface{}{"user_id": targetUserID})
 	utils.RespondSuccess(w, http.StatusOK, "Member removed from team", nil)
 }
 
@@ -335,6 +340,7 @@ func (h *TeamHandler) DeleteTeam(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db.LogActivity(claims.UserID, claims.Username, "delete_team", "team", teamID, teamName, fmt.Sprintf("Deleted team '%s'", teamName))
+	events.Broadcast("team:delete", "team", "delete", teamID, "", claims.UserID, nil)
 	utils.RespondSuccess(w, http.StatusOK, "Team deleted successfully", nil)
 }
 

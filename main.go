@@ -11,6 +11,7 @@ import (
 
 	"eledrive/config"
 	"eledrive/db"
+	"eledrive/events"
 	"eledrive/handlers"
 	"eledrive/middleware"
 	"eledrive/storage"
@@ -108,6 +109,12 @@ func main() {
 
 	// API Routes
 	r.Route("/api", func(api chi.Router) {
+		// Real-time Event Streams & Webhooks (load everything in real time)
+		api.Get("/realtime", events.GlobalHub.ServeHTTP)
+		api.Get("/events", events.GlobalHub.ServeHTTP)
+		api.Post("/webhook", events.HandleWebhook)
+		api.Post("/webhooks/drive", events.HandleWebhook)
+
 		// Public Auth
 		api.Post("/auth/register", authHandler.Register)
 		api.Post("/auth/login", authHandler.Login)

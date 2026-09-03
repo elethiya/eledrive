@@ -7,6 +7,7 @@ import (
 
 	"eledrive/config"
 	"eledrive/db"
+	"eledrive/events"
 	"eledrive/middleware"
 	"eledrive/models"
 	"eledrive/storage"
@@ -285,5 +286,6 @@ func (h *StatsHandler) EmptyTrash(w http.ResponseWriter, r *http.Request) {
 	_, _ = db.DB.Exec("DELETE FROM folders WHERE owner_id = ? AND is_trashed = 1", claims.UserID)
 
 	_, _ = h.storage.UpdateUserStorage(claims.UserID)
+	events.Broadcast("trash:empty", "trash", "empty", "", "", claims.UserID, nil)
 	utils.RespondSuccess(w, http.StatusOK, "Trash emptied", nil)
 }

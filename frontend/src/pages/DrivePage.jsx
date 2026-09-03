@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   folderAPI,
   fileAPI,
 } from '../api/client';
 import { useConfirm } from '../context/ConfirmContext';
+import { useRealtimeEvent, useRealtime } from '../context/RealtimeContext';
 import Breadcrumbs from '../components/Breadcrumbs';
 import FileCard from '../components/FileCard';
 import {
@@ -57,34 +58,34 @@ export default function DrivePage({
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc', 'desc'
 
   // Load Folder Contents
-  useEffect(() => {
-    let isMounted = true;
-    setLoading(true);
-
-    const loadContent = async () => {
-      try {
-        const fetchFolder = folderAPI.getFolder || folderAPI.getContents;
-        const res = await fetchFolder(currentFolderId || '');
-        if (isMounted && res.data) {
-          setFolderData({
-            folder: res.data.folder,
-            breadcrumbs: res.data.breadcrumbs || [],
-            subfolders: res.data.subfolders || [],
-            files: res.data.files || [],
-          });
-        }
-      } catch (err) {
-        console.error('Failed to load drive content:', err);
-      } finally {
-        if (isMounted) setLoading(false);
+  const loadContent = useCallback(async (showLoading = false) => {
+    if (showLoading) setLoading(true);
+    try {
+      const fetchFolder = folderAPI.getFolder || folderAPI.getContents;
+      const res = await fetchFolder(currentFolderId || '');
+      if (res.data) {
+        setFolderData({
+          folder: res.data.folder,
+          breadcrumbs: res.data.breadcrumbs || [],
+          subfolders: res.data.subfolders || [],
+          files: res.data.files || [],
+        });
       }
-    };
-
-    loadContent();
-    return () => {
-      isMounted = false;
-    };
+    } catch (err) {
+      console.error('Failed to load drive content:', err);
+    } finally {
+      setLoading(false);
+    }
   }, [currentFolderId]);
+
+  useEffect(() => {
+    loadContent(true);
+  }, [loadContent]);
+
+  // Real-time Event Subscription: load everything in real time without refreshing
+  useRealtimeEvent(['file', 'folder', 'trash', 'sync', 'item'], () => {
+    loadContent(false);
+  });
 
   // Navigation handlers
   const handleOpenItem = (item) => {

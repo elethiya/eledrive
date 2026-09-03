@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { statsAPI, folderAPI, fileAPI } from '../api/client';
+import { useRealtimeEvent } from '../context/RealtimeContext';
 import FileCard from '../components/FileCard';
 import { Star } from 'lucide-react';
 
@@ -17,6 +18,11 @@ export default function StarredPage({
   useEffect(() => {
     loadStarred();
   }, []);
+
+  // Real-time Event Subscription for Starred items
+  useRealtimeEvent(['file', 'folder', 'sync'], () => {
+    loadStarred();
+  });
 
   const loadStarred = async () => {
     setLoading(true);

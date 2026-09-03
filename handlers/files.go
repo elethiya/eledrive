@@ -12,6 +12,7 @@ import (
 
 	"eledrive/config"
 	"eledrive/db"
+	"eledrive/events"
 	"eledrive/middleware"
 	"eledrive/models"
 	"eledrive/storage"
@@ -248,6 +249,7 @@ func (h *FileHandler) Rename(w http.ResponseWriter, r *http.Request) {
 	f.Name = cleanName
 	f.Extension = ext
 	f.MimeType = newMime
+	events.Broadcast("file:update", "file", "rename", fileID, "", claims.UserID, map[string]interface{}{"name": cleanName})
 	utils.RespondJSON(w, http.StatusOK, f)
 }
 
@@ -283,6 +285,7 @@ func (h *FileHandler) Move(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	events.Broadcast("file:update", "file", "move", fileID, "", claims.UserID, map[string]interface{}{"target_folder_id": req.TargetFolderID})
 	utils.RespondSuccess(w, http.StatusOK, "File moved successfully", nil)
 }
 
@@ -302,6 +305,11 @@ func (h *FileHandler) ToggleStar(w http.ResponseWriter, r *http.Request) {
 		utils.RespondError(w, http.StatusInternalServerError, "Failed to update star")
 		return
 	}
+
+	events.Broadcast("file:star", "file", "star", fileID, "", claims.UserID, map[string]interface{}{
+		"id":         fileID,
+		"is_starred": newStarred,
+	})
 
 	utils.RespondSuccess(w, http.StatusOK, "Updated", map[string]interface{}{
 		"id":         fileID,
@@ -331,6 +339,7 @@ func (h *FileHandler) Trash(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, _ = h.storage.UpdateUserStorage(claims.UserID)
+	events.Broadcast("file:trash", "file", "trash", fileID, "", claims.UserID, nil)
 	utils.RespondSuccess(w, http.StatusOK, "File moved to trash", nil)
 }
 
@@ -349,6 +358,7 @@ func (h *FileHandler) Restore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, _ = h.storage.UpdateUserStorage(claims.UserID)
+	events.Broadcast("file:restore", "file", "restore", fileID, "", claims.UserID, nil)
 	utils.RespondSuccess(w, http.StatusOK, "File restored", nil)
 }
 
@@ -371,6 +381,7 @@ func (h *FileHandler) PermanentDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, _ = h.storage.UpdateUserStorage(claims.UserID)
+	events.Broadcast("file:delete", "file", "delete", fileID, "", claims.UserID, nil)
 	utils.RespondSuccess(w, http.StatusOK, "File permanently deleted", nil)
 }
 

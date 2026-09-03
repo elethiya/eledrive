@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useRealtimeEvent, useRealtime } from '../context/RealtimeContext';
 import { formatBytes } from '../utils/formatters';
 
 export default function Sidebar({
@@ -29,10 +30,16 @@ export default function Sidebar({
   onUploadFiles,
   onUploadFolder,
 }) {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
+  const { isConnected } = useRealtime();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const fileInputRef = useRef(null);
   const folderInputRef = useRef(null);
+
+  // Auto-refresh storage in real time when any file, trash, or storage update arrives
+  useRealtimeEvent(['file', 'trash', 'storage', 'sync'], () => {
+    if (refreshUser) refreshUser();
+  });
 
   const used = user?.storage_used || 0;
   const limit = user?.storage_limit || 10 * 1024 * 1024 * 1024;
@@ -258,9 +265,17 @@ export default function Sidebar({
 
         {/* Storage Meter */}
         <div className="p-4 border border-slate-800/80 bg-slate-950/60 m-3 rounded-2xl">
-          <div className="flex items-center gap-2 mb-2 text-slate-300">
-            <Cloud className="w-4 h-4 text-blue-400" />
-            <span className="text-xs font-semibold">Team Storage</span>
+          <div className="flex items-center justify-between mb-2 text-slate-300">
+            <div className="flex items-center gap-2">
+              <Cloud className="w-4 h-4 text-blue-400" />
+              <span className="text-xs font-semibold">Team Storage</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] font-mono">
+              <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+              <span className={isConnected ? 'text-emerald-400 font-semibold' : 'text-slate-500'}>
+                {isConnected ? 'Live' : 'Sync'}
+              </span>
+            </div>
           </div>
           <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
             <div

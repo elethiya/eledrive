@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ConfirmProvider } from './context/ConfirmContext';
+import { RealtimeProvider } from './context/RealtimeContext';
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 import DrivePage from './pages/DrivePage';
@@ -530,7 +531,9 @@ export default function App() {
   return (
     <AuthProvider>
       <ConfirmProvider>
-        <AppContent />
+        <RealtimeProvider>
+          <AppContent />
+        </RealtimeProvider>
       </ConfirmProvider>
     </AuthProvider>
   );
