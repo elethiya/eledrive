@@ -31,6 +31,7 @@ function AppContent() {
   const initialPath = window.location.pathname;
   const isInitialAdmin = initialPath === '/admin' || initialPath.startsWith('/admin/');
   const [currentView, setCurrentView] = useState(isInitialAdmin ? 'admin' : 'drive'); // 'drive' | 'shared' | 'recent' | 'starred' | 'trash' | 'profile' | 'admin'
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentFolderId, setCurrentFolderId] = useState('');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
   const [authView, setAuthView] = useState('login'); // 'login' | 'register'
@@ -232,6 +233,8 @@ function AppContent() {
     <div className="dark bg-slate-950 text-slate-100 flex h-screen w-screen overflow-hidden font-sans select-none">
       {/* Left Sidebar */}
       <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
         currentView={currentView}
         setCurrentView={(view) => {
           setCurrentView(view);
@@ -247,6 +250,7 @@ function AppContent() {
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-slate-950">
         {/* Top Navbar */}
         <Navbar
+          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           searchType={searchType}

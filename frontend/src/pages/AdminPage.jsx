@@ -168,7 +168,7 @@ export default function AdminPage({ onBackToDrive }) {
   return (
     <div className="flex-1 overflow-y-auto bg-slate-950 text-slate-100 flex flex-col h-full">
       {/* Admin Header */}
-      <div className="h-16 px-6 border-b border-slate-800 bg-slate-900 flex items-center justify-between shrink-0">
+      <div className="px-4 sm:px-6 py-3.5 border-b border-slate-800 bg-slate-900 flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={onBackToDrive}
@@ -178,7 +178,7 @@ export default function AdminPage({ onBackToDrive }) {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
               <ShieldCheck className="w-4 h-4" />
             </div>
             <div>
@@ -189,10 +189,10 @@ export default function AdminPage({ onBackToDrive }) {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+        <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs overflow-x-auto w-full md:w-auto">
           <button
             onClick={() => setActiveTab('users')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium transition-all ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap ${
               activeTab === 'users'
                 ? 'bg-purple-600/30 text-purple-300 font-bold border border-purple-500/40 shadow-xs'
                 : 'text-slate-400 hover:text-slate-200'
@@ -207,7 +207,7 @@ export default function AdminPage({ onBackToDrive }) {
               setActiveTab('logs');
               loadLogs();
             }}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium transition-all ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap ${
               activeTab === 'logs'
                 ? 'bg-purple-600/30 text-purple-300 font-bold border border-purple-500/40 shadow-xs'
                 : 'text-slate-400 hover:text-slate-200'
@@ -219,7 +219,7 @@ export default function AdminPage({ onBackToDrive }) {
 
           <button
             onClick={() => setActiveTab('settings')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium transition-all ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap ${
               activeTab === 'settings'
                 ? 'bg-purple-600/30 text-purple-300 font-bold border border-purple-500/40 shadow-xs'
                 : 'text-slate-400 hover:text-slate-200'
@@ -232,12 +232,12 @@ export default function AdminPage({ onBackToDrive }) {
       </div>
 
       {/* Main Content */}
-      <div className="p-6 md:p-8 max-w-6xl w-full mx-auto space-y-6 flex-1">
+      <div className="p-3.5 sm:p-6 md:p-8 max-w-6xl w-full mx-auto space-y-5 sm:space-y-6 flex-1">
         {/* Metric Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="bg-slate-900 border border-slate-800 p-3.5 sm:p-4 rounded-2xl shadow-lg">
             <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Total Users</span>
+              <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider">Total Users</span>
               <Users className="w-4 h-4 text-blue-400" />
             </div>
             <span className="text-2xl font-bold text-slate-100">{stats?.total_users || 0}</span>
@@ -383,14 +383,14 @@ export default function AdminPage({ onBackToDrive }) {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2.5 w-full md:w-auto">
+              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                 <select
                   value={logAction}
                   onChange={(e) => {
                     setLogAction(e.target.value);
                     loadLogs(e.target.value, logSearch);
                   }}
-                  className="text-xs px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none"
+                  className="text-xs px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none flex-1 sm:flex-initial"
                 >
                   <option value="all">All Actions</option>
                   <option value="upload">Uploads</option>
@@ -506,7 +506,7 @@ export default function AdminPage({ onBackToDrive }) {
 
         {/* TAB 3: SYSTEM SETTINGS */}
         {activeTab === 'settings' && (
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl shadow-xl p-6 md:p-8 space-y-6 max-w-2xl">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 space-y-5 sm:space-y-6 max-w-2xl">
             <div>
               <h3 className="text-base font-bold text-slate-100">Global Drive Settings</h3>
               <p className="text-xs text-slate-400">Configure global parameters and security for EleDrive</p>
@@ -690,8 +690,8 @@ function EditUserAdminModal({ user, onClose, onUpdated }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-slate-900 rounded-3xl max-w-md w-full shadow-2xl border border-slate-800 p-6 animate-in zoom-in-95 duration-150 text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="bg-slate-900 rounded-3xl max-w-md w-full shadow-2xl border border-slate-800 p-4 sm:p-6 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center">

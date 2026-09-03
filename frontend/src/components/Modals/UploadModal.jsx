@@ -7,7 +7,7 @@ export default function UploadModal({ uploadStatus, onClose }) {
   const { isUploading, progress, totalFiles, success, error } = uploadStatus;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 max-w-sm w-full animate-in slide-in-from-bottom-5 duration-200 text-slate-100">
+    <div className="fixed bottom-4 inset-x-4 sm:inset-x-auto sm:right-6 sm:w-80 z-50 animate-in slide-in-from-bottom-5 duration-200 text-slate-100">
       <div className="bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 p-4">
         <div className="flex items-center justify-between pb-3">
           <div className="flex items-center gap-2.5">

@@ -39,42 +39,42 @@ export default function PreviewModal({ isOpen, onClose, file }) {
   const inlineUrl = fileAPI.getDownloadUrl(file.id, true);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-slate-900 rounded-3xl max-w-4xl w-full h-[85vh] shadow-2xl border border-slate-800 flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-8 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="bg-slate-900 rounded-2xl sm:rounded-3xl max-w-4xl w-full h-[90vh] sm:h-[85vh] shadow-2xl border border-slate-800 flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 text-slate-100">
         {/* Header */}
-        <div className="h-16 px-6 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-950/60">
-          <div className="flex items-center gap-3 truncate pr-4">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+        <div className="h-14 sm:h-16 px-4 sm:px-6 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-950/60">
+          <div className="flex items-center gap-2.5 sm:gap-3 truncate pr-2 sm:pr-4">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
               {category === 'code' ? (
-                <Code2 className="w-5 h-5" />
+                <Code2 className="w-4 h-4 sm:w-5 sm:h-5" />
               ) : category === 'document' ? (
-                <FileText className="w-5 h-5" />
+                <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
               ) : (
-                <Eye className="w-5 h-5" />
+                <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
             </div>
             <div className="truncate">
-              <h3 className="text-sm font-bold text-slate-100 truncate">{file.name}</h3>
-              <p className="text-xs text-slate-400">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-100 truncate">{file.name}</h3>
+              <p className="text-[10px] sm:text-xs text-slate-400">
                 {formatBytes(file.size)} • {file.mime_type || 'Unknown type'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <a
               href={downloadUrl}
               download={file.name}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-xs transition-all"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-xs transition-all"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Download</span>
+              <span className="hidden sm:inline">Download</span>
             </a>
             <button
               onClick={onClose}
               className="p-1.5 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-800 transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
         </div>

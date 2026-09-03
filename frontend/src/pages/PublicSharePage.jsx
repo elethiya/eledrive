@@ -145,7 +145,7 @@ export default function PublicSharePage({ token, onBackToDrive }) {
       </header>
 
       {/* Body */}
-      <main className="flex-1 max-w-4xl w-full mx-auto p-6 md:p-8 flex flex-col">
+      <main className="flex-1 max-w-4xl w-full mx-auto p-3.5 sm:p-6 md:p-8 flex flex-col">
         {loading ? (
           <div className="flex-1 flex items-center justify-center text-slate-500 text-xs">
             Loading shared workspace...
@@ -195,17 +195,17 @@ export default function PublicSharePage({ token, onBackToDrive }) {
         ) : data ? (
           <div className="space-y-6">
             {/* Header info */}
-            <div className="bg-slate-900 rounded-3xl p-6 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="bg-slate-900 rounded-3xl p-4 sm:p-6 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
                   {data.target_type === 'folder' ? (
-                    <Folder className="w-8 h-8 text-amber-400" />
+                    <Folder className="w-7 h-7 sm:w-8 sm:h-8 text-amber-400" />
                   ) : (
-                    <FileText className="w-8 h-8 text-blue-400" />
+                    <FileText className="w-7 h-7 sm:w-8 sm:h-8 text-blue-400" />
                   )}
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-slate-100">
+                  <h1 className="text-lg sm:text-xl font-bold text-slate-100">
                     {data.target_type === 'folder' ? data.folder?.name : data.file?.name}
                   </h1>
                   <p className="text-xs text-slate-400 mt-0.5">
@@ -217,7 +217,7 @@ export default function PublicSharePage({ token, onBackToDrive }) {
               </div>
 
               {/* Actions: Download / Upload */}
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 {data.permission === 'upload_and_view' && data.target_type === 'folder' && (
                   <button
                     onClick={() => fileInputRef.current?.click()}

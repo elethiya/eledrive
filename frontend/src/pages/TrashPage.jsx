@@ -69,7 +69,7 @@ export default function TrashPage() {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950 text-slate-100">
       {/* Header */}
-      <div className="h-14 px-6 border-b border-slate-800 bg-slate-900/60 flex items-center justify-between shrink-0">
+      <div className="h-14 px-4 sm:px-6 border-b border-slate-800 bg-slate-900/60 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2 text-slate-100 font-bold text-xs">
           <Trash2 className="w-4 h-4 text-rose-500" />
           <span>Trash</span>
@@ -86,7 +86,7 @@ export default function TrashPage() {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-3.5 sm:p-6">
         {loading ? (
           <div className="h-64 flex items-center justify-center text-slate-500 text-xs">
             Loading trash...

@@ -151,12 +151,12 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-slate-900 rounded-3xl max-w-lg w-full shadow-2xl border border-slate-800 p-6 animate-in zoom-in-95 duration-150 text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="bg-slate-900 rounded-2xl sm:rounded-3xl max-w-lg w-full shadow-2xl border border-slate-800 p-4 sm:p-6 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
               <Share2 className="w-5 h-5" />
             </div>
             <div>
@@ -166,7 +166,7 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                   {itemType}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 truncate max-w-[260px]">{item.name}</p>
+              <p className="text-xs text-slate-400 truncate max-w-[200px] sm:max-w-[260px]">{item.name}</p>
             </div>
           </div>
           <button
@@ -181,7 +181,7 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
         <div className="flex border-b border-slate-800 mt-3 text-xs">
           <button
             onClick={() => setActiveTab('team')}
-            className={`flex items-center gap-2 px-4 py-2.5 font-semibold border-b-2 transition-all ${
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 font-semibold border-b-2 transition-all ${
               activeTab === 'team'
                 ? 'border-blue-500 text-blue-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -192,7 +192,7 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
           </button>
           <button
             onClick={() => setActiveTab('link')}
-            className={`flex items-center gap-2 px-4 py-2.5 font-semibold border-b-2 transition-all ${
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 font-semibold border-b-2 transition-all ${
               activeTab === 'link'
                 ? 'border-blue-500 text-blue-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -210,7 +210,7 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                 Add Team Member
               </label>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-1">
                   <input
                     type="text"

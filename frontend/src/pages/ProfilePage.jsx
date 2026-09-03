@@ -128,12 +128,12 @@ export default function ProfilePage() {
   const percent = Math.min(100, Math.round((used / limit) * 100));
 
   return (
-    <div className="flex-1 overflow-y-auto bg-slate-950 text-slate-100 p-6 md:p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="flex-1 overflow-y-auto bg-slate-950 text-slate-100 p-3.5 sm:p-6 md:p-8">
+      <div className="max-w-4xl mx-auto space-y-5 sm:space-y-6">
         {/* Profile Banner */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 flex flex-col sm:flex-row items-center sm:items-start gap-6 shadow-xl">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 md:p-8 flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 shadow-xl">
           <div
-            className="w-20 h-20 rounded-3xl flex items-center justify-center text-white text-3xl font-bold shadow-2xl ring-4 ring-slate-800/80 shrink-0"
+            className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl flex items-center justify-center text-white text-2xl sm:text-3xl font-bold shadow-2xl ring-4 ring-slate-800/80 shrink-0"
             style={{ backgroundColor: avatarColor }}
           >
             {name ? name.charAt(0).toUpperCase() : 'U'}
@@ -162,9 +162,9 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
           {/* Form 1: Profile Settings */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-5">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl space-y-4 sm:space-y-5">
             <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
               <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
                 <User className="w-4 h-4" />
@@ -207,7 +207,7 @@ export default function ProfilePage() {
                   <Palette className="w-3.5 h-3.5 text-slate-400" />
                   <span>Avatar Accent Color</span>
                 </label>
-                <div className="flex items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-2.5">
                   {AVATAR_COLORS.map((c) => (
                     <button
                       key={c}
@@ -263,7 +263,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Form 2: Password Security */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-5">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl space-y-4 sm:space-y-5">
             <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
               <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
                 <KeyRound className="w-4 h-4" />
@@ -343,7 +343,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Section 3: Storage Breakdown */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl">
           <div className="flex items-center gap-3 pb-4 border-b border-slate-800">
             <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
               <HardDrive className="w-4 h-4" />

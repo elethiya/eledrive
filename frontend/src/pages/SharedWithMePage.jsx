@@ -64,7 +64,7 @@ export default function SharedWithMePage({
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-3.5 sm:p-6">
         {loading ? (
           <div className="h-64 flex items-center justify-center text-slate-500 text-xs">
             Loading shared items...
@@ -89,7 +89,7 @@ export default function SharedWithMePage({
                 <div
                   className={
                     viewMode === 'grid'
-                      ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5'
+                      ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-3.5'
                       : 'space-y-1.5'
                   }
                 >
@@ -119,7 +119,7 @@ export default function SharedWithMePage({
                 <div
                   className={
                     viewMode === 'grid'
-                      ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5'
+                      ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-3.5'
                       : 'space-y-1.5'
                   }
                 >
