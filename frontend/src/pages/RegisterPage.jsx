@@ -155,6 +155,14 @@ export default function RegisterPage({ onNavigateLogin }) {
         </div>
           </>
         )}
+
+        {/* Footer Attribution */}
+        <div className="mt-8 pt-4 border-t border-slate-800/60 text-center">
+          <p className="text-[11px] text-slate-500 font-medium tracking-wide">
+            Developed and Powered by{' '}
+            <span className="font-bold text-slate-400 tracking-wider">ELETHIYA</span>
+          </p>
+        </div>
       </div>
     </div>
   );

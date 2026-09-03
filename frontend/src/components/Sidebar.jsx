@@ -96,7 +96,10 @@ export default function Sidebar({
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-500/20">
               E
             </div>
-            <span className="text-base font-bold tracking-tight text-slate-100">EleDrive</span>
+            <div>
+              <span className="text-base font-bold tracking-tight text-slate-100 block leading-tight">EleDrive</span>
+              <p className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase leading-none mt-0.5">by ELETHIYA</p>
+            </div>
           </div>
 
           <button
@@ -289,6 +292,14 @@ export default function Sidebar({
             <span>{formatBytes(used)} used</span>
             <span>{formatBytes(limit)}</span>
           </div>
+        </div>
+
+        {/* Footer Attribution */}
+        <div className="px-4 pb-3 pt-0.5 text-center">
+          <p className="text-[10px] text-slate-500 font-medium tracking-wide">
+            Developed and Powered by{' '}
+            <span className="font-bold text-slate-400 tracking-wider">ELETHIYA</span>
+          </p>
         </div>
       </aside>
     </>

@@ -1489,27 +1489,35 @@ export default function AdminPage({ onBackToDrive }) {
             </form>
           </div>
         )}
+
+        {/* Footer Attribution */}
+        <div className="text-center pt-8 pb-4 border-t border-slate-800/60">
+          <p className="text-xs text-slate-500 font-medium tracking-wide">
+            Developed and Powered by{' '}
+            <span className="font-bold text-slate-400 tracking-wider">ELETHIYA</span>
+          </p>
+        </div>
       </div>
 
       {/* Edit User Profile Window (Enhanced with extensive options) */}
       {editUserModal && (editUserModal.role !== 'owner' || user?.role === 'owner') && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
-          <div className="relative bg-slate-900 rounded-2xl sm:rounded-3xl max-w-xl w-full border border-slate-800 p-4 sm:p-7 shadow-2xl shadow-black/80 space-y-4 sm:space-y-5 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 md:p-6 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
+          <div className="relative bg-slate-900 rounded-none sm:rounded-3xl max-w-xl w-full h-full sm:h-auto sm:max-h-[90vh] border-0 sm:border border-slate-800 shadow-none sm:shadow-2xl sm:shadow-black/80 flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 text-slate-100">
             {/* Ambient Glow */}
             <div className="absolute -top-16 -right-16 w-44 h-44 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800 relative z-10">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+            {/* Fixed Header */}
+            <div className="h-14 sm:h-16 px-4 sm:px-6 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/95 backdrop-blur-sm relative z-10 gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
                   <Edit className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-100">Edit User Profile</h3>
-                  <p className="text-[11px] text-slate-400">Configure account identity, credentials, roles & quotas</p>
+                <div className="min-w-0">
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-100 truncate">Edit User Profile</h3>
+                  <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">Configure identity, credentials, roles & quotas</p>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -1517,7 +1525,7 @@ export default function AdminPage({ onBackToDrive }) {
                     setEditUserModal(null);
                     setViewUserModal(u);
                   }}
-                  className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-400 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-400 text-xs font-semibold flex items-center gap-1.5 transition-colors"
                   title="View Full Profile Details"
                 >
                   <Eye className="w-3.5 h-3.5" />
@@ -1528,229 +1536,232 @@ export default function AdminPage({ onBackToDrive }) {
                     setEditUserModal(null);
                     setResetPasswordInput('');
                   }}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                  className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
                   title="Close"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
               </div>
             </div>
 
-            {/* User Identity Visual & Color Customization */}
-            <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/80 space-y-3 relative z-10">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-white text-lg shadow-md ring-2 ring-slate-800 shrink-0"
-                  style={{ backgroundColor: editUserModal.avatar_color || '#3b82f6' }}
-                >
-                  {editUserModal.name?.charAt(0).toUpperCase() || 'U'}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-semibold text-slate-200 text-xs truncate">{editUserModal.name || 'User'}</span>
-                    {editUserModal.role === 'owner' && <Crown className="w-3 h-3 text-amber-400 shrink-0" />}
+            {/* Scrollable Body with custom-scrollbar */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-4 relative z-10">
+              {/* User Identity Visual & Color Customization */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-950/70 border border-slate-800/80 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-white text-lg shadow-md ring-2 ring-slate-800 shrink-0"
+                    style={{ backgroundColor: editUserModal.avatar_color || '#3b82f6' }}
+                  >
+                    {editUserModal.name?.charAt(0).toUpperCase() || 'U'}
                   </div>
-                  <div className="text-[11px] text-slate-400 flex items-center gap-1 font-mono">
-                    <Lock className="w-3 h-3 text-slate-500" />
-                    <span>@{editUserModal.username}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-slate-200 text-xs truncate">{editUserModal.name || 'User'}</span>
+                      {editUserModal.role === 'owner' && <Crown className="w-3 h-3 text-amber-400 shrink-0" />}
+                    </div>
+                    <div className="text-[11px] text-slate-400 flex items-center gap-1 font-mono mt-0.5">
+                      <Lock className="w-3 h-3 text-slate-500 shrink-0" />
+                      <span className="truncate">@{editUserModal.username}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Avatar Accent Color Picker */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
+                    <Palette className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Avatar Accent Theme</span>
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {AVATAR_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setEditUserModal({ ...editUserModal, avatar_color: color })}
+                        className={`w-6 h-6 rounded-full transition-all ${
+                          editUserModal.avatar_color === color
+                            ? 'ring-2 ring-offset-2 ring-offset-slate-900 ring-blue-500 scale-110 shadow-sm'
+                            : 'hover:scale-105 opacity-80 hover:opacity-100'
+                        }`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
                   </div>
                 </div>
               </div>
 
-              {/* Avatar Accent Color Picker */}
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
-                  <Palette className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Avatar Accent Theme</span>
-                </label>
-                <div className="flex flex-wrap items-center gap-2">
-                  {AVATAR_COLORS.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setEditUserModal({ ...editUserModal, avatar_color: color })}
-                      className={`w-6 h-6 rounded-full transition-all ${
-                        editUserModal.avatar_color === color
-                          ? 'ring-2 ring-offset-2 ring-offset-slate-900 ring-blue-500 scale-110 shadow-sm'
-                          : 'hover:scale-105 opacity-80 hover:opacity-100'
-                      }`}
-                      style={{ backgroundColor: color }}
+              {/* Profile Fields */}
+              <div className="space-y-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Full Name</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editUserModal.name}
+                      onChange={(e) => setEditUserModal({ ...editUserModal, name: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-blue-500"
                     />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Profile Fields */}
-            <div className="space-y-3.5 relative z-10">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Full Name</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={editUserModal.name}
-                    onChange={(e) => setEditUserModal({ ...editUserModal, name: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Email Address</span>
-                  </label>
-                  <input
-                    type="email"
-                    value={editUserModal.email || ''}
-                    onChange={(e) => setEditUserModal({ ...editUserModal, email: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Role Privilege</label>
-                  <select
-                    value={editUserModal.role}
-                    disabled={editUserModal.role === 'owner' || !isOwner}
-                    onChange={(e) => setEditUserModal({ ...editUserModal, role: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 disabled:opacity-50"
-                  >
-                    <option value="member">Member</option>
-                    <option value="admin">Admin</option>
-                    {editUserModal.role === 'owner' && <option value="owner">Owner</option>}
-                  </select>
-                  {!isOwner && (
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      Only Workspace Owner can assign or revoke Admin roles.
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Account Status</label>
-                  <select
-                    value={editUserModal.status}
-                    disabled={editUserModal.role === 'owner'}
-                    onChange={(e) => setEditUserModal({ ...editUserModal, status: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 disabled:opacity-50"
-                  >
-                    <option value="approved">Approved (Active)</option>
-                    <option value="pending">Pending Review</option>
-                    <option value="rejected">Rejected (Suspended)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Storage Quota Section with Presets */}
-              <div className="p-3.5 bg-slate-950/60 border border-slate-800 rounded-2xl space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
-                    <HardDrive className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Allocated Storage Quota</span>
-                  </label>
-                  {editUserModal.role === 'owner' && (
-                    <span className="text-amber-400 font-bold text-[10px]">Owner Quota</span>
-                  )}
-                </div>
-
-                {editUserModal.role === 'owner' && user?.role !== 'owner' ? (
-                  <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-[11px] text-amber-400 flex items-center gap-2">
-                    <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                    <span>Admins cannot change the Owner's storage limit</span>
                   </div>
-                ) : (
-                  <>
-                    {/* Quick Quota Presets */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[10px] text-slate-500 font-semibold mr-1">Presets:</span>
-                      {QUOTA_PRESETS.map((gb) => {
-                        const currentGB = Math.round((editUserModal.storage_limit || 10737418240) / (1024 * 1024 * 1024));
-                        return (
-                          <button
-                            key={gb}
-                            type="button"
-                            onClick={() =>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Email Address</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={editUserModal.email || ''}
+                      onChange={(e) => setEditUserModal({ ...editUserModal, email: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1">Role Privilege</label>
+                    <select
+                      value={editUserModal.role}
+                      disabled={editUserModal.role === 'owner' || !isOwner}
+                      onChange={(e) => setEditUserModal({ ...editUserModal, role: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 disabled:opacity-50"
+                    >
+                      <option value="member">Member</option>
+                      <option value="admin">Admin</option>
+                      {editUserModal.role === 'owner' && <option value="owner">Owner</option>}
+                    </select>
+                    {!isOwner && (
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Only Workspace Owner can assign or revoke Admin roles.
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1">Account Status</label>
+                    <select
+                      value={editUserModal.status}
+                      disabled={editUserModal.role === 'owner'}
+                      onChange={(e) => setEditUserModal({ ...editUserModal, status: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 disabled:opacity-50"
+                    >
+                      <option value="approved">Approved (Active)</option>
+                      <option value="pending">Pending Review</option>
+                      <option value="rejected">Rejected (Suspended)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Storage Quota Section with Presets */}
+                <div className="p-3.5 bg-slate-950/60 border border-slate-800 rounded-2xl space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+                      <HardDrive className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Allocated Storage Quota</span>
+                    </label>
+                    {editUserModal.role === 'owner' && (
+                      <span className="text-amber-400 font-bold text-[10px]">Owner Quota</span>
+                    )}
+                  </div>
+
+                  {editUserModal.role === 'owner' && user?.role !== 'owner' ? (
+                    <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-[11px] text-amber-400 flex items-center gap-2">
+                      <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span>Admins cannot change the Owner's storage limit</span>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Quick Quota Presets */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] text-slate-500 font-semibold mr-1">Presets:</span>
+                        {QUOTA_PRESETS.map((gb) => {
+                          const currentGB = Math.round((editUserModal.storage_limit || 10737418240) / (1024 * 1024 * 1024));
+                          return (
+                            <button
+                              key={gb}
+                              type="button"
+                              onClick={() =>
+                                setEditUserModal({
+                                  ...editUserModal,
+                                  storage_limit: gb * 1024 * 1024 * 1024,
+                                })
+                              }
+                              className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all ${
+                                currentGB === gb
+                                  ? 'bg-blue-600 text-white shadow-xs'
+                                  : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200 border border-slate-800'
+                              }`}
+                            >
+                              {gb} GB
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="flex items-center gap-3 pt-1">
+                        <div className="relative flex-1">
+                          <input
+                            type="number"
+                            min="1"
+                            max="100000"
+                            value={Math.round((editUserModal.storage_limit || 10737418240) / (1024 * 1024 * 1024))}
+                            onChange={(e) =>
                               setEditUserModal({
                                 ...editUserModal,
-                                storage_limit: gb * 1024 * 1024 * 1024,
+                                storage_limit: (parseInt(e.target.value) || 10) * 1024 * 1024 * 1024,
                               })
                             }
-                            className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all ${
-                              currentGB === gb
-                                ? 'bg-blue-600 text-white shadow-xs'
-                                : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200 border border-slate-800'
-                            }`}
-                          >
-                            {gb} GB
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div className="flex items-center gap-3 pt-1">
-                      <div className="relative flex-1">
-                        <input
-                          type="number"
-                          min="1"
-                          max="100000"
-                          value={Math.round((editUserModal.storage_limit || 10737418240) / (1024 * 1024 * 1024))}
-                          onChange={(e) =>
-                            setEditUserModal({
-                              ...editUserModal,
-                              storage_limit: (parseInt(e.target.value) || 10) * 1024 * 1024 * 1024,
-                            })
-                          }
-                          className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 font-semibold focus:outline-hidden focus:border-blue-500 pr-9"
-                        />
-                        <span className="absolute right-3 top-2 text-[11px] text-slate-500 font-bold pointer-events-none">GB</span>
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 font-semibold focus:outline-hidden focus:border-blue-500 pr-9"
+                          />
+                          <span className="absolute right-3 top-2 text-[11px] text-slate-500 font-bold pointer-events-none">GB</span>
+                        </div>
+                        <span className="text-[11px] text-slate-400 shrink-0">
+                          {formatBytes(editUserModal.storage_used || 0)} consumed
+                        </span>
                       </div>
-                      <span className="text-[11px] text-slate-400 shrink-0">
-                        {formatBytes(editUserModal.storage_used || 0)} consumed
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Password Reset Option */}
-              <div className="p-3.5 bg-slate-950/60 border border-slate-800 rounded-2xl space-y-2">
-                <label className="block text-[11px] font-semibold text-slate-300 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <KeyRound className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Reset User Password</span>
-                  </span>
-                  <span className="text-[10px] text-slate-500">Optional</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type={showResetPassword ? 'text' : 'password'}
-                    value={resetPasswordInput}
-                    onChange={(e) => setResetPasswordInput(e.target.value)}
-                    placeholder="Leave empty to keep current password"
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-purple-500 pr-9"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowResetPassword(!showResetPassword)}
-                    className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-200"
-                    title={showResetPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showResetPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
+                    </>
+                  )}
                 </div>
-                <p className="text-[10px] text-slate-500">
-                  Minimum 6 characters. Enter a new password to immediately force an account credential update.
-                </p>
+
+                {/* Password Reset Option */}
+                <div className="p-3.5 bg-slate-950/60 border border-slate-800 rounded-2xl space-y-2">
+                  <label className="block text-[11px] font-semibold text-slate-300 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <KeyRound className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Reset User Password</span>
+                    </span>
+                    <span className="text-[10px] text-slate-500">Optional</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showResetPassword ? 'text' : 'password'}
+                      value={resetPasswordInput}
+                      onChange={(e) => setResetPasswordInput(e.target.value)}
+                      placeholder="Leave empty to keep current password"
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-purple-500 pr-9"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowResetPassword(!showResetPassword)}
+                      className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-200"
+                      title={showResetPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showResetPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    Minimum 6 characters. Enter a new password to immediately force an account credential update.
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800 relative z-10">
+            {/* Fixed Footer */}
+            <div className="h-14 sm:h-16 px-4 sm:px-6 border-t border-slate-800 flex items-center justify-end gap-2.5 shrink-0 bg-slate-900/95 backdrop-blur-sm relative z-10">
               <button
                 type="button"
                 onClick={() => {
@@ -1815,230 +1826,254 @@ export default function AdminPage({ onBackToDrive }) {
 
       {/* User Profile View Floating Window */}
       {viewUserModal && (viewUserModal.role !== 'owner' || user?.role === 'owner') && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
-          <div className="relative bg-slate-900 rounded-2xl sm:rounded-3xl max-w-2xl w-full shadow-2xl shadow-black/80 border border-slate-800 p-4 sm:p-7 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto flex flex-col space-y-4 sm:space-y-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 md:p-6 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
+          <div className="relative bg-slate-900 rounded-none sm:rounded-3xl max-w-2xl w-full h-full sm:h-auto sm:max-h-[90vh] border-0 sm:border border-slate-800 shadow-none sm:shadow-2xl sm:shadow-black/80 flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 text-slate-100">
             {/* Ambient Top Glow */}
             <div className="absolute -top-16 -left-16 w-44 h-44 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
-            {/* Header with Close */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800 relative z-10">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-blue-400" />
-                <h3 className="text-sm font-bold text-slate-100">User Profile Overview</h3>
-              </div>
-              <button
-                onClick={() => setViewUserModal(null)}
-                className="text-slate-400 hover:text-slate-200 p-1 rounded-lg hover:bg-slate-800 transition-colors"
-                title="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Hero Profile Banner */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/70 border border-slate-800/90 flex items-center sm:items-start gap-3.5 sm:gap-4 relative z-10">
-              <div
-                className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl flex items-center justify-center font-bold text-white text-xl sm:text-3xl shadow-xl ring-2 sm:ring-4 ring-slate-800/80 shrink-0"
-                style={{ backgroundColor: viewUserModal.avatar_color || '#3b82f6' }}
-              >
-                {viewUserModal.name?.charAt(0).toUpperCase() || 'U'}
-              </div>
-
-              <div className="flex-1 text-left min-w-0">
-                <div className="flex flex-wrap items-center justify-start gap-2 mb-1">
-                  <h4 className="text-base sm:text-lg font-bold text-slate-100 truncate">{viewUserModal.name}</h4>
-                  <span
-                    className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border shrink-0 ${
-                      viewUserModal.role === 'owner'
-                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                        : viewUserModal.role === 'admin'
-                        ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-                        : 'bg-slate-800 text-slate-300 border-slate-700'
-                    }`}
-                  >
-                    {viewUserModal.role === 'owner' ? 'Workspace Owner' : viewUserModal.role === 'admin' ? 'Administrator' : 'Team Member'}
-                  </span>
-                  <span
-                    className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border shrink-0 ${
-                      viewUserModal.status === 'approved'
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                        : viewUserModal.status === 'pending'
-                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                        : 'bg-red-500/10 text-red-400 border-red-500/30'
-                    }`}
-                  >
-                    {viewUserModal.status}
-                  </span>
+            {/* Fixed Header */}
+            <div className="h-14 sm:h-16 px-4 sm:px-6 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/95 backdrop-blur-sm relative z-10 gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-
-                <p className="text-xs text-slate-400 truncate mb-2">{viewUserModal.email}</p>
-
-                {/* Copyable User ID pill */}
-                <div className="flex flex-wrap items-center justify-start gap-2 text-[11px] text-slate-400">
-                  <span className="font-mono text-slate-300 bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-800 truncate max-w-[200px] sm:max-w-[240px]">
-                    ID: {viewUserModal.id}
-                  </span>
+                <div className="min-w-0">
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-100 truncate">User Profile Overview</h3>
+                  <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">Identity, quota & forensic audit trail</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {viewUserModal.role === 'owner' && user?.role !== 'owner' ? null : (
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(viewUserModal.id);
-                      toast.success('User ID copied to clipboard!');
+                      const u = viewUserModal;
+                      setViewUserModal(null);
+                      setEditUserModal(u);
                     }}
-                    className="p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
-                    title="Copy User ID"
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-400 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                    title="Edit Profile"
                   >
-                    <Copy className="w-3.5 h-3.5" />
+                    <Edit className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Edit Profile</span>
                   </button>
-                </div>
+                )}
+                <button
+                  onClick={() => setViewUserModal(null)}
+                  className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                  title="Close"
+                >
+                  <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
               </div>
             </div>
 
-            {/* Quick Metrics Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10">
-              <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                  Active Files
-                </span>
-                <span className="text-sm font-bold text-slate-100 mt-1 block">
-                  {viewUserModal.files_count || 0}
-                </span>
-              </div>
-              <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                  Storage Used
-                </span>
-                <span className="text-sm font-bold text-blue-400 mt-1 block">
-                  {formatBytes(viewUserModal.storage_used || 0)}
-                </span>
-              </div>
-              <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                  Storage Quota
-                </span>
-                <span className="text-sm font-bold text-purple-400 mt-1 block">
-                  {formatBytes(viewUserModal.storage_limit || 0)}
-                </span>
-              </div>
-              <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                  Quota Left
-                </span>
-                <span className="text-sm font-bold text-emerald-400 mt-1 block">
-                  {formatBytes(Math.max(0, (viewUserModal.storage_limit || 0) - (viewUserModal.storage_used || 0)))}
-                </span>
-              </div>
-            </div>
+            {/* Scrollable Body with custom-scrollbar */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-4 sm:space-y-5 relative z-10">
+              {/* Hero Profile Banner */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/70 border border-slate-800/90 flex items-center sm:items-start gap-3.5 sm:gap-4">
+                <div
+                  className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl flex items-center justify-center font-bold text-white text-xl sm:text-3xl shadow-xl ring-2 sm:ring-4 ring-slate-800/80 shrink-0"
+                  style={{ backgroundColor: viewUserModal.avatar_color || '#3b82f6' }}
+                >
+                  {viewUserModal.name?.charAt(0).toUpperCase() || 'U'}
+                </div>
 
-            {/* Storage Meter Visual Bar */}
-            <div className="p-4 bg-slate-950/50 border border-slate-800/80 rounded-2xl space-y-2 relative z-10">
-              {(() => {
-                const usedBytes = viewUserModal.storage_used || 0;
-                const limitBytes = viewUserModal.storage_limit || 1;
-                const pct = Math.min(100, Math.round((usedBytes / limitBytes) * 100));
-                return (
-                  <>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-300 font-semibold flex items-center gap-1.5">
-                        <HardDrive className="w-3.5 h-3.5 text-blue-400" />
-                        Storage Quota Utilization
-                      </span>
-                      <span className="font-mono text-[11px] text-slate-400">{pct}% utilized</span>
-                    </div>
-                    <div className="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          pct > 90 ? 'bg-red-500 shadow-sm shadow-red-500/50' : pct > 75 ? 'bg-amber-500' : 'bg-gradient-to-r from-blue-500 to-indigo-500'
-                        }`}
-                        style={{ width: `${Math.max(pct, 2)}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-[11px] text-slate-500 font-medium">
-                      <span>{formatBytes(usedBytes)} used</span>
-                      <span>{formatBytes(limitBytes)} total</span>
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
+                <div className="flex-1 text-left min-w-0">
+                  <div className="flex flex-wrap items-center justify-start gap-2 mb-1">
+                    <h4 className="text-base sm:text-lg font-bold text-slate-100 truncate">{viewUserModal.name}</h4>
+                    <span
+                      className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border shrink-0 ${
+                        viewUserModal.role === 'owner'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                          : viewUserModal.role === 'admin'
+                          ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                          : 'bg-slate-800 text-slate-300 border-slate-700'
+                      }`}
+                    >
+                      {viewUserModal.role === 'owner' ? 'Workspace Owner' : viewUserModal.role === 'admin' ? 'Administrator' : 'Team Member'}
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border shrink-0 ${
+                        viewUserModal.status === 'approved'
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                          : viewUserModal.status === 'pending'
+                          ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                          : 'bg-red-500/10 text-red-400 border-red-500/30'
+                      }`}
+                    >
+                      {viewUserModal.status}
+                    </span>
+                  </div>
 
-            {/* Comprehensive Detail Field Tiles */}
-            <div className="p-4 bg-slate-950/50 border border-slate-800/80 rounded-2xl space-y-3 relative z-10">
-              <h5 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Account Specifications</h5>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/80 border border-slate-800">
-                  <span className="text-slate-400">Username</span>
-                  <span className="font-semibold text-slate-200 font-mono">@{viewUserModal.username}</span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/80 border border-slate-800">
-                  <span className="text-slate-400">Email</span>
-                  <span className="font-semibold text-slate-200 truncate max-w-[150px]">{viewUserModal.email}</span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/80 border border-slate-800">
-                  <span className="text-slate-400">Registered On</span>
-                  <span className="font-semibold text-slate-200">{formatDate(viewUserModal.created_at)}</span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/80 border border-slate-800">
-                  <span className="text-slate-400">Last Profile Update</span>
-                  <span className="font-semibold text-slate-200">{formatDate(viewUserModal.updated_at)}</span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/80 border border-slate-800">
-                  <span className="text-slate-400">Role Privilege</span>
-                  <span className="font-semibold text-slate-200">{viewUserModal.role?.toUpperCase()}</span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/80 border border-slate-800">
-                  <span className="text-slate-400">Forensic Attribution</span>
-                  <span className="font-semibold text-emerald-400 font-mono text-[11px]">ACTIVE</span>
-                </div>
-              </div>
-            </div>
+                  <p className="text-xs text-slate-400 truncate mb-2">{viewUserModal.email}</p>
 
-            {/* User Activity Logs Audit Trail */}
-            <div className="p-4 bg-slate-950/50 border border-slate-800/80 rounded-2xl space-y-3 relative z-10">
-              <div className="flex items-center justify-between">
-                <h5 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <ScrollText className="w-3.5 h-3.5 text-blue-400" />
-                  Recent Activity Audit Trail
-                </h5>
-                <span className="text-[10px] text-slate-500">Last recorded events</span>
+                  {/* Copyable User ID pill */}
+                  <div className="flex flex-wrap items-center justify-start gap-2 text-[11px] text-slate-400">
+                    <span className="font-mono text-slate-300 bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-800 truncate max-w-[200px] sm:max-w-[240px]">
+                      ID: {viewUserModal.id}
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(viewUserModal.id);
+                        toast.success('User ID copied to clipboard!');
+                      }}
+                      className="p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+                      title="Copy User ID"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              {(() => {
-                const userLogs = (logs || []).filter(
-                  (l) => l.user_id === viewUserModal.id || l.user_name === viewUserModal.name || l.user_name === viewUserModal.username
-                ).slice(0, 5);
+              {/* Quick Metrics Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                    Active Files
+                  </span>
+                  <span className="text-sm font-bold text-slate-100 mt-1 block">
+                    {viewUserModal.files_count || 0}
+                  </span>
+                </div>
+                <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                    Storage Used
+                  </span>
+                  <span className="text-sm font-bold text-blue-400 mt-1 block">
+                    {formatBytes(viewUserModal.storage_used || 0)}
+                  </span>
+                </div>
+                <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                    Storage Quota
+                  </span>
+                  <span className="text-sm font-bold text-purple-400 mt-1 block">
+                    {formatBytes(viewUserModal.storage_limit || 0)}
+                  </span>
+                </div>
+                <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                    Quota Left
+                  </span>
+                  <span className="text-sm font-bold text-emerald-400 mt-1 block">
+                    {formatBytes(Math.max(0, (viewUserModal.storage_limit || 0) - (viewUserModal.storage_used || 0)))}
+                  </span>
+                </div>
+              </div>
 
-                if (userLogs.length === 0) {
+              {/* Storage Meter Visual Bar */}
+              <div className="p-3.5 sm:p-4 bg-slate-950/50 border border-slate-800/80 rounded-2xl space-y-2">
+                {(() => {
+                  const usedBytes = viewUserModal.storage_used || 0;
+                  const limitBytes = viewUserModal.storage_limit || 1;
+                  const pct = Math.min(100, Math.round((usedBytes / limitBytes) * 100));
                   return (
-                    <div className="text-center py-4 text-xs text-slate-500">
-                      No forensic activity recorded for this user yet.
+                    <>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                          <HardDrive className="w-3.5 h-3.5 text-blue-400" />
+                          Storage Quota Utilization
+                        </span>
+                        <span className="font-mono text-[11px] text-slate-400">{pct}% utilized</span>
+                      </div>
+                      <div className="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            pct > 90 ? 'bg-red-500 shadow-sm shadow-red-500/50' : pct > 75 ? 'bg-amber-500' : 'bg-gradient-to-r from-blue-500 to-indigo-500'
+                          }`}
+                          style={{ width: `${Math.max(pct, 2)}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[11px] text-slate-500 font-medium">
+                        <span>{formatBytes(usedBytes)} used</span>
+                        <span>{formatBytes(limitBytes)} total</span>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+
+              {/* Comprehensive Detail Field Tiles */}
+              <div className="p-3.5 sm:p-4 bg-slate-950/50 border border-slate-800/80 rounded-2xl space-y-3">
+                <h5 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Account Specifications</h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 text-xs">
+                  <div className="flex items-center justify-between p-2 sm:p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+                    <span className="text-slate-400">Username</span>
+                    <span className="font-semibold text-slate-200 font-mono">@{viewUserModal.username}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 sm:p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+                    <span className="text-slate-400">Email</span>
+                    <span className="font-semibold text-slate-200 truncate max-w-[150px]">{viewUserModal.email}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 sm:p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+                    <span className="text-slate-400">Registered On</span>
+                    <span className="font-semibold text-slate-200">{formatDate(viewUserModal.created_at)}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 sm:p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+                    <span className="text-slate-400">Last Profile Update</span>
+                    <span className="font-semibold text-slate-200">{formatDate(viewUserModal.updated_at)}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 sm:p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+                    <span className="text-slate-400">Role Privilege</span>
+                    <span className="font-semibold text-slate-200">{viewUserModal.role?.toUpperCase()}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 sm:p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+                    <span className="text-slate-400">Forensic Attribution</span>
+                    <span className="font-semibold text-emerald-400 font-mono text-[11px]">ACTIVE</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* User Activity Logs Audit Trail */}
+              <div className="p-3.5 sm:p-4 bg-slate-950/50 border border-slate-800/80 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <h5 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <ScrollText className="w-3.5 h-3.5 text-blue-400" />
+                    Recent Activity Audit Trail
+                  </h5>
+                  <span className="text-[10px] text-slate-500">Last recorded events</span>
+                </div>
+
+                {(() => {
+                  const userLogs = (logs || []).filter(
+                    (l) => l.user_id === viewUserModal.id || l.user_name === viewUserModal.name || l.user_name === viewUserModal.username
+                  ).slice(0, 8);
+
+                  if (userLogs.length === 0) {
+                    return (
+                      <div className="text-center py-4 text-xs text-slate-500">
+                        No forensic activity recorded for this user yet.
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                      {userLogs.map((log) => (
+                        <div
+                          key={log.id}
+                          className="flex items-center justify-between p-2 rounded-xl bg-slate-900/70 border border-slate-800/70 text-xs gap-2"
+                        >
+                          <div className="flex items-center gap-2 truncate min-w-0">
+                            <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono text-[10px] font-semibold uppercase shrink-0">
+                              {log.action}
+                            </span>
+                            <span className="text-slate-300 truncate font-medium">{log.item_name || log.details}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 shrink-0">
+                            {formatDate(log.created_at)}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   );
-                }
-
-                return (
-                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                    {userLogs.map((log) => (
-                      <div
-                        key={log.id}
-                        className="flex items-center justify-between p-2 rounded-xl bg-slate-900/70 border border-slate-800/70 text-xs"
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono text-[10px] font-semibold uppercase">
-                            {log.action}
-                          </span>
-                          <span className="text-slate-300 truncate font-medium">{log.item_name || log.details}</span>
-                        </div>
-                        <span className="text-[10px] text-slate-500 shrink-0 ml-2">
-                          {formatDate(log.created_at)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
+                })()}
+              </div>
             </div>
 
-            {/* Action Footer */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800 relative z-10">
+            {/* Fixed Action Footer */}
+            <div className="h-14 sm:h-16 px-4 sm:px-6 border-t border-slate-800 flex items-center justify-between gap-2 shrink-0 bg-slate-900/95 backdrop-blur-sm relative z-10">
               <div className="flex items-center gap-2">
                 {viewUserModal.status === 'pending' && (
                   <>
@@ -2079,7 +2114,8 @@ export default function AdminPage({ onBackToDrive }) {
                     className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
                   >
                     <Edit className="w-3.5 h-3.5" />
-                    <span>Edit User / Quota</span>
+                    <span className="hidden sm:inline">Edit User / Quota</span>
+                    <span className="sm:hidden">Edit</span>
                   </button>
                 )}
               </div>
@@ -2087,7 +2123,7 @@ export default function AdminPage({ onBackToDrive }) {
               <button
                 type="button"
                 onClick={() => setViewUserModal(null)}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors"
+                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors shadow-md"
               >
                 Done
               </button>

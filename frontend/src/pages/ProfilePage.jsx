@@ -481,6 +481,14 @@ export default function ProfilePage() {
             )}
           </div>
         </div>
+
+        {/* Footer Attribution */}
+        <div className="text-center py-4 border-t border-slate-800/60">
+          <p className="text-xs text-slate-500 font-medium tracking-wide">
+            Developed and Powered by{' '}
+            <span className="font-bold text-slate-400 tracking-wider">ELETHIYA</span>
+          </p>
+        </div>
       </div>
     </div>
   );

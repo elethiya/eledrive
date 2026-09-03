@@ -352,6 +352,14 @@ export default function PublicSharePage({ token, onBackToDrive }) {
           </div>
         ) : null}
       </main>
+
+      {/* Footer Attribution */}
+      <footer className="py-4 border-t border-slate-800 text-center shrink-0 bg-slate-950/60">
+        <p className="text-[11px] text-slate-500 font-medium tracking-wide">
+          Developed and Powered by{' '}
+          <span className="font-bold text-slate-400 tracking-wider">ELETHIYA</span>
+        </p>
+      </footer>
     </div>
   );
 }

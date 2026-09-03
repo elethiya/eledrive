@@ -111,6 +111,7 @@ function AppContent() {
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-xs font-semibold text-slate-400">Loading EleDrive...</span>
+          <span className="text-[10px] text-slate-600 font-medium tracking-wide">Developed & Powered by ELETHIYA</span>
         </div>
       </div>
     );
