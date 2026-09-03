@@ -41,7 +41,7 @@ func InitDB(cfg *config.Config) (*sql.DB, error) {
 	}
 
 	if err := seedDefaultData(); err != nil {
-		log.Printf("Warning: failed to seed default data: %v", err)
+		log.Printf("\033[1;33m[WARN]\033[0m Failed to seed default data: %v", err)
 	}
 
 	EnsureDefaultSettings()
@@ -239,7 +239,7 @@ func seedDefaultData() error {
 		VALUES (?, 'folder', ?, ?, ?, 'editor', ?)
 	`, shareID, projectFolderID, adminID, alexID, time.Now())
 
-	log.Println("Initialized SQLite database with seed users (admin@eledrive.local, alex@eledrive.local, sarah@eledrive.local / password123)")
+	log.Println("\033[1;32m[DB]\033[0m Initialized SQLite database with seed users")
 	return nil
 }
 

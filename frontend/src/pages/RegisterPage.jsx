@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { HardDrive, ArrowRight, Lock, Mail, User, AtSign, Clock, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 

@@ -158,11 +158,11 @@ func main() {
 	}
 
 	addr := fmt.Sprintf(":%s", cfg.Port)
-	log.Printf("==================================================")
-	log.Printf("   🚀 EleDrive Server running on http://localhost%s", addr)
-	log.Printf("   📦 Storage dir: %s", cfg.StorageDir)
-	log.Printf("   🗄️  Database:    %s", cfg.DBPath)
-	log.Printf("==================================================")
+	log.Printf("\033[1;34m==================================================\033[0m")
+	log.Printf("\033[1;32m[SERVER]\033[0m  EleDrive running on http://localhost%s", addr)
+	log.Printf("\033[1;34m[STORAGE]\033[0m Storage dir: %s", cfg.StorageDir)
+	log.Printf("\033[1;35m[DB]\033[0m      Database:    %s", cfg.DBPath)
+	log.Printf("\033[1;34m==================================================\033[0m")
 
 	if err := http.ListenAndServe(addr, r); err != nil {
 		log.Fatalf("Server failed: %v", err)

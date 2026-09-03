@@ -84,7 +84,7 @@ check_tool() {
     local cmd="$1"
     local name="$2"
     if ! command -v "$cmd" &> /dev/null; then
-        echo -e "${RED}✗ Error:${RESET} $name ('$cmd') is required but not installed or not in PATH."
+        echo -e "${RED}[ERROR]${RESET} $name ('$cmd') is required but not installed or not in PATH."
         exit 1
     fi
 }
@@ -102,18 +102,18 @@ fi
 # Clean step (if requested)
 # ------------------------------------------------------------------------------
 if [ "$CLEAN" = true ]; then
-    echo -e "\n${YELLOW}🧹 Cleaning previous build artifacts...${RESET}"
+    echo -e "\n${YELLOW}[CLEAN]${RESET} Removing previous build artifacts..."
     if [ -d "${FRONTEND_DIR}/dist" ]; then
         rm -rf "${FRONTEND_DIR}/dist"
-        echo -e "  - Removed ${FRONTEND_DIR}/dist"
+        echo -e "  ${YELLOW}[CLEAN]${RESET} Removed ${FRONTEND_DIR}/dist"
     fi
     if [ -f "${ROOT_DIR}/${BINARY_NAME}" ]; then
         rm -f "${ROOT_DIR}/${BINARY_NAME}"
-        echo -e "  - Removed ${ROOT_DIR}/${BINARY_NAME}"
+        echo -e "  ${YELLOW}[CLEAN]${RESET} Removed ${ROOT_DIR}/${BINARY_NAME}"
     fi
     if [ -f "${ROOT_DIR}/eledrive" ]; then
         rm -f "${ROOT_DIR}/eledrive"
-        echo -e "  - Removed ${ROOT_DIR}/eledrive"
+        echo -e "  ${YELLOW}[CLEAN]${RESET} Removed ${ROOT_DIR}/eledrive"
     fi
 fi
 
@@ -123,25 +123,25 @@ START_TIME=$(date +%s)
 # Step 1: Build Frontend
 # ------------------------------------------------------------------------------
 if [ "$BUILD_FRONTEND" = true ]; then
-    echo -e "\n${BOLD}${CYAN}[1/2] 📦 Building React Frontend (Vite)...${RESET}"
+    echo -e "\n${BOLD}${CYAN}[BUILD][1/2]${RESET} Compiling React Frontend (Vite)..."
     cd "${FRONTEND_DIR}"
 
     # Install dependencies if node_modules does not exist
     if [ ! -d "node_modules" ]; then
-        echo -e "  ${YELLOW}➜ node_modules not found. Installing npm dependencies...${RESET}"
+        echo -e "  ${BLUE}[INFO]${RESET} node_modules not found. Installing npm dependencies..."
         npm install
     fi
 
-    echo -e "  ${CYAN}➜ Compiling assets with Vite...${RESET}"
+    echo -e "  ${BLUE}[VITE]${RESET} Bundling assets..."
     npm run build
 
     if [ ! -f "dist/index.html" ]; then
-        echo -e "${RED}✗ Frontend build failed! (dist/index.html was not generated)${RESET}"
+        echo -e "${RED}[ERROR]${RESET} Frontend build failed! (dist/index.html was not generated)"
         exit 1
     fi
 
     DIST_SIZE=$(du -sh dist | awk '{print $1}')
-    echo -e "  ${GREEN}✓ Frontend successfully built!${RESET} Output: ${FRONTEND_DIR}/dist (${DIST_SIZE})"
+    echo -e "  ${GREEN}[SUCCESS]${RESET} Frontend successfully built: ${FRONTEND_DIR}/dist (${DIST_SIZE})"
     cd "${ROOT_DIR}"
 fi
 
@@ -151,20 +151,20 @@ fi
 if [ "$BUILD_BACKEND" = true ]; then
     STEP_NUM="2/2"
     if [ "$BUILD_FRONTEND" = false ]; then STEP_NUM="1/1"; fi
-    echo -e "\n${BOLD}${CYAN}[${STEP_NUM}] 🔨 Compiling Golang Backend (${BINARY_NAME})...${RESET}"
+    echo -e "\n${BOLD}${CYAN}[BUILD][${STEP_NUM}]${RESET} Compiling Golang Backend (${BINARY_NAME})..."
     cd "${ROOT_DIR}"
 
     # Check formatting / vet
-    echo -e "  ${CYAN}➜ Verifying Go code (go vet)...${RESET}"
+    echo -e "  ${BLUE}[VET]${RESET} Verifying Go source code..."
     go vet ./...
 
     # Compile optimized binary (-s -w strips debug symbols for a leaner binary)
-    echo -e "  ${CYAN}➜ Compiling binary: ${BINARY_NAME}...${RESET}"
+    echo -e "  ${BLUE}[GO]${RESET} Compiling binary: ${BINARY_NAME}..."
     go build -ldflags="-s -w" -o "${BINARY_NAME}" .
     chmod +x "${BINARY_NAME}"
 
     BIN_SIZE=$(du -sh "${BINARY_NAME}" | awk '{print $1}')
-    echo -e "  ${GREEN}✓ Backend binary compiled successfully!${RESET} (${BIN_SIZE})"
+    echo -e "  ${GREEN}[SUCCESS]${RESET} Backend binary compiled: ${BINARY_NAME} (${BIN_SIZE})"
 fi
 
 END_TIME=$(date +%s)
@@ -174,7 +174,7 @@ TOTAL_TIME=$((END_TIME - START_TIME))
 # Completion Summary
 # ------------------------------------------------------------------------------
 echo -e "\n${BOLD}${GREEN}======================================================${RESET}"
-echo -e "${BOLD}${GREEN}        🎉 Build Completed in ${TOTAL_TIME} seconds!           ${RESET}"
+echo -e "${BOLD}${GREEN}        [SUCCESS] Build completed in ${TOTAL_TIME} seconds!     ${RESET}"
 echo -e "${BOLD}${GREEN}======================================================${RESET}"
 
 if [ "$BUILD_BACKEND" = true ]; then
