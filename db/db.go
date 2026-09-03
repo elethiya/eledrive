@@ -145,7 +145,22 @@ func migrate() error {
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
+	CREATE TABLE IF NOT EXISTS main.download_logs (
+		id TEXT PRIMARY KEY,
+		target_type TEXT NOT NULL, -- 'file' or 'folder'
+		target_id TEXT NOT NULL,
+		secret_uuid TEXT,
+		user_id TEXT,
+		user_name TEXT,
+		user_email TEXT,
+		ip_address TEXT,
+		user_agent TEXT,
+		downloaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
 	CREATE INDEX IF NOT EXISTS main.idx_activity_logs_created ON activity_logs(created_at DESC);
+	CREATE INDEX IF NOT EXISTS main.idx_download_logs_target ON download_logs(target_id, downloaded_at DESC);
+	CREATE INDEX IF NOT EXISTS main.idx_download_logs_uuid ON download_logs(secret_uuid);
 	`
 
 	if _, err := DB.Exec(accountSchema); err != nil {
@@ -163,6 +178,7 @@ func migrate() error {
 		is_trashed INTEGER DEFAULT 0,
 		trashed_at DATETIME NULL,
 		color TEXT NULL,
+		secret_uuid TEXT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY(parent_id) REFERENCES folders(id) ON DELETE CASCADE
@@ -181,6 +197,8 @@ func migrate() error {
 		is_starred INTEGER DEFAULT 0,
 		is_trashed INTEGER DEFAULT 0,
 		trashed_at DATETIME NULL,
+		secret_uuid TEXT NULL,
+		forensic_meta TEXT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY(folder_id) REFERENCES folders(id) ON DELETE CASCADE
@@ -228,6 +246,48 @@ func migrate() error {
 	}
 	// Existing users and admins are set to approved
 	_, _ = DB.Exec("UPDATE main.users SET status = 'approved' WHERE status IS NULL OR status = '' OR role = 'admin' OR role = 'owner'")
+
+	// Ensure secret_uuid and forensic_meta exist in files
+	var fUUIDCount int
+	_ = DB.QueryRow("SELECT COUNT(*) FROM drive.pragma_table_info('files') WHERE name='secret_uuid'").Scan(&fUUIDCount)
+	if fUUIDCount == 0 {
+		_, _ = DB.Exec("ALTER TABLE drive.files ADD COLUMN secret_uuid TEXT")
+		_, _ = DB.Exec("ALTER TABLE drive.files ADD COLUMN forensic_meta TEXT")
+	}
+
+	// Ensure secret_uuid exists in folders
+	var fldUUIDCount int
+	_ = DB.QueryRow("SELECT COUNT(*) FROM drive.pragma_table_info('folders') WHERE name='secret_uuid'").Scan(&fldUUIDCount)
+	if fldUUIDCount == 0 {
+		_, _ = DB.Exec("ALTER TABLE drive.folders ADD COLUMN secret_uuid TEXT")
+	}
+
+	// Create indices on secret_uuid now that columns are guaranteed to exist
+	_, _ = DB.Exec("CREATE INDEX IF NOT EXISTS drive.idx_folders_secret_uuid ON folders(secret_uuid)")
+	_, _ = DB.Exec("CREATE INDEX IF NOT EXISTS drive.idx_files_secret_uuid ON files(secret_uuid)")
+
+	// Backfill missing secret UUIDs for any existing files and folders
+	fileRows, err := DB.Query("SELECT id FROM drive.files WHERE secret_uuid IS NULL OR secret_uuid = ''")
+	if err == nil {
+		defer fileRows.Close()
+		for fileRows.Next() {
+			var fid string
+			if err := fileRows.Scan(&fid); err == nil {
+				_, _ = DB.Exec("UPDATE drive.files SET secret_uuid = ? WHERE id = ?", uuid.New().String(), fid)
+			}
+		}
+	}
+
+	folderRows, err := DB.Query("SELECT id FROM drive.folders WHERE secret_uuid IS NULL OR secret_uuid = ''")
+	if err == nil {
+		defer folderRows.Close()
+		for folderRows.Next() {
+			var fldID string
+			if err := folderRows.Scan(&fldID); err == nil {
+				_, _ = DB.Exec("UPDATE drive.folders SET secret_uuid = ? WHERE id = ?", uuid.New().String(), fldID)
+			}
+		}
+	}
 
 	// Ensure exactly one owner exists: if no owner exists, promote the first admin
 	var ownerCount int

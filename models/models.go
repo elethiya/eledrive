@@ -38,6 +38,7 @@ type Folder struct {
 	Color            *string   `json:"color,omitempty"`
 	SharedPermission *string   `json:"shared_permission,omitempty"` // viewer or editor
 	ItemCount        int       `json:"item_count,omitempty"`
+	SecretUUID       string    `json:"secret_uuid,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }
@@ -58,6 +59,8 @@ type File struct {
 	IsTrashed        bool      `json:"is_trashed"`
 	TrashedAt        *time.Time`json:"trashed_at,omitempty"`
 	SharedPermission *string   `json:"shared_permission,omitempty"` // viewer or editor
+	SecretUUID       string    `json:"secret_uuid,omitempty"`
+	ForensicMeta     string    `json:"forensic_meta,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }
@@ -155,4 +158,45 @@ type AdminUserDetail struct {
 	FilesCount   int       `json:"files_count"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type DownloadRecord struct {
+	ID           string    `json:"id"`
+	TargetType   string    `json:"target_type"` // "file" or "folder"
+	TargetID     string    `json:"target_id"`
+	SecretUUID   string    `json:"secret_uuid"`
+	UserID       string    `json:"user_id"`
+	UserName     string    `json:"user_name"`
+	UserEmail    string    `json:"user_email"`
+	IPAddress    string    `json:"ip_address"`
+	UserAgent    string    `json:"user_agent"`
+	DownloadedAt time.Time `json:"downloaded_at"`
+}
+
+type ForensicInspectionResult struct {
+	Matched          bool             `json:"matched"`
+	SecretUUID       string           `json:"secret_uuid"`
+	OriginalFilename string           `json:"original_filename"`
+	FileType         string           `json:"file_type"`
+	FileSize         int64            `json:"file_size"`
+	UploaderID       string           `json:"uploader_id"`
+	UploaderName     string           `json:"uploader_name"`
+	UploaderEmail    string           `json:"uploader_email"`
+	UploaderUsername string           `json:"uploader_username"`
+	UploadedAt       *time.Time       `json:"uploaded_at,omitempty"`
+	SignatureValid   bool             `json:"signature_valid"`
+	SHA256Checksum   string           `json:"sha256_checksum,omitempty"`
+	DownloadHistory  []DownloadRecord `json:"download_history"`
+	TargetID         string           `json:"target_id,omitempty"`
+	IsFolder         bool             `json:"is_folder"`
+	RiskAssessment   string           `json:"risk_assessment"` // "LEAK_IDENTIFIED", "NOT_FOUND", "AUTHENTIC"
+	MetadataSummary  string           `json:"metadata_summary"`
+}
+
+type SecurityStats struct {
+	TotalTrackedFiles    int              `json:"total_tracked_files"`
+	TotalTrackedFolders  int              `json:"total_tracked_folders"`
+	TotalDownloadsLogged int              `json:"total_downloads_logged"`
+	RecentDownloads      []DownloadRecord `json:"recent_downloads"`
+	RecentTrackedFiles   []File           `json:"recent_tracked_files"`
 }

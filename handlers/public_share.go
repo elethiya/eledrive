@@ -363,11 +363,11 @@ func (h *PublicShareHandler) DownloadPublic(w http.ResponseWriter, r *http.Reque
 	_, _ = db.DB.Exec("UPDATE share_links SET download_count = download_count + 1 WHERE id = ?", link.ID)
 
 	if link.TargetType == "file" {
-		var name, storagePath, mimeType string
+		var name, storagePath, mimeType, secretUUID string
 		var size int64
 		var updatedAt time.Time
-		err := db.DB.QueryRow("SELECT name, storage_path, mime_type, size, updated_at FROM files WHERE id = ?", link.TargetID).
-			Scan(&name, &storagePath, &mimeType, &size, &updatedAt)
+		err := db.DB.QueryRow("SELECT name, storage_path, mime_type, size, COALESCE(secret_uuid, ''), updated_at FROM files WHERE id = ?", link.TargetID).
+			Scan(&name, &storagePath, &mimeType, &size, &secretUUID, &updatedAt)
 		if err != nil {
 			utils.RespondError(w, http.StatusNotFound, "File not found")
 			return
@@ -381,6 +381,8 @@ func (h *PublicShareHandler) DownloadPublic(w http.ResponseWriter, r *http.Reque
 		}
 		defer file.Close()
 
+		utils.LogDownloadEvent(db.DB, "file", link.TargetID, secretUUID, "public_guest", "Public Link Visitor", link.Token, r.RemoteAddr, r.UserAgent())
+
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", name))
 		w.Header().Set("Content-Type", mimeType)
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", size))
@@ -389,12 +391,14 @@ func (h *PublicShareHandler) DownloadPublic(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Target is folder: stream entire folder as ZIP!
-	var folderName string
-	err = db.DB.QueryRow("SELECT name FROM folders WHERE id = ?", link.TargetID).Scan(&folderName)
+	var folderName, secretUUID string
+	err = db.DB.QueryRow("SELECT name, COALESCE(secret_uuid, '') FROM folders WHERE id = ?", link.TargetID).Scan(&folderName, &secretUUID)
 	if err != nil {
 		utils.RespondError(w, http.StatusNotFound, "Folder not found")
 		return
 	}
+
+	utils.LogDownloadEvent(db.DB, "folder", link.TargetID, secretUUID, "public_guest", "Public Link Visitor", link.Token, r.RemoteAddr, r.UserAgent())
 
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.zip\"", folderName))

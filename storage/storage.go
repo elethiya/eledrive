@@ -3,11 +3,13 @@ package storage
 import (
 	"archive/zip"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"eledrive/config"
 	"eledrive/db"
@@ -63,6 +65,31 @@ func (s *StorageService) DeleteFile(storagePath string) error {
 func (s *StorageService) ZipFolder(folderID string, folderName string, w io.Writer) error {
 	zipWriter := zip.NewWriter(w)
 	defer zipWriter.Close()
+
+	// Look up folder secret UUID
+	var secretUUID, ownerID string
+	_ = db.DB.QueryRow("SELECT COALESCE(secret_uuid, ''), owner_id FROM folders WHERE id = ?", folderID).Scan(&secretUUID, &ownerID)
+
+	// Embed forensic manifest inside root of ZIP
+	manifestName := fmt.Sprintf("%s/.eledrive_forensic_manifest.json", strings.Trim(folderName, "/"))
+	mf, err := zipWriter.Create(manifestName)
+	if err == nil {
+		manifestData := map[string]interface{}{
+			"security_classification": "ELEDRIVE_FORENSIC_TAGGED",
+			"folder_id":               folderID,
+			"folder_name":             folderName,
+			"secret_uuid":             secretUUID,
+			"owner_id":                ownerID,
+			"timestamp":               time.Now().UTC().Format(time.RFC3339),
+			"forensic_watermark":      "This folder and its contents are cryptographically fingerprinted to identify leaks.",
+		}
+		manifestJSON, _ := json.MarshalIndent(manifestData, "", "  ")
+		_, _ = mf.Write(manifestJSON)
+	}
+
+	if secretUUID != "" {
+		_ = zipWriter.SetComment(fmt.Sprintf("EleDrive Protected Asset | Secret UUID: %s", secretUUID))
+	}
 
 	// Recursively collect items
 	return s.addFolderToZip(folderID, folderName, zipWriter)

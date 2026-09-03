@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, FileText, Code2, Eye, File } from 'lucide-react';
+import { X, Download, FileText, Code2, Eye, File, Shield } from 'lucide-react';
 import { fileAPI } from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
 import { formatBytes, getFileTypeCategory } from '../../utils/formatters';
 
 export default function PreviewModal({ isOpen, onClose, file }) {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [previewData, setPreviewData] = useState(null);
   const [error, setError] = useState(null);
@@ -62,6 +64,14 @@ export default function PreviewModal({ isOpen, onClose, file }) {
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {file.secret_uuid && (
+              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-mono">
+                <Shield className="w-3 h-3 text-emerald-400" />
+                <span className="truncate max-w-[140px]" title={`Secret UUID: ${file.secret_uuid}`}>
+                  {file.secret_uuid.slice(0, 8)}...
+                </span>
+              </div>
+            )}
             <a
               href={downloadUrl}
               download={file.name}
@@ -81,6 +91,18 @@ export default function PreviewModal({ isOpen, onClose, file }) {
 
         {/* Content Viewer */}
         <div className="flex-1 bg-slate-950 text-slate-100 overflow-auto flex items-center justify-center relative">
+          {/* Dynamic Anti-Leak Watermark Overlay */}
+          <div className="absolute inset-0 pointer-events-none z-10 flex flex-col justify-around select-none overflow-hidden opacity-[0.07] rotate-[-15deg] scale-125">
+            {[...Array(8)].map((_, i) => (
+              <div
+                key={i}
+                className="whitespace-nowrap text-xs font-mono font-bold tracking-widest text-slate-100 text-center"
+              >
+                CONFIDENTIAL • {user?.email || user?.username || 'ELEDRIVE ASSET'} • UUID: {file.secret_uuid || file.id} • DO NOT SHARE
+              </div>
+            ))}
+          </div>
+
           {loading && (
             <div className="text-center text-slate-400 text-xs">Loading preview...</div>
           )}

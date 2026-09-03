@@ -48,20 +48,24 @@ func CheckFolderAccess(userID string, folderID string) (*models.Folder, string, 
 	var parentID sql.NullString
 	var color sql.NullString
 	var trashedAt sql.NullTime
+	var secretUUID sql.NullString
 
 	err := db.DB.QueryRow(`
-		SELECT f.id, f.name, f.parent_id, f.owner_id, u.name, u.email, f.is_starred, f.is_trashed, f.trashed_at, f.color, f.created_at, f.updated_at
+		SELECT f.id, f.name, f.parent_id, f.owner_id, u.name, u.email, f.is_starred, f.is_trashed, f.trashed_at, f.color, COALESCE(f.secret_uuid, ''), f.created_at, f.updated_at
 		FROM folders f
 		JOIN users u ON f.owner_id = u.id
 		WHERE f.id = ?
 	`, folderID).Scan(
 		&f.ID, &f.Name, &parentID, &f.OwnerID, &f.OwnerName, &f.OwnerEmail,
-		&f.IsStarred, &f.IsTrashed, &trashedAt, &color, &f.CreatedAt, &f.UpdatedAt,
+		&f.IsStarred, &f.IsTrashed, &trashedAt, &color, &secretUUID, &f.CreatedAt, &f.UpdatedAt,
 	)
 	if err != nil {
 		return nil, "", err
 	}
 
+	if secretUUID.Valid {
+		f.SecretUUID = secretUUID.String
+	}
 	if parentID.Valid {
 		f.ParentID = &parentID.String
 	}
@@ -289,12 +293,13 @@ func (h *FolderHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	folderID := uuid.New().String()
+	secretUUID := utils.GenerateSecretUUID()
 	now := time.Now()
 
 	_, err := db.DB.Exec(`
-		INSERT INTO folders (id, name, parent_id, owner_id, color, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`, folderID, req.Name, req.ParentID, ownerID, req.Color, now, now)
+		INSERT INTO folders (id, name, parent_id, owner_id, color, secret_uuid, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, folderID, req.Name, req.ParentID, ownerID, req.Color, secretUUID, now, now)
 
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, "Failed to create folder")
@@ -302,14 +307,17 @@ func (h *FolderHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	folder := models.Folder{
-		ID:        folderID,
-		Name:      req.Name,
-		ParentID:  req.ParentID,
-		OwnerID:   ownerID,
-		Color:     req.Color,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:         folderID,
+		Name:       req.Name,
+		ParentID:   req.ParentID,
+		OwnerID:    ownerID,
+		Color:      req.Color,
+		SecretUUID: secretUUID,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
+
+	db.LogActivity(claims.UserID, claims.Username, "create_folder", "folder", folderID, req.Name, fmt.Sprintf("Created folder '%s' [Secret UUID: %s]", req.Name, secretUUID))
 
 	utils.RespondJSON(w, http.StatusCreated, folder)
 }
@@ -496,6 +504,9 @@ func (h *FolderHandler) DownloadZip(w http.ResponseWriter, r *http.Request) {
 	zipFilename := fmt.Sprintf("%s.zip", f.Name)
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", zipFilename))
+
+	utils.LogDownloadEvent(db.DB, "folder", folderID, f.SecretUUID, claims.UserID, claims.Username, claims.Email, r.RemoteAddr, r.UserAgent())
+	db.LogActivity(claims.UserID, claims.Username, "download", "folder", folderID, f.Name, fmt.Sprintf("Downloaded folder ZIP archive [Secret UUID: %s]", f.SecretUUID))
 
 	err = h.storage.ZipFolder(folderID, f.Name, w)
 	if err != nil {

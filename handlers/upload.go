@@ -126,10 +126,18 @@ func (h *UploadHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		ext := filepath.Ext(filename)
 		mimeType := utils.DetectMimeType(filename)
 
+		// Generate Cryptographic Secret UUID and Forensic Watermark Meta
+		secretUUID := utils.GenerateSecretUUID()
+		metaJSON, _ := utils.BuildForensicMeta(secretUUID, claims.UserID, claims.Email, claims.Username, filename, h.cfg.JWTSecret)
+
+		// Inject physical forensic watermark into stored file bytes
+		fullDiskPath := h.storage.GetFilePath(storageDiskName)
+		_ = utils.InjectForensicWatermark(fullDiskPath, secretUUID, claims.UserID, claims.Email, claims.Username, h.cfg.JWTSecret)
+
 		_, err = db.DB.Exec(`
-			INSERT INTO files (id, name, original_name, folder_id, owner_id, storage_path, size, mime_type, extension, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, fileID, filename, filename, destFolderID, targetOwnerID, storageDiskName, writtenBytes, mimeType, ext, now, now)
+			INSERT INTO files (id, name, original_name, folder_id, owner_id, storage_path, size, mime_type, extension, secret_uuid, forensic_meta, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, fileID, filename, filename, destFolderID, targetOwnerID, storageDiskName, writtenBytes, mimeType, ext, secretUUID, metaJSON, now, now)
 
 		if err != nil {
 			_ = h.storage.DeleteFile(storageDiskName)
@@ -137,7 +145,7 @@ func (h *UploadHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		storageUsed += writtenBytes
-		db.LogActivity(claims.UserID, claims.Username, "upload", "file", fileID, filename, fmt.Sprintf("Uploaded %s (%d bytes)", filename, writtenBytes))
+		db.LogActivity(claims.UserID, claims.Username, "upload", "file", fileID, filename, fmt.Sprintf("Uploaded %s (%d bytes) [Secret UUID: %s]", filename, writtenBytes, secretUUID))
 
 		uploadedFiles = append(uploadedFiles, models.File{
 			ID:           fileID,
@@ -148,6 +156,8 @@ func (h *UploadHandler) Upload(w http.ResponseWriter, r *http.Request) {
 			Size:         writtenBytes,
 			MimeType:     mimeType,
 			Extension:    ext,
+			SecretUUID:   secretUUID,
+			ForensicMeta: metaJSON,
 			CreatedAt:    now,
 			UpdatedAt:    now,
 		})

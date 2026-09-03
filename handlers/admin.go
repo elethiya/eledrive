@@ -4,10 +4,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
+	"eledrive/config"
 	"eledrive/db"
 	"eledrive/middleware"
 	"eledrive/models"
@@ -18,11 +21,12 @@ import (
 )
 
 type AdminHandler struct {
+	cfg     *config.Config
 	storage *storage.StorageService
 }
 
-func NewAdminHandler(storage *storage.StorageService) *AdminHandler {
-	return &AdminHandler{storage: storage}
+func NewAdminHandler(cfg *config.Config, storage *storage.StorageService) *AdminHandler {
+	return &AdminHandler{cfg: cfg, storage: storage}
 }
 
 // RequireAdmin verifies that the authenticated user has role == "admin" or role == "owner"
@@ -409,3 +413,223 @@ func (h *AdminHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 	utils.RespondSuccess(w, http.StatusOK, "Settings updated successfully", req)
 }
+
+type InspectLeakRequest struct {
+	Query string `json:"query"` // UUID, filename, or token
+}
+
+// InspectLeak analyzes a suspect file or secret UUID to uncover who leaked it
+func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+	_ = claims
+
+	var suspectBytes []byte
+	var queryStr string
+
+	// Check if file was uploaded in multipart form
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		err := r.ParseMultipartForm(50 * 1024 * 1024) // up to 50MB for inspection
+		if err == nil && r.MultipartForm != nil {
+			if files := r.MultipartForm.File["file"]; len(files) > 0 {
+				f, err := files[0].Open()
+				if err == nil {
+					suspectBytes, _ = io.ReadAll(f)
+					f.Close()
+				}
+			}
+			if q := r.FormValue("query"); q != "" {
+				queryStr = strings.TrimSpace(q)
+			}
+		}
+	} else {
+		var req InspectLeakRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+			queryStr = strings.TrimSpace(req.Query)
+		}
+	}
+
+	result := &models.ForensicInspectionResult{
+		Matched:        false,
+		RiskAssessment: "NOT_FOUND",
+	}
+
+	var foundSecretUUID string
+
+	// 1. If physical file bytes were provided, extract embedded forensic metadata from file
+	if len(suspectBytes) > 0 {
+		extracted, err := utils.ExtractForensicWatermark(suspectBytes, h.cfg.JWTSecret)
+		if err == nil && extracted != nil && extracted.SecretUUID != "" {
+			result = extracted
+			foundSecretUUID = extracted.SecretUUID
+		}
+	}
+
+	// 2. If no watermark extracted from file, or if queryStr was provided, use queryStr
+	if foundSecretUUID == "" && queryStr != "" {
+		foundSecretUUID = queryStr
+	}
+
+	if foundSecretUUID == "" {
+		utils.RespondError(w, http.StatusBadRequest, "No forensic watermark found in uploaded file and no Secret UUID provided")
+		return
+	}
+
+	// 3. Query files table in database
+	var fileID, fileName, ownerID, uploaderName, uploaderEmail, uploaderUsername, mimeType string
+	var fileSize int64
+	var uploadedAt time.Time
+	var forensicMeta sql.NullString
+
+	err := db.DB.QueryRow(`
+		SELECT f.id, f.name, f.owner_id, u.name, u.email, u.username, f.size, f.mime_type, f.created_at, f.forensic_meta
+		FROM files f
+		JOIN users u ON f.owner_id = u.id
+		WHERE f.secret_uuid = ? OR f.id = ? OR LOWER(f.name) = LOWER(?)
+		LIMIT 1
+	`, foundSecretUUID, foundSecretUUID, foundSecretUUID).Scan(
+		&fileID, &fileName, &ownerID, &uploaderName, &uploaderEmail, &uploaderUsername, &fileSize, &mimeType, &uploadedAt, &forensicMeta,
+	)
+
+	if err == nil {
+		result.Matched = true
+		result.SecretUUID = foundSecretUUID
+		result.OriginalFilename = fileName
+		result.FileType = mimeType
+		result.FileSize = fileSize
+		result.UploaderID = ownerID
+		result.UploaderName = uploaderName
+		result.UploaderEmail = uploaderEmail
+		result.UploaderUsername = uploaderUsername
+		result.UploadedAt = &uploadedAt
+		result.TargetID = fileID
+		result.IsFolder = false
+		result.RiskAssessment = "LEAK_IDENTIFIED"
+		result.SignatureValid = true
+		result.MetadataSummary = fmt.Sprintf("Asset leaked from workspace. Originally uploaded by %s (%s).", uploaderName, uploaderEmail)
+
+		// Fetch download history for this file
+		result.DownloadHistory = h.getDownloadHistory("file", fileID, foundSecretUUID)
+
+		utils.RespondJSON(w, http.StatusOK, result)
+		return
+	}
+
+	// 4. Query folders table
+	var folderID, folderName, fOwnerID, fUploaderName, fUploaderEmail, fUploaderUsername string
+	var fUploadedAt time.Time
+
+	err = db.DB.QueryRow(`
+		SELECT f.id, f.name, f.owner_id, u.name, u.email, u.username, f.created_at
+		FROM folders f
+		JOIN users u ON f.owner_id = u.id
+		WHERE f.secret_uuid = ? OR f.id = ? OR LOWER(f.name) = LOWER(?)
+		LIMIT 1
+	`, foundSecretUUID, foundSecretUUID, foundSecretUUID).Scan(
+		&folderID, &folderName, &fOwnerID, &fUploaderName, &fUploaderEmail, &fUploaderUsername, &fUploadedAt,
+	)
+
+	if err == nil {
+		result.Matched = true
+		result.SecretUUID = foundSecretUUID
+		result.OriginalFilename = folderName
+		result.FileType = "Folder / Archive"
+		result.UploaderID = fOwnerID
+		result.UploaderName = fUploaderName
+		result.UploaderEmail = fUploaderEmail
+		result.UploaderUsername = fUploaderUsername
+		result.UploadedAt = &fUploadedAt
+		result.TargetID = folderID
+		result.IsFolder = true
+		result.RiskAssessment = "LEAK_IDENTIFIED"
+		result.SignatureValid = true
+		result.MetadataSummary = fmt.Sprintf("Folder archive leaked. Originally created by %s (%s).", fUploaderName, fUploaderEmail)
+
+		result.DownloadHistory = h.getDownloadHistory("folder", folderID, foundSecretUUID)
+
+		utils.RespondJSON(w, http.StatusOK, result)
+		return
+	}
+
+	// If metadata was extracted from file trailer itself even if deleted from DB
+	if result.UploaderEmail != "" {
+		result.Matched = true
+		result.MetadataSummary = fmt.Sprintf("Forensic metadata embedded inside file confirms uploader was %s (%s). (Asset was subsequently removed from workspace database).", result.UploaderName, result.UploaderEmail)
+		utils.RespondJSON(w, http.StatusOK, result)
+		return
+	}
+
+	utils.RespondError(w, http.StatusNotFound, fmt.Sprintf("No workspace asset matched the Secret UUID or forensic fingerprint: %s", foundSecretUUID))
+}
+
+func (h *AdminHandler) getDownloadHistory(targetType, targetID, secretUUID string) []models.DownloadRecord {
+	history := make([]models.DownloadRecord, 0)
+	rows, err := db.DB.Query(`
+		SELECT id, target_type, target_id, COALESCE(secret_uuid, ''), user_id, user_name, user_email, ip_address, user_agent, downloaded_at
+		FROM download_logs
+		WHERE target_id = ? OR secret_uuid = ?
+		ORDER BY downloaded_at DESC
+		LIMIT 50
+	`, targetID, secretUUID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var rec models.DownloadRecord
+			if err := rows.Scan(&rec.ID, &rec.TargetType, &rec.TargetID, &rec.SecretUUID, &rec.UserID, &rec.UserName, &rec.UserEmail, &rec.IPAddress, &rec.UserAgent, &rec.DownloadedAt); err == nil {
+				history = append(history, rec)
+			}
+		}
+	}
+	return history
+}
+
+func (h *AdminHandler) GetSecurityStats(w http.ResponseWriter, r *http.Request) {
+	var stats models.SecurityStats
+	_ = db.DB.QueryRow("SELECT COUNT(*) FROM files WHERE secret_uuid IS NOT NULL AND secret_uuid != ''").Scan(&stats.TotalTrackedFiles)
+	_ = db.DB.QueryRow("SELECT COUNT(*) FROM folders WHERE secret_uuid IS NOT NULL AND secret_uuid != ''").Scan(&stats.TotalTrackedFolders)
+	_ = db.DB.QueryRow("SELECT COUNT(*) FROM download_logs").Scan(&stats.TotalDownloadsLogged)
+
+	// Recent downloads
+	stats.RecentDownloads = make([]models.DownloadRecord, 0)
+	rows, err := db.DB.Query(`
+		SELECT id, target_type, target_id, COALESCE(secret_uuid, ''), user_id, user_name, user_email, ip_address, user_agent, downloaded_at
+		FROM download_logs
+		ORDER BY downloaded_at DESC LIMIT 20
+	`)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var rec models.DownloadRecord
+			if err := rows.Scan(&rec.ID, &rec.TargetType, &rec.TargetID, &rec.SecretUUID, &rec.UserID, &rec.UserName, &rec.UserEmail, &rec.IPAddress, &rec.UserAgent, &rec.DownloadedAt); err == nil {
+				stats.RecentDownloads = append(stats.RecentDownloads, rec)
+			}
+		}
+	}
+
+	// Recent tracked files
+	stats.RecentTrackedFiles = make([]models.File, 0)
+	fRows, err := db.DB.Query(`
+		SELECT f.id, f.name, f.original_name, f.folder_id, f.owner_id, u.name, u.email,
+		       f.size, f.mime_type, f.extension, f.secret_uuid, f.created_at, f.updated_at
+		FROM files f
+		JOIN users u ON f.owner_id = u.id
+		WHERE f.is_trashed = 0 AND f.secret_uuid IS NOT NULL AND f.secret_uuid != ''
+		ORDER BY f.created_at DESC LIMIT 10
+	`)
+	if err == nil {
+		defer fRows.Close()
+		for fRows.Next() {
+			var fl models.File
+			var pID sql.NullString
+			if err := fRows.Scan(&fl.ID, &fl.Name, &fl.OriginalName, &pID, &fl.OwnerID, &fl.OwnerName, &fl.OwnerEmail,
+				&fl.Size, &fl.MimeType, &fl.Extension, &fl.SecretUUID, &fl.CreatedAt, &fl.UpdatedAt); err == nil {
+				if pID.Valid {
+					fl.FolderID = &pID.String
+				}
+				stats.RecentTrackedFiles = append(stats.RecentTrackedFiles, fl)
+			}
+		}
+	}
+
+	utils.RespondJSON(w, http.StatusOK, stats)
+}
+

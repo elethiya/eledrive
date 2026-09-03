@@ -128,6 +128,15 @@ export const adminAPI = {
   deleteUser: (id) => api.delete(`/admin/users/${id}`),
   getSettings: () => api.get('/admin/settings'),
   updateSettings: (data) => api.put('/admin/settings', data),
+  inspectLeak: (formDataOrJson) => {
+    if (formDataOrJson instanceof FormData) {
+      return api.post('/admin/security/inspect', formDataOrJson, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.post('/admin/security/inspect', formDataOrJson);
+  },
+  getSecurityStats: () => api.get('/admin/security/stats'),
 };
 
 export default api;

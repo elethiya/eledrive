@@ -79,7 +79,7 @@ func main() {
 	publicShareHandler := handlers.NewPublicShareHandler(cfg, storageService)
 	statsHandler := handlers.NewStatsHandler(cfg, storageService)
 	profileHandler := handlers.NewProfileHandler()
-	adminHandler := handlers.NewAdminHandler(storageService)
+	adminHandler := handlers.NewAdminHandler(cfg, storageService)
 
 	r := chi.NewRouter()
 
@@ -186,6 +186,10 @@ func main() {
 				admin.Delete("/admin/users/{id}", adminHandler.DeleteUser)
 				admin.Get("/admin/settings", adminHandler.GetSettings)
 				admin.Put("/admin/settings", adminHandler.UpdateSettings)
+
+				// Security & Forensic Leak Tracker
+				admin.Post("/admin/security/inspect", adminHandler.InspectLeak)
+				admin.Get("/admin/security/stats", adminHandler.GetSecurityStats)
 			})
 		})
 	})

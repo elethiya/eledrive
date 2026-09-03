@@ -33,10 +33,12 @@ func CheckFileAccess(userID string, fileID string) (*models.File, string, error)
 	var f models.File
 	var folderID sql.NullString
 	var trashedAt sql.NullTime
+	var secretUUID, forensicMeta sql.NullString
 
 	err := db.DB.QueryRow(`
 		SELECT f.id, f.name, f.original_name, f.folder_id, f.owner_id, u.name, u.email,
 		       f.storage_path, f.size, f.mime_type, f.extension, f.is_starred, f.is_trashed, f.trashed_at,
+		       COALESCE(f.secret_uuid, ''), COALESCE(f.forensic_meta, ''),
 		       f.created_at, f.updated_at
 		FROM files f
 		JOIN users u ON f.owner_id = u.id
@@ -44,12 +46,19 @@ func CheckFileAccess(userID string, fileID string) (*models.File, string, error)
 	`, fileID).Scan(
 		&f.ID, &f.Name, &f.OriginalName, &folderID, &f.OwnerID, &f.OwnerName, &f.OwnerEmail,
 		&f.StoragePath, &f.Size, &f.MimeType, &f.Extension, &f.IsStarred, &f.IsTrashed, &trashedAt,
+		&secretUUID, &forensicMeta,
 		&f.CreatedAt, &f.UpdatedAt,
 	)
 	if err != nil {
 		return nil, "", err
 	}
 
+	if secretUUID.Valid {
+		f.SecretUUID = secretUUID.String
+	}
+	if forensicMeta.Valid {
+		f.ForensicMeta = forensicMeta.String
+	}
 	if folderID.Valid {
 		f.FolderID = &folderID.String
 	}
@@ -124,6 +133,11 @@ func (h *FileHandler) Download(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf("%s; filename=\"%s\"", disposition, f.Name))
 	w.Header().Set("Content-Type", f.MimeType)
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", f.Size))
+
+	if !isInline {
+		utils.LogDownloadEvent(db.DB, "file", f.ID, f.SecretUUID, claims.UserID, claims.Username, claims.Email, r.RemoteAddr, r.UserAgent())
+		db.LogActivity(claims.UserID, claims.Username, "download", "file", f.ID, f.Name, fmt.Sprintf("Downloaded %s [Secret UUID: %s]", f.Name, f.SecretUUID))
+	}
 
 	http.ServeContent(w, r, f.Name, f.UpdatedAt, file)
 }
