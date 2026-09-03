@@ -89,6 +89,22 @@ export default function AdminPage({ onBackToDrive }) {
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [savingUserEdit, setSavingUserEdit] = useState(false);
 
+  const handleOpenViewModal = (targetUser) => {
+    if (targetUser?.role === 'owner' && user?.role !== 'owner') {
+      toast.error("Admins cannot open, view, or touch the Workspace Owner account");
+      return;
+    }
+    setViewUserModal(targetUser);
+  };
+
+  const handleOpenEditModal = (targetUser) => {
+    if (targetUser?.role === 'owner' && user?.role !== 'owner') {
+      toast.error("Admins cannot open, view, or touch the Workspace Owner account");
+      return;
+    }
+    setEditUserModal(targetUser);
+  };
+
   // Logs Tab
   const [logs, setLogs] = useState([]);
   const [logAction, setLogAction] = useState('all');
@@ -598,27 +614,48 @@ export default function AdminPage({ onBackToDrive }) {
                         return (
                           <tr key={u.id} className="hover:bg-slate-850/50 transition-colors">
                             <td className="py-3.5 px-4">
-                              <button
-                                onClick={() => setViewUserModal(u)}
-                                className="flex items-center gap-3 text-left group hover:opacity-95 focus:outline-hidden"
-                                title="Click to view full user profile & activity"
-                              >
-                                <div
-                                  className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-sm shrink-0 ring-2 ring-slate-800 group-hover:ring-blue-500/50 transition-all shadow-xs"
-                                  style={{ backgroundColor: u.avatar_color || '#3b82f6' }}
+                              {u.role === 'owner' && user?.role !== 'owner' ? (
+                                <div className="flex items-center gap-3 select-none" title="Workspace Owner (Protected)">
+                                  <div
+                                    className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-sm shrink-0 ring-2 ring-amber-500/30 shadow-xs"
+                                    style={{ backgroundColor: u.avatar_color || '#f59e0b' }}
+                                  >
+                                    {u.name?.charAt(0).toUpperCase() || 'U'}
+                                  </div>
+                                  <div className="truncate max-w-[200px]">
+                                    <div className="font-semibold text-slate-100 flex items-center gap-1.5">
+                                      <span>{u.name}</span>
+                                      <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                    </div>
+                                    <div className="text-[11px] text-amber-400/80 font-medium flex items-center gap-1">
+                                      <Lock className="w-3 h-3 text-amber-400/80" />
+                                      <span>Account Protected</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => handleOpenViewModal(u)}
+                                  className="flex items-center gap-3 text-left group hover:opacity-95 focus:outline-hidden"
+                                  title="Click to view full user profile & activity"
                                 >
-                                  {u.name?.charAt(0).toUpperCase() || 'U'}
-                                </div>
-                                <div className="truncate max-w-[200px]">
-                                  <div className="font-semibold text-slate-100 flex items-center gap-1.5 group-hover:text-blue-400 transition-colors">
-                                    <span>{u.name}</span>
-                                    {u.role === 'owner' && <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                                  <div
+                                    className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-sm shrink-0 ring-2 ring-slate-800 group-hover:ring-blue-500/50 transition-all shadow-xs"
+                                    style={{ backgroundColor: u.avatar_color || '#3b82f6' }}
+                                  >
+                                    {u.name?.charAt(0).toUpperCase() || 'U'}
                                   </div>
-                                  <div className="text-[11px] text-slate-400 truncate">
-                                    @{u.username} • {u.email}
+                                  <div className="truncate max-w-[200px]">
+                                    <div className="font-semibold text-slate-100 flex items-center gap-1.5 group-hover:text-blue-400 transition-colors">
+                                      <span>{u.name}</span>
+                                      {u.role === 'owner' && <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                                    </div>
+                                    <div className="text-[11px] text-slate-400 truncate">
+                                      @{u.username} • {u.email}
+                                    </div>
                                   </div>
-                                </div>
-                              </button>
+                                </button>
+                              )}
                             </td>
                             <td className="py-3.5 px-4">
                               <span
@@ -647,75 +684,85 @@ export default function AdminPage({ onBackToDrive }) {
                               </span>
                             </td>
                             <td className="py-3.5 px-4">
-                              <div className="w-32">
-                                <div className="flex justify-between text-[10px] text-slate-400 mb-1">
-                                  <span>{formatBytes(u.storage_used)}</span>
-                                  <span>{formatBytes(u.storage_limit)}</span>
+                              {u.role === 'owner' && user?.role !== 'owner' ? (
+                                <div className="flex items-center gap-1.5 text-[11px] text-slate-500 italic">
+                                  <Lock className="w-3 h-3 text-amber-500/70" />
+                                  <span>Protected Quota</span>
                                 </div>
-                                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full rounded-full ${
-                                      usagePct > 90 ? 'bg-red-500' : 'bg-blue-500'
-                                    }`}
-                                    style={{ width: `${usagePct}%` }}
-                                  />
+                              ) : (
+                                <div className="w-32">
+                                  <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+                                    <span>{formatBytes(u.storage_used)}</span>
+                                    <span>{formatBytes(u.storage_limit)}</span>
+                                  </div>
+                                  <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full rounded-full ${
+                                        usagePct > 90 ? 'bg-red-500' : 'bg-blue-500'
+                                      }`}
+                                      style={{ width: `${usagePct}%` }}
+                                    />
+                                  </div>
                                 </div>
-                              </div>
+                              )}
                             </td>
                             <td className="py-3.5 px-4 text-slate-400 text-[11px]">
                               {formatDate(u.created_at)}
                             </td>
                             <td className="py-3.5 px-4 text-right">
                               <div className="flex items-center justify-end gap-1.5">
-                                {u.status === 'pending' && (
-                                  <>
-                                    <button
-                                      onClick={() => handleApproveUser(u.id)}
-                                      className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors"
-                                      title="Approve User Account"
-                                    >
-                                      <Check className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={() => handleRejectUser(u.id)}
-                                      className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
-                                      title="Reject User Account"
-                                    >
-                                      <X className="w-3.5 h-3.5" />
-                                    </button>
-                                  </>
-                                )}
-                                <button
-                                  onClick={() => setViewUserModal(u)}
-                                  className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors"
-                                  title="View User Full Details & Activity"
-                                >
-                                  <Eye className="w-3.5 h-3.5" />
-                                </button>
                                 {u.role === 'owner' && user?.role !== 'owner' ? (
                                   <span
-                                    className="p-1.5 rounded-lg bg-slate-900/60 text-slate-600 cursor-not-allowed inline-flex items-center justify-center"
-                                    title="Admins cannot edit or change the Owner's storage limit"
+                                    className="px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-semibold flex items-center gap-1.5 cursor-not-allowed select-none"
+                                    title="Workspace Owner: Admins cannot open, view, or touch the Owner account"
                                   >
-                                    <Lock className="w-3.5 h-3.5" />
+                                    <Lock className="w-3 h-3 text-amber-400" />
+                                    <span>Owner Protected</span>
                                   </span>
                                 ) : (
-                                  <button
-                                    onClick={() => setEditUserModal(u)}
-                                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
-                                    title={u.role === 'owner' ? 'Edit Self & Storage Limit' : 'Edit User'}
-                                  >
-                                    <Edit className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                                {u.role !== 'owner' && (
-                                  <button
-                                    onClick={() => handleDeleteUser(u.id)}
-                                    className="p-1.5 rounded-lg bg-slate-800 text-red-400 hover:bg-red-500/20 transition-colors"
-                                    title="Delete User"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
+                                  <>
+                                    {u.status === 'pending' && (
+                                      <>
+                                        <button
+                                          onClick={() => handleApproveUser(u.id)}
+                                          className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors"
+                                          title="Approve User Account"
+                                        >
+                                          <Check className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleRejectUser(u.id)}
+                                          className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                                          title="Reject User Account"
+                                        >
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                      </>
+                                    )}
+                                    <button
+                                      onClick={() => handleOpenViewModal(u)}
+                                      className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors"
+                                      title="View User Full Details & Activity"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleOpenEditModal(u)}
+                                      className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+                                      title={u.role === 'owner' ? 'Edit Self & Storage Limit' : 'Edit User'}
+                                    >
+                                      <Edit className="w-3.5 h-3.5" />
+                                    </button>
+                                    {u.role !== 'owner' && (
+                                      <button
+                                        onClick={() => handleDeleteUser(u.id)}
+                                        className="p-1.5 rounded-lg bg-slate-800 text-red-400 hover:bg-red-500/20 transition-colors"
+                                        title="Delete User"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </td>
@@ -1426,7 +1473,7 @@ export default function AdminPage({ onBackToDrive }) {
       </div>
 
       {/* Edit User Profile Window (Enhanced with extensive options) */}
-      {editUserModal && (
+      {editUserModal && (editUserModal.role !== 'owner' || user?.role === 'owner') && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
           <div className="relative bg-slate-900 rounded-3xl max-w-xl w-full border border-slate-800 p-5 sm:p-7 shadow-2xl shadow-black/80 space-y-5 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[90vh] overflow-y-auto">
             {/* Ambient Glow */}
@@ -1748,7 +1795,7 @@ export default function AdminPage({ onBackToDrive }) {
       )}
 
       {/* User Profile View Floating Window */}
-      {viewUserModal && (
+      {viewUserModal && (viewUserModal.role !== 'owner' || user?.role === 'owner') && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
           <div className="relative bg-slate-900 rounded-3xl max-w-2xl w-full shadow-2xl shadow-black/80 border border-slate-800 p-5 sm:p-7 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[90vh] overflow-y-auto flex flex-col space-y-5">
             {/* Ambient Top Glow */}

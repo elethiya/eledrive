@@ -121,6 +121,7 @@ func (h *AdminHandler) ClearLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
 	rows, err := db.DB.Query(`
 		SELECT u.id, u.email, u.username, u.name, u.avatar_color, u.role, COALESCE(u.status, 'approved') AS status,
 		       u.storage_used, u.storage_limit,
@@ -142,6 +143,14 @@ func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 			&u.ID, &u.Email, &u.Username, &u.Name, &u.AvatarColor, &u.Role, &u.Status,
 			&u.StorageUsed, &u.StorageLimit, &u.FilesCount, &u.CreatedAt, &u.UpdatedAt,
 		); err == nil {
+			// If viewer is an admin (not owner) and target user is owner:
+			// Mask sensitive data so admins cannot view owner's email, storage, or files
+			if claims.Role != "owner" && u.Role == "owner" {
+				u.Email = "[Owner Protected]"
+				u.StorageUsed = 0
+				u.StorageLimit = 0
+				u.FilesCount = 0
+			}
 			users = append(users, u)
 		}
 	}
@@ -267,10 +276,15 @@ func (h *AdminHandler) ApproveUser(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r.Context())
 	targetUserID := chi.URLParam(r, "id")
 
-	var userName, username string
-	err := db.DB.QueryRow("SELECT name, username FROM users WHERE id = ?", targetUserID).Scan(&userName, &username)
+	var userName, username, userRole string
+	err := db.DB.QueryRow("SELECT name, username, role FROM users WHERE id = ?", targetUserID).Scan(&userName, &username, &userRole)
 	if err != nil {
 		utils.RespondError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	if userRole == "owner" {
+		utils.RespondError(w, http.StatusForbidden, "Admins cannot modify or touch the Workspace Owner account")
 		return
 	}
 
@@ -289,10 +303,15 @@ func (h *AdminHandler) RejectUser(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r.Context())
 	targetUserID := chi.URLParam(r, "id")
 
-	var userName, username string
-	err := db.DB.QueryRow("SELECT name, username FROM users WHERE id = ?", targetUserID).Scan(&userName, &username)
+	var userName, username, userRole string
+	err := db.DB.QueryRow("SELECT name, username, role FROM users WHERE id = ?", targetUserID).Scan(&userName, &username, &userRole)
 	if err != nil {
 		utils.RespondError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	if userRole == "owner" {
+		utils.RespondError(w, http.StatusForbidden, "Admins cannot modify or touch the Workspace Owner account")
 		return
 	}
 
