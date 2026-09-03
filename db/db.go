@@ -11,7 +11,6 @@ import (
 	"eledrive/config"
 	"eledrive/utils"
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 	_ "modernc.org/sqlite"
 )
 
@@ -51,10 +50,6 @@ func InitDB(cfg *config.Config) (*sql.DB, error) {
 
 	if err := migrate(); err != nil {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
-	}
-
-	if err := seedDefaultData(); err != nil {
-		log.Printf("\033[1;33m[WARN]\033[0m Failed to seed default data: %v", err)
 	}
 
 	EnsureDefaultSettings()
@@ -245,80 +240,6 @@ func migrate() error {
 		`)
 	}
 
-	return nil
-}
-
-func seedDefaultData() error {
-	var count int
-	err := DB.QueryRow("SELECT COUNT(*) FROM main.users").Scan(&count)
-	if err != nil {
-		return err
-	}
-	if count > 0 {
-		return nil
-	}
-
-	// Create a default team owner user: admin@eledrive.local / password123
-	// and a teammate user: alex@eledrive.local / password123
-	hashedPw, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
-	if err != nil {
-		return err
-	}
-
-	adminID := uuid.New().String()
-	_, err = DB.Exec(`
-		INSERT INTO main.users (id, email, username, password_hash, name, avatar_color, role, status, storage_limit, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, 'owner', 'approved', ?, ?, ?)
-	`, adminID, "admin@eledrive.local", "admin", string(hashedPw), "Admin User", "#3b82f6", int64(20*1024*1024*1024), time.Now(), time.Now())
-	if err != nil {
-		return err
-	}
-
-	alexID := uuid.New().String()
-	_, err = DB.Exec(`
-		INSERT INTO main.users (id, email, username, password_hash, name, avatar_color, role, status, storage_limit, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, 'member', 'approved', ?, ?, ?)
-	`, alexID, "alex@eledrive.local", "alex", string(hashedPw), "Alex Miller", "#10b981", int64(10*1024*1024*1024), time.Now(), time.Now())
-	if err != nil {
-		return err
-	}
-
-	sarahID := uuid.New().String()
-	_, err = DB.Exec(`
-		INSERT INTO main.users (id, email, username, password_hash, name, avatar_color, role, status, storage_limit, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, 'member', 'approved', ?, ?, ?)
-	`, sarahID, "sarah@eledrive.local", "sarah", string(hashedPw), "Sarah Connor", "#8b5cf6", int64(10*1024*1024*1024), time.Now(), time.Now())
-	if err != nil {
-		return err
-	}
-
-	// Create starter project folder in drive.db
-	projectFolderID := uuid.New().String()
-	_, err = DB.Exec(`
-		INSERT INTO drive.folders (id, name, parent_id, owner_id, color, created_at, updated_at)
-		VALUES (?, ?, NULL, ?, ?, ?, ?)
-	`, projectFolderID, "Alpha Web Project", adminID, "#3b82f6", time.Now(), time.Now())
-	if err != nil {
-		return err
-	}
-
-	docsFolderID := uuid.New().String()
-	_, err = DB.Exec(`
-		INSERT INTO drive.folders (id, name, parent_id, owner_id, color, created_at, updated_at)
-		VALUES (?, ?, NULL, ?, ?, ?, ?)
-	`, docsFolderID, "Team Documentation", adminID, "#10b981", time.Now(), time.Now())
-	if err != nil {
-		return err
-	}
-
-	// Share "Alpha Web Project" with Alex as Editor
-	shareID := uuid.New().String()
-	_, _ = DB.Exec(`
-		INSERT INTO drive.shares (id, target_type, target_id, shared_by_user_id, shared_with_user_id, permission, created_at)
-		VALUES (?, 'folder', ?, ?, ?, 'editor', ?)
-	`, shareID, projectFolderID, adminID, alexID, time.Now())
-
-	log.Println("\033[1;32m[DB]\033[0m Initialized SQLite database with seed users")
 	return nil
 }
 

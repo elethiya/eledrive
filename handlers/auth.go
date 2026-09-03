@@ -100,10 +100,24 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	avatarColor := avatarColors[colorIndex]
 	now := time.Now()
 
+	// Check if this is the first user registering in the system
+	var totalUsers int
+	_ = db.DB.QueryRow("SELECT COUNT(*) FROM users").Scan(&totalUsers)
+
+	role := "member"
+	status := "pending"
+	quotaLimit := int64(10 * 1024 * 1024 * 1024) // 10 GB
+
+	if totalUsers == 0 {
+		role = "owner"
+		status = "approved"
+		quotaLimit = int64(20 * 1024 * 1024 * 1024) // 20 GB for Workspace Owner
+	}
+
 	_, err = db.DB.Exec(`
 		INSERT INTO users (id, email, username, password_hash, name, avatar_color, role, status, storage_limit, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, 'member', 'pending', ?, ?, ?)
-	`, userID, req.Email, req.Username, string(hashedPassword), req.Name, avatarColor, int64(10*1024*1024*1024), now, now)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, userID, req.Email, req.Username, string(hashedPassword), req.Name, avatarColor, role, status, quotaLimit, now, now)
 
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, "Failed to create user account")
@@ -116,12 +130,28 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		Username:     req.Username,
 		Name:         req.Name,
 		AvatarColor:  avatarColor,
-		Role:         "member",
-		Status:       "pending",
+		Role:         role,
+		Status:       status,
 		StorageUsed:  0,
-		StorageLimit: int64(10 * 1024 * 1024 * 1024),
+		StorageLimit: quotaLimit,
 		CreatedAt:    now,
 		UpdatedAt:    now,
+	}
+
+	if status == "approved" {
+		// First user becomes Owner and receives active session token
+		token, tokenErr := middleware.GenerateToken(userID, req.Username, req.Email, role, h.cfg)
+		if tokenErr == nil {
+			db.LogActivity(userID, req.Username, "register", "user", userID, req.Name, "First workspace user registered as Workspace Owner")
+			utils.RespondJSON(w, http.StatusCreated, map[string]interface{}{
+				"success": true,
+				"message": "Workspace initialized successfully! You are the Workspace Owner.",
+				"status":  "approved",
+				"token":   token,
+				"user":    user,
+			})
+			return
+		}
 	}
 
 	db.LogActivity(userID, req.Username, "register", "user", userID, req.Name, "New account registered (pending administrator approval)")

@@ -76,15 +76,14 @@ A modern, high-performance, self-hosted team cloud drive built with **Golang**, 
 
 ---
 
-## 👥 Seed Accounts
+## 👥 User Accounts & First-Time Setup
 
-| Account | Email | Password | Role |
-|---|---|---|---|
-| **Admin Lead** | `admin@eledrive.local` | `password123` | Administrator (Access to `/admin`) |
-| **Alex Miller** | `alex@eledrive.local` | `password123` | Team Member |
-| **Sarah Connor** | `sarah@eledrive.local` | `password123` | Team Member |
+EleDrive ships with **no hardcoded or default accounts**:
 
-*(You can switch between teammates in 1 click using the profile menu in the top-right corner of the interface)*.
+1. Open the application in your browser (`http://localhost:8080`).
+2. Navigate to the **Register** page (`/register`).
+3. The **first user** to register is automatically assigned as the **Workspace Owner** (`owner` role) with an active, approved status.
+4. Subsequent users register as standard team members (`member` role) in `pending` status, requiring manual approval by the Owner or an Administrator in the Admin Panel (`/admin`).
 
 ---
 

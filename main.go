@@ -19,9 +19,39 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {
+	// CLI helper flags for administration and set-owner.sh
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "--hash-password":
+			if len(os.Args) > 2 {
+				h, err := bcrypt.GenerateFromPassword([]byte(os.Args[2]), bcrypt.DefaultCost)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error hashing password: %v\n", err)
+					os.Exit(1)
+				}
+				fmt.Print(string(h))
+				os.Exit(0)
+			}
+			fmt.Fprintln(os.Stderr, "Usage: eledrive-app --hash-password <password>")
+			os.Exit(1)
+
+		case "--init-db":
+			cfg := config.LoadConfig()
+			database, err := db.InitDB(cfg)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to initialize database: %v\n", err)
+				os.Exit(1)
+			}
+			database.Close()
+			fmt.Println("Database initialized successfully.")
+			os.Exit(0)
+		}
+	}
+
 	cfg := config.LoadConfig()
 
 	// Initialize file & folder logger in database/logs/<date>/<time>.log/
