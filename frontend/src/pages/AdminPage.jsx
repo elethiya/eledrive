@@ -378,13 +378,13 @@ export default function AdminPage({ onBackToDrive }) {
             >
               {isOwner ? <Crown className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="text-sm font-bold text-slate-100">
+                <h1 className="text-xs sm:text-sm font-bold text-slate-100 truncate">
                   {isOwner ? 'EleDrive Workspace Owner Console' : 'EleDrive Admin Console'}
                 </h1>
                 <span
-                  className={`text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded border ${
+                  className={`text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded border shrink-0 ${
                     isOwner
                       ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
                       : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
@@ -393,14 +393,14 @@ export default function AdminPage({ onBackToDrive }) {
                   {isOwner ? 'Owner Level' : 'Admin'}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-400 hidden sm:block truncate">
                 Workspace Governance • Cryptographic Forensic Leak Attribution
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={async () => {
               setIsRefreshingStats(true);
@@ -416,7 +416,7 @@ export default function AdminPage({ onBackToDrive }) {
               }
             }}
             disabled={isRefreshingStats}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-all group disabled:opacity-60"
+            className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-all group disabled:opacity-60"
             title="Refresh dashboard metrics & data"
           >
             <RefreshCw
@@ -430,91 +430,92 @@ export default function AdminPage({ onBackToDrive }) {
       </header>
 
       {/* Main Content Area */}
-      <div className="p-6 max-w-7xl w-full mx-auto space-y-6">
-        {/* Top Executive Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-all">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-slate-400">Total Users</span>
-              <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
-                <Users className="w-4 h-4" />
+      <div className="p-3.5 sm:p-6 max-w-7xl w-full mx-auto space-y-4 sm:space-y-6">
+        {/* Top Executive Stats Cards (2-col on mobile, 4-col on desktop) */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+          <div className="p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-all">
+            <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-400 truncate">Total Users</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0">
+                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
-            <div className="text-2xl font-black text-slate-100">
+            <div className="text-xl sm:text-2xl font-black text-slate-100">
               {loadingStats ? '...' : stats?.total_users ?? 0}
             </div>
-            <div className="mt-2 flex items-center gap-1.5 text-[11px]">
+            <div className="mt-1.5 sm:mt-2 flex items-center gap-1.5 text-[10px] sm:text-[11px]">
               {stats?.pending_approvals > 0 ? (
-                <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 animate-pulse">
-                  {stats.pending_approvals} Pending Approval
+                <span className="px-1.5 sm:px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 animate-pulse text-[10px] sm:text-[11px]">
+                  {stats.pending_approvals} Pending
                 </span>
               ) : (
-                <span className="text-emerald-400 flex items-center gap-1">
-                  <CheckCircle className="w-3 h-3" /> All approved
+                <span className="text-emerald-400 flex items-center gap-1 truncate text-[10px] sm:text-[11px]">
+                  <CheckCircle className="w-3 h-3 shrink-0" /> All approved
                 </span>
               )}
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-all">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-slate-400">Forensic Assets</span>
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-                <Fingerprint className="w-4 h-4" />
+          <div className="p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-all">
+            <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-400 truncate">Forensic Assets</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
+                <Fingerprint className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
-            <div className="text-2xl font-black text-slate-100">
+            <div className="text-xl sm:text-2xl font-black text-slate-100">
               {loadingStats ? '...' : (stats?.total_files ?? 0) + (stats?.total_folders ?? 0)}
             </div>
-            <div className="mt-2 text-[11px] text-emerald-400 font-medium flex items-center gap-1">
-              <ShieldCheck className="w-3 h-3" /> 100% Watermarked & Tracked
+            <div className="mt-1.5 sm:mt-2 text-[10px] sm:text-[11px] text-emerald-400 font-medium flex items-center gap-1 truncate">
+              <ShieldCheck className="w-3 h-3 shrink-0" /> Watermarked
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-all">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-slate-400">Storage Usage</span>
-              <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
-                <HardDrive className="w-4 h-4" />
+          <div className="p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-all">
+            <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-400 truncate">Storage Usage</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center shrink-0">
+                <HardDrive className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
-            <div className="text-2xl font-black text-slate-100">
+            <div className="text-xl sm:text-2xl font-black text-slate-100 truncate">
               {loadingStats ? '...' : formatBytes(stats?.total_storage_used ?? 0)}
             </div>
-            <div className="mt-2 text-[11px] text-slate-400">
-              Across {stats?.total_files ?? 0} files in workspace
+            <div className="mt-1.5 sm:mt-2 text-[10px] sm:text-[11px] text-slate-400 truncate">
+              {stats?.total_files ?? 0} files total
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-all">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-slate-400">Protection Engine</span>
-              <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
-                <Lock className="w-4 h-4" />
+          <div className="p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-all">
+            <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-400 truncate">Engine Status</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
+                <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
-            <div className="text-sm font-bold text-slate-100 mt-1">
-              Steganographic & Cryptographic
+            <div className="text-xs sm:text-sm font-bold text-slate-100 mt-1 truncate">
+              Crypto Security
             </div>
-            <div className="mt-2 text-[11px] text-emerald-400 flex items-center gap-1 font-mono">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-              ACTIVE • SHA-256 HMAC
+            <div className="mt-1.5 sm:mt-2 text-[10px] sm:text-[11px] text-emerald-400 flex items-center gap-1 font-mono truncate">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block shrink-0" />
+              ACTIVE SHA-256
             </div>
           </div>
         </div>
 
-        {/* Tab Navigation Navigation */}
-        <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+        {/* Tab Navigation (Horizontal Scrollable on Mobile) */}
+        <div className="flex items-center gap-1.5 sm:gap-2 border-b border-slate-800 pb-2 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setActiveTab('users')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
               activeTab === 'users'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
                 : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>Users Management</span>
+            <span>Users</span>
+            <span className="hidden sm:inline">Management</span>
             {stats?.pending_approvals > 0 && (
               <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 font-black text-[10px]">
                 {stats.pending_approvals}
@@ -524,41 +525,44 @@ export default function AdminPage({ onBackToDrive }) {
 
           <button
             onClick={() => setActiveTab('security')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
               activeTab === 'security'
                 ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/30'
                 : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
             }`}
           >
             <Fingerprint className="w-4 h-4 text-emerald-400" />
-            <span>Forensic Leak Tracker</span>
-            <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-mono border border-emerald-500/30">
+            <span className="hidden sm:inline">Forensic </span>
+            <span>Leak Tracker</span>
+            <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-mono border border-emerald-500/30 hidden xs:inline">
               NEW
             </span>
           </button>
 
           <button
             onClick={() => setActiveTab('logs')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
               activeTab === 'logs'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
                 : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
             }`}
           >
             <ScrollText className="w-4 h-4" />
-            <span>Audit & Activity Logs</span>
+            <span className="hidden sm:inline">Audit & </span>
+            <span>Activity Logs</span>
           </button>
 
           <button
             onClick={() => setActiveTab('settings')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
               activeTab === 'settings'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
                 : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
             }`}
           >
             <Settings className="w-4 h-4" />
-            <span>Platform Settings</span>
+            <span className="hidden sm:inline">Platform </span>
+            <span>Settings</span>
           </button>
         </div>
 
@@ -1488,8 +1492,8 @@ export default function AdminPage({ onBackToDrive }) {
 
       {/* Edit User Profile Window (Enhanced with extensive options) */}
       {editUserModal && (editUserModal.role !== 'owner' || user?.role === 'owner') && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
-          <div className="relative bg-slate-900 rounded-3xl max-w-xl w-full border border-slate-800 p-5 sm:p-7 shadow-2xl shadow-black/80 space-y-5 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
+          <div className="relative bg-slate-900 rounded-2xl sm:rounded-3xl max-w-xl w-full border border-slate-800 p-4 sm:p-7 shadow-2xl shadow-black/80 space-y-4 sm:space-y-5 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto">
             {/* Ambient Glow */}
             <div className="absolute -top-16 -right-16 w-44 h-44 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -1810,8 +1814,8 @@ export default function AdminPage({ onBackToDrive }) {
 
       {/* User Profile View Floating Window */}
       {viewUserModal && (viewUserModal.role !== 'owner' || user?.role === 'owner') && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
-          <div className="relative bg-slate-900 rounded-3xl max-w-2xl w-full shadow-2xl shadow-black/80 border border-slate-800 p-5 sm:p-7 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[90vh] overflow-y-auto flex flex-col space-y-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
+          <div className="relative bg-slate-900 rounded-2xl sm:rounded-3xl max-w-2xl w-full shadow-2xl shadow-black/80 border border-slate-800 p-4 sm:p-7 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto flex flex-col space-y-4 sm:space-y-5">
             {/* Ambient Top Glow */}
             <div className="absolute -top-16 -left-16 w-44 h-44 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 

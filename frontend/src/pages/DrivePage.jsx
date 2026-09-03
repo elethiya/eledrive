@@ -326,7 +326,7 @@ export default function DrivePage({
             {/* New Folder quick button */}
             <button
               onClick={onOpenNewFolder}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-slate-900 hover:bg-slate-850 active:bg-slate-800 text-slate-200 border border-slate-800 rounded-xl text-xs font-semibold transition-colors shadow-xs shrink-0"
+              className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 bg-slate-900 hover:bg-slate-850 active:bg-slate-800 text-slate-200 border border-slate-800 rounded-xl text-xs font-semibold transition-colors shadow-xs shrink-0"
               title="Create a new folder"
             >
               <FolderPlus className="w-3.5 h-3.5 text-amber-400" />
@@ -337,7 +337,7 @@ export default function DrivePage({
             {!currentFolderId ? (
               <button
                 onClick={() => onOpenShare({ id: 'root', name: 'My Drive' }, 'drive')}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded-xl text-xs font-semibold transition-colors shadow-xs shrink-0"
+                className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded-xl text-xs font-semibold transition-colors shadow-xs shrink-0"
                 title="Share entire My Drive with a team"
               >
                 <Users className="w-3.5 h-3.5" />
@@ -346,7 +346,7 @@ export default function DrivePage({
             ) : (
               <button
                 onClick={() => onOpenShare(folder, 'folder')}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded-xl text-xs font-semibold transition-colors shadow-xs shrink-0"
+                className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded-xl text-xs font-semibold transition-colors shadow-xs shrink-0"
                 title="Share this folder with a team"
               >
                 <Users className="w-3.5 h-3.5" />
@@ -358,7 +358,7 @@ export default function DrivePage({
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-900 hover:bg-slate-850 active:bg-slate-800 text-slate-300 hover:text-slate-100 border border-slate-800 rounded-xl text-xs font-semibold transition-all shadow-xs shrink-0 group disabled:opacity-60"
+              className="flex items-center justify-center gap-1 p-2 sm:px-2.5 sm:py-1.5 bg-slate-900 hover:bg-slate-850 active:bg-slate-800 text-slate-300 hover:text-slate-100 border border-slate-800 rounded-xl text-xs font-semibold transition-all shadow-xs shrink-0 group disabled:opacity-60"
               title="Refresh contents"
             >
               <RefreshCw
@@ -366,7 +366,7 @@ export default function DrivePage({
                   isRefreshing ? 'animate-spin text-blue-400' : 'group-hover:rotate-180 text-slate-400 group-hover:text-slate-200'
                 }`}
               />
-              <span className="hidden md:inline text-[11px]">Refresh</span>
+              <span className="hidden sm:inline text-[11px]">Refresh</span>
             </button>
           </div>
         </div>

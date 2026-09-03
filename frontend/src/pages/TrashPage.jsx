@@ -106,7 +106,7 @@ export default function TrashPage() {
               }
             }}
             disabled={isRefreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-slate-100 border border-slate-800 rounded-xl text-xs font-semibold transition-all group disabled:opacity-60 shadow-xs"
+            className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-slate-100 border border-slate-800 rounded-xl text-xs font-semibold transition-all group disabled:opacity-60 shadow-xs"
             title="Refresh trash"
           >
             <RefreshCw
@@ -120,10 +120,11 @@ export default function TrashPage() {
           {!isEmpty && (
             <button
               onClick={handleEmptyTrash}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+              className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+              title="Empty Trash"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              <span>Empty Trash</span>
+              <span className="hidden sm:inline">Empty Trash</span>
             </button>
           )}
         </div>
@@ -169,11 +170,11 @@ export default function TrashPage() {
                     </span>
                     <button
                       onClick={() => handleRestore(f, true)}
-                      className="flex items-center gap-1 text-blue-400 hover:text-blue-300 font-semibold px-2 py-1 rounded-lg hover:bg-slate-800 transition-colors"
+                      className="flex items-center justify-center gap-1 text-blue-400 hover:text-blue-300 font-semibold p-1.5 sm:px-2 sm:py-1 rounded-lg hover:bg-slate-800 transition-colors"
                       title="Restore folder"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Restore</span>
+                      <span className="hidden sm:inline">Restore</span>
                     </button>
                     <button
                       onClick={() => handlePermanentDelete(f, true)}
@@ -205,11 +206,11 @@ export default function TrashPage() {
                     </span>
                     <button
                       onClick={() => handleRestore(fl, false)}
-                      className="flex items-center gap-1 text-blue-400 hover:text-blue-300 font-semibold px-2 py-1 rounded-lg hover:bg-slate-800 transition-colors"
+                      className="flex items-center justify-center gap-1 text-blue-400 hover:text-blue-300 font-semibold p-1.5 sm:px-2 sm:py-1 rounded-lg hover:bg-slate-800 transition-colors"
                       title="Restore file"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Restore</span>
+                      <span className="hidden sm:inline">Restore</span>
                     </button>
                     <button
                       onClick={() => handlePermanentDelete(fl, false)}

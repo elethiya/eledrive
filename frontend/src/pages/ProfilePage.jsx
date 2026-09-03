@@ -259,7 +259,7 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-500 mb-1">
                     Username
@@ -429,22 +429,22 @@ export default function ProfilePage() {
                       </button>
                     ))}
                   </div>
-                  <form onSubmit={handleUpdateSelfStorage} className="flex items-center gap-2">
-                    <div className="relative">
+                  <form onSubmit={handleUpdateSelfStorage} className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:flex-initial">
                       <input
                         type="number"
                         min="1"
                         max="100000"
                         value={selfLimitGB}
                         onChange={(e) => setSelfLimitGB(e.target.value)}
-                        className="w-24 px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-100 font-semibold focus:outline-hidden focus:border-amber-400 pr-8"
+                        className="w-full sm:w-24 px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-100 font-semibold focus:outline-hidden focus:border-amber-400 pr-8"
                       />
                       <span className="absolute right-2.5 top-1.5 text-[11px] text-slate-400 font-bold pointer-events-none">GB</span>
                     </div>
                     <button
                       type="submit"
                       disabled={savingSelfLimit}
-                      className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-all shadow-md disabled:opacity-50 flex items-center gap-1.5"
+                      className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5 shrink-0"
                     >
                       <Save className="w-3.5 h-3.5" />
                       <span>{savingSelfLimit ? 'Saving...' : 'Update'}</span>

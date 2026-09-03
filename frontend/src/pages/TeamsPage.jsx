@@ -454,16 +454,18 @@ export default function TeamsPage() {
                       </span>
 
                       {/* Action Button */}
-                      <div className="w-20 text-right">
+                      <div className="w-16 sm:w-20 text-right flex justify-end">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleOpenTeam(t.id);
                           }}
-                          className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shadow-xs"
+                          className="flex items-center justify-center gap-1.5 p-1.5 sm:px-3 sm:py-1 rounded-lg bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shadow-xs"
+                          title="Manage team"
                         >
-                          Manage
+                          <Settings className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Manage</span>
                         </button>
                       </div>
                     </div>
