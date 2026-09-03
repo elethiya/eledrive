@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { HardDrive, ArrowRight, Lock, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import RegistrationReviewScreen from '../components/RegistrationReviewScreen';
 
 export default function LoginPage({ onNavigateRegister }) {
   const { login } = useAuth();
@@ -8,6 +9,8 @@ export default function LoginPage({ onNavigateRegister }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isPendingReview, setIsPendingReview] = useState(false);
+  const [pendingIdentifier, setPendingIdentifier] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -16,7 +19,17 @@ export default function LoginPage({ onNavigateRegister }) {
     try {
       await login(emailOrUser, password);
     } catch (err) {
-      setError(err.message);
+      const errMsg = err.response?.data?.error || err.message || '';
+      if (
+        (err.response?.status === 403 && errMsg.toLowerCase().includes('pending')) ||
+        errMsg.toLowerCase().includes('pending administrator') ||
+        err.response?.data?.status === 'pending'
+      ) {
+        setPendingIdentifier(emailOrUser ? (emailOrUser.includes('@') ? emailOrUser : `@${emailOrUser}`) : '');
+        setIsPendingReview(true);
+      } else {
+        setError(errMsg);
+      }
     } finally {
       setLoading(false);
     }
@@ -42,20 +55,26 @@ export default function LoginPage({ onNavigateRegister }) {
           </div>
         </div>
 
-        <h2 className="text-lg font-bold text-slate-100 mb-1">Welcome back</h2>
-        <p className="text-xs text-slate-400 mb-6">
-          Sign in to access your projects, shared folders, and drive.
-        </p>
+        {isPendingReview ? (
+          <RegistrationReviewScreen
+            identifier={pendingIdentifier}
+            onReturn={() => {
+              setIsPendingReview(false);
+              setError('');
+            }}
+          />
+        ) : (
+          <>
+            <h2 className="text-lg font-bold text-slate-100 mb-1">Welcome back</h2>
+            <p className="text-xs text-slate-400 mb-6">
+              Sign in to access your projects, shared folders, and drive.
+            </p>
 
-        {error && (
-          <div className={`mb-4 p-3.5 rounded-2xl text-xs font-semibold flex items-start gap-2.5 ${
-            error.toLowerCase().includes('pending')
-              ? 'bg-amber-950/40 border border-amber-500/40 text-amber-300'
-              : 'bg-red-950/40 border border-red-500/40 text-red-300'
-          }`}>
-            <span>{error}</span>
-          </div>
-        )}
+            {error && (
+              <div className="mb-4 p-3.5 rounded-2xl text-xs font-semibold flex items-start gap-2.5 bg-red-950/40 border border-red-500/40 text-red-300">
+                <span>{error}</span>
+              </div>
+            )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -111,6 +130,8 @@ export default function LoginPage({ onNavigateRegister }) {
             Create Team Account
           </button>
         </div>
+          </>
+        )}
       </div>
     </div>
   );
