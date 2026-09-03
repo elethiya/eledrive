@@ -33,11 +33,14 @@ export default function NewFolderModal({ isOpen, onClose, onCreate }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-slate-900 rounded-2xl sm:rounded-3xl max-w-md w-full shadow-2xl border border-slate-800 p-4 sm:p-6 animate-in zoom-in-95 duration-150 text-slate-100">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
+      <div className="relative bg-slate-900 rounded-3xl max-w-md w-full shadow-2xl shadow-black/80 border border-slate-800 p-5 sm:p-6 animate-in zoom-in-95 duration-150 text-slate-100 overflow-hidden">
+        {/* Ambient Top Glow */}
+        <div className="absolute -top-16 -left-16 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex items-center justify-between pb-4 border-b border-slate-800 relative z-10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center shadow-md shadow-blue-500/10">
               <FolderPlus className="w-5 h-5" />
             </div>
             <div>
@@ -53,7 +56,7 @@ export default function NewFolderModal({ isOpen, onClose, onCreate }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+        <form onSubmit={handleSubmit} className="mt-5 space-y-4 relative z-10">
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5">
               Folder Name
@@ -64,7 +67,7 @@ export default function NewFolderModal({ isOpen, onClose, onCreate }) {
               placeholder="e.g. backend-api, assets"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full text-xs px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:border-blue-500 outline-none"
+              className="w-full text-xs px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:border-blue-500 outline-none shadow-inner transition-colors"
             />
           </div>
 
@@ -78,8 +81,8 @@ export default function NewFolderModal({ isOpen, onClose, onCreate }) {
                   key={c.hex}
                   type="button"
                   onClick={() => setSelectedColor(c.hex)}
-                  className={`w-7 h-7 rounded-full transition-transform ${
-                    selectedColor === c.hex ? 'scale-125 ring-2 ring-offset-2 ring-offset-slate-900 ring-blue-500' : 'hover:scale-110'
+                  className={`w-8 h-8 rounded-full transition-all ${
+                    selectedColor === c.hex ? 'scale-115 ring-2 ring-offset-2 ring-offset-slate-900 ring-blue-500 shadow-md' : 'hover:scale-105 opacity-80 hover:opacity-100'
                   }`}
                   style={{ backgroundColor: c.hex }}
                   title={c.label}
@@ -92,14 +95,14 @@ export default function NewFolderModal({ isOpen, onClose, onCreate }) {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-slate-800 rounded-xl transition-colors"
+              className="flex-1 sm:flex-none px-4 py-2.5 text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || !name.trim()}
-              className="px-5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl shadow-md shadow-blue-600/20 transition-all"
+              className="flex-1 sm:flex-none px-5 py-2.5 text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 rounded-xl shadow-lg shadow-blue-600/20 transition-all active:scale-95"
             >
               {loading ? 'Creating...' : 'Create Folder'}
             </button>

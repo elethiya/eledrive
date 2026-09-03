@@ -3,6 +3,7 @@ import {
   folderAPI,
   fileAPI,
 } from '../api/client';
+import { useConfirm } from '../context/ConfirmContext';
 import Breadcrumbs from '../components/Breadcrumbs';
 import FileCard from '../components/FileCard';
 import {
@@ -46,6 +47,7 @@ export default function DrivePage({
     subfolders: [],
     files: [],
   });
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -134,7 +136,13 @@ export default function DrivePage({
 
   const handleTrash = async (item) => {
     const isFolder = item.mime_type === undefined;
-    if (!confirm(`Are you sure you want to move "${item.name}" to trash?`)) return;
+    const ok = await confirm({
+      title: isFolder ? 'Move Folder to Trash' : 'Move File to Trash',
+      message: `Are you sure you want to move "${item.name}" to trash? You can restore it anytime from Trash.`,
+      confirmText: 'Move to Trash',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     try {
       if (isFolder) {

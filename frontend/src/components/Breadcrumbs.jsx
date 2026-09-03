@@ -70,11 +70,12 @@ export default function Breadcrumbs({
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             onClick={onShareFolder}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 hover:from-blue-600/30 hover:to-indigo-600/30 text-blue-400 border border-blue-500/30 rounded-xl text-xs font-semibold shadow-xs transition-all"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 hover:from-blue-600/30 hover:to-indigo-600/30 text-blue-400 border border-blue-500/30 rounded-xl text-xs font-semibold shadow-xs transition-all"
             title="Share entire My Drive with team"
           >
             <Users className="w-3.5 h-3.5" />
-            <span>Share Drive with Team</span>
+            <span className="hidden sm:inline">Share Drive with Team</span>
+            <span className="sm:hidden">Share</span>
           </button>
         </div>
       )}

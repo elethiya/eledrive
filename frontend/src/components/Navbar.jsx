@@ -138,6 +138,17 @@ export default function Navbar({
             <ChevronDown className="w-3 h-3 text-slate-400" />
           </button>
 
+          {/* Close button for mobile search bar overlay */}
+          {mobileSearchOpen && (
+            <button
+              onClick={() => setMobileSearchOpen(false)}
+              className="sm:hidden p-2 text-slate-400 hover:text-slate-100 rounded-xl hover:bg-slate-800 transition-colors shrink-0 ml-1"
+              title="Close search"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+
           {filterOpen && (
             <>
               <div

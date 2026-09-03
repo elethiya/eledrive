@@ -48,16 +48,19 @@ export default function MoveModal({ isOpen, onClose, item, onMove }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-slate-900 rounded-2xl sm:rounded-3xl max-w-md w-full shadow-2xl border border-slate-800 p-4 sm:p-6 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
+      <div className="relative bg-slate-900 rounded-3xl max-w-md w-full shadow-2xl shadow-black/80 border border-slate-800 p-5 sm:p-6 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Ambient Top Glow */}
+        <div className="absolute -top-16 -left-16 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex items-center justify-between pb-4 border-b border-slate-800 relative z-10 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shadow-md shadow-amber-500/10">
               <FolderInput className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-100">Move Item</h3>
-              <p className="text-xs text-slate-400 truncate max-w-[240px]">{item.name}</p>
+              <p className="text-xs text-slate-400 truncate max-w-[200px] sm:max-w-[240px]">{item.name}</p>
             </div>
           </div>
           <button
@@ -130,11 +133,11 @@ export default function MoveModal({ isOpen, onClose, item, onMove }) {
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2.5 pt-4 mt-4 border-t border-slate-800">
+        <div className="flex items-center justify-end gap-2.5 pt-4 mt-4 border-t border-slate-800 relative z-10 shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-slate-800 rounded-xl transition-colors"
+            className="flex-1 sm:flex-none px-4 py-2.5 text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors"
           >
             Cancel
           </button>
@@ -142,7 +145,7 @@ export default function MoveModal({ isOpen, onClose, item, onMove }) {
             type="button"
             disabled={loading}
             onClick={handleConfirm}
-            className="px-5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl shadow-md shadow-blue-600/20 transition-all"
+            className="flex-1 sm:flex-none px-5 py-2.5 text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 rounded-xl shadow-lg shadow-blue-600/20 transition-all active:scale-95"
           >
             {loading ? 'Moving...' : 'Move Here'}
           </button>

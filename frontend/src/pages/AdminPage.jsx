@@ -35,10 +35,12 @@ import {
 } from 'lucide-react';
 import { adminAPI } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 import { formatBytes, formatDate } from '../utils/formatters';
 
 export default function AdminPage({ onBackToDrive }) {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState('users'); // 'users' | 'security' | 'logs' | 'settings'
 
   // Admin Stats
@@ -243,7 +245,14 @@ export default function AdminPage({ onBackToDrive }) {
   };
 
   const handleRejectUser = async (id) => {
-    if (!confirm('Are you sure you want to reject this account?')) return;
+    const ok = await confirm({
+      title: 'Reject Account Request',
+      message: 'Are you sure you want to reject this pending user registration?',
+      confirmText: 'Reject Account',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
     try {
       await adminAPI.rejectUser(id);
       loadUsers();
@@ -254,7 +263,14 @@ export default function AdminPage({ onBackToDrive }) {
   };
 
   const handleDeleteUser = async (id) => {
-    if (!confirm('Are you sure you want to permanently delete this user account and their storage?')) return;
+    const ok = await confirm({
+      title: 'Delete User & Storage',
+      message: 'Are you sure you want to permanently delete this user account and all of their uploaded storage? This cannot be undone.',
+      confirmText: 'Delete User Permanently',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
     try {
       await adminAPI.deleteUser(id);
       loadUsers();
@@ -265,7 +281,14 @@ export default function AdminPage({ onBackToDrive }) {
   };
 
   const handleClearLogs = async () => {
-    if (!confirm('Are you sure you want to clear all activity logs?')) return;
+    const ok = await confirm({
+      title: 'Clear Activity Logs',
+      message: 'Are you sure you want to clear all forensic activity logs? This action cannot be undone.',
+      confirmText: 'Clear All Logs',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
     try {
       await adminAPI.clearLogs();
       loadLogs();

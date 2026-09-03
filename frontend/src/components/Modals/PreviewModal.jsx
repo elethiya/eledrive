@@ -39,8 +39,8 @@ export default function PreviewModal({ isOpen, onClose, file }) {
   const inlineUrl = fileAPI.getDownloadUrl(file.id, true);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-8 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-slate-900 rounded-2xl sm:rounded-3xl max-w-4xl w-full h-[90vh] sm:h-[85vh] shadow-2xl border border-slate-800 flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-8 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
+      <div className="bg-slate-900 rounded-2xl sm:rounded-3xl max-w-4xl w-full h-[92vh] sm:h-[85vh] shadow-2xl shadow-black/80 border border-slate-800 flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 text-slate-100">
         {/* Header */}
         <div className="h-14 sm:h-16 px-4 sm:px-6 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-950/60">
           <div className="flex items-center gap-2.5 sm:gap-3 truncate pr-2 sm:pr-4">

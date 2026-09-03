@@ -195,8 +195,8 @@ export default function FileCard({
       onClick={handleCardClick}
       className="group flex items-center justify-between px-3.5 sm:px-4 py-2.5 bg-slate-900/60 hover:bg-slate-850 active:bg-slate-800 rounded-xl border border-slate-800/80 hover:border-slate-700 transition-all select-none cursor-pointer text-xs text-slate-200"
     >
-      {/* Column 1: Icon + Name + Shared Pill + Extension badge */}
-      <div className="flex items-center gap-3 flex-1 min-w-0 pr-3 sm:pr-6">
+      {/* Column 1: Icon & Name & Mobile Details */}
+      <div className="flex items-center gap-3 flex-1 min-w-0 pr-2">
         <div
           className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border border-slate-800/80 shadow-inner"
           style={{
@@ -206,23 +206,32 @@ export default function FileCard({
           {renderIcon('w-4 h-4')}
         </div>
 
-        <div className="truncate flex items-center gap-2 min-w-0">
-          <span className="font-medium text-slate-200 truncate group-hover:text-blue-400 transition-colors">
-            {item.name}
-          </span>
-
-          {item.shared_permission && (
-            <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded-md shrink-0">
-              <Users className="w-2.5 h-2.5" />
-              <span>Shared</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="font-medium text-slate-200 truncate group-hover:text-blue-400 transition-colors text-xs sm:text-xs">
+              {item.name}
             </span>
-          )}
 
-          {!isFolder && extClean && (
-            <span className="hidden md:inline-block text-[9px] font-mono font-medium text-slate-400 uppercase px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800/80 shrink-0">
-              {extClean}
-            </span>
-          )}
+            {item.shared_permission && (
+              <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded-md shrink-0">
+                <Users className="w-2.5 h-2.5" />
+                <span className="hidden xs:inline">Shared</span>
+              </span>
+            )}
+
+            {!isFolder && extClean && (
+              <span className="hidden md:inline-block text-[9px] font-mono font-medium text-slate-400 uppercase px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800/80 shrink-0">
+                {extClean}
+              </span>
+            )}
+          </div>
+
+          {/* Mobile subtext: size / count + date */}
+          <div className="sm:hidden flex items-center gap-2 text-[10px] text-slate-500 font-mono mt-0.5">
+            <span>{isFolder ? `${item.item_count || 0} items` : formatBytes(item.size)}</span>
+            <span>•</span>
+            <span>{formatDate(item.updated_at)}</span>
+          </div>
         </div>
       </div>
 

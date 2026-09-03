@@ -3,9 +3,12 @@ import { statsAPI, folderAPI, fileAPI } from '../api/client';
 import { Trash2, RotateCcw, AlertTriangle, Folder, File } from 'lucide-react';
 import { formatBytes, formatDate } from '../utils/formatters';
 
+import { useConfirm } from '../context/ConfirmContext';
+
 export default function TrashPage() {
   const [data, setData] = useState({ folders: [], files: [] });
   const [loading, setLoading] = useState(true);
+  const confirm = useConfirm();
 
   useEffect(() => {
     loadTrash();
@@ -32,14 +35,19 @@ export default function TrashPage() {
       }
       loadTrash();
     } catch (e) {
-      alert(e.message);
+      console.error(e);
     }
   };
 
   const handlePermanentDelete = async (item, isFolder) => {
-    if (!confirm(`Permanently delete "${item.name}"? This action cannot be undone.`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: isFolder ? 'Permanently Delete Folder' : 'Permanently Delete File',
+      message: `Are you sure you want to permanently delete "${item.name}"? This action cannot be undone.`,
+      confirmText: 'Delete Permanently',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
     try {
       if (isFolder) {
         await folderAPI.permanentDeleteFolder(item.id);
@@ -48,19 +56,24 @@ export default function TrashPage() {
       }
       loadTrash();
     } catch (e) {
-      alert(e.message);
+      console.error(e);
     }
   };
 
   const handleEmptyTrash = async () => {
-    if (!confirm('Are you sure you want to empty the trash permanently? All items will be permanently erased.')) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Empty Trash Permanently',
+      message: 'Are you sure you want to empty the trash permanently? All items will be permanently erased.',
+      confirmText: 'Empty Trash',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
     try {
       await statsAPI.emptyTrash();
       loadTrash();
     } catch (e) {
-      alert(e.message);
+      console.error(e);
     }
   };
 

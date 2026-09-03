@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { teamAPI } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 import { formatDate } from '../utils/formatters';
 
 const TEAM_COLORS = [
@@ -33,6 +34,7 @@ const TEAM_COLORS = [
 
 export default function TeamsPage() {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -159,7 +161,14 @@ export default function TeamsPage() {
 
   const handleRemoveMember = async (userId) => {
     if (!activeTeam) return;
-    if (!confirm('Are you sure you want to remove this member from the team?')) return;
+    const ok = await confirm({
+      title: 'Remove Team Member',
+      message: 'Are you sure you want to remove this member from the team? They will lose access to all shared team folders.',
+      confirmText: 'Remove Member',
+      variant: 'warning',
+    });
+    if (!ok) return;
+
     try {
       await teamAPI.removeMember(activeTeam.id, userId);
       handleOpenTeam(activeTeam.id);
@@ -170,7 +179,14 @@ export default function TeamsPage() {
   };
 
   const handleDeleteTeam = async (teamId) => {
-    if (!confirm('Are you sure you want to delete this team? This cannot be undone.')) return;
+    const ok = await confirm({
+      title: 'Delete Team Workspace',
+      message: 'Are you sure you want to delete this team? This action cannot be undone and all team members will lose access.',
+      confirmText: 'Delete Team',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
     try {
       await teamAPI.deleteTeam(teamId);
       if (activeTeam?.id === teamId) setActiveTeam(null);
@@ -363,18 +379,21 @@ export default function TeamsPage() {
 
       {/* Create Team Modal */}
       {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-slate-900 rounded-3xl max-w-md w-full border border-slate-800 p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
+          <div className="relative bg-slate-900 rounded-3xl max-w-md w-full border border-slate-800 p-5 sm:p-6 shadow-2xl shadow-black/80 space-y-4 overflow-hidden">
+            {/* Ambient Top Glow */}
+            <div className="absolute -top-16 -left-16 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="flex items-center justify-between relative z-10">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold shadow-md shadow-blue-500/10">
                   <Users className="w-4 h-4" />
                 </div>
                 <h3 className="text-sm font-bold text-slate-100">Create New Team</h3>
               </div>
               <button
                 onClick={() => setCreateModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-200"
+                className="p-1.5 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-800 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -509,25 +528,28 @@ export default function TeamsPage() {
 
       {/* Team Details / Manage Modal */}
       {activeTeam && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-slate-900 rounded-3xl max-w-xl w-full border border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
+          <div className="relative bg-slate-900 rounded-3xl max-w-xl w-full border border-slate-800 shadow-2xl shadow-black/80 overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Ambient Top Glow */}
+            <div className="absolute -top-16 -left-16 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
             {/* Modal Header */}
-            <div className="p-6 border-b border-slate-800 bg-slate-950/60 flex items-start justify-between gap-4">
+            <div className="p-4 sm:p-6 border-b border-slate-800 bg-slate-950/60 flex items-start justify-between gap-4 relative z-10 shrink-0">
               <div className="flex items-center gap-3.5">
                 <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-white text-xl shadow-lg shrink-0"
+                  className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center font-bold text-white text-lg sm:text-xl shadow-lg shrink-0 ring-1 ring-white/10"
                   style={{ backgroundColor: activeTeam.avatar_color || '#3b82f6' }}
                 >
                   {activeTeam.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-base font-bold text-slate-100">{activeTeam.name}</h2>
+                    <h2 className="text-sm sm:text-base font-bold text-slate-100">{activeTeam.name}</h2>
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
                       {activeTeam.members?.length || 0} Members
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">
                     {activeTeam.description || 'No description set'}
                   </p>
                 </div>
@@ -535,14 +557,14 @@ export default function TeamsPage() {
 
               <button
                 onClick={() => setActiveTeam(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-200"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-6">
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-5 sm:space-y-6 relative z-10">
               {/* Add Member Section */}
               {(activeTeam.user_role === 'leader' || activeTeam.created_by_user_id === user?.id || user?.role === 'admin' || user?.role === 'owner') && (
                 <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
@@ -609,7 +631,7 @@ export default function TeamsPage() {
                   Team Members ({activeTeam.members?.length || 0})
                 </h4>
 
-                <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950">
+                <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950">
                   <table className="w-full text-left text-xs text-slate-300">
                     <thead className="bg-slate-900 text-slate-400 font-semibold border-b border-slate-800">
                       <tr>
