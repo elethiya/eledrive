@@ -75,6 +75,9 @@ func (h *StatsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
+		if err := rows.Err(); err != nil {
+			_ = err
+		}
 	}
 
 	utils.RespondJSON(w, http.StatusOK, models.DriveStats{
@@ -119,6 +122,10 @@ func (h *StatsHandler) GetRecent(w http.ResponseWriter, r *http.Request) {
 			files = append(files, f)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Database error")
+		return
+	}
 
 	utils.RespondJSON(w, http.StatusOK, files)
 }
@@ -156,6 +163,9 @@ func (h *StatsHandler) GetStarred(w http.ResponseWriter, r *http.Request) {
 				folders = append(folders, f)
 			}
 		}
+		if err := fRows.Err(); err != nil {
+			_ = err
+		}
 	}
 
 	// Files
@@ -183,6 +193,9 @@ func (h *StatsHandler) GetStarred(w http.ResponseWriter, r *http.Request) {
 				}
 				files = append(files, fl)
 			}
+		}
+		if err := fileRows.Err(); err != nil {
+			_ = err
 		}
 	}
 
@@ -227,6 +240,9 @@ func (h *StatsHandler) GetTrash(w http.ResponseWriter, r *http.Request) {
 				folders = append(folders, f)
 			}
 		}
+		if err := fRows.Err(); err != nil {
+			_ = err
+		}
 	}
 
 	// Trashed files
@@ -259,6 +275,9 @@ func (h *StatsHandler) GetTrash(w http.ResponseWriter, r *http.Request) {
 				files = append(files, fl)
 			}
 		}
+		if err := fileRows.Err(); err != nil {
+			_ = err
+		}
 	}
 
 	utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
@@ -278,6 +297,9 @@ func (h *StatsHandler) EmptyTrash(w http.ResponseWriter, r *http.Request) {
 			if err := rows.Scan(&path); err == nil {
 				_ = h.storage.DeleteFile(path)
 			}
+		}
+		if err := rows.Err(); err != nil {
+			_ = err
 		}
 		rows.Close()
 	}

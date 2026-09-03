@@ -107,6 +107,10 @@ func (h *AdminHandler) GetLogs(w http.ResponseWriter, r *http.Request) {
 			logs = append(logs, logEntry)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to read logs")
+		return
+	}
 
 	utils.RespondJSON(w, http.StatusOK, logs)
 }
@@ -153,6 +157,10 @@ func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 			}
 			users = append(users, u)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to read users")
+		return
 	}
 
 	utils.RespondJSON(w, http.StatusOK, users)
@@ -363,6 +371,9 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 				_ = h.storage.DeleteFile(path)
 			}
 		}
+		if err := rows.Err(); err != nil {
+			_ = err
+		}
 		rows.Close()
 	}
 
@@ -409,6 +420,9 @@ func (h *AdminHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			}
+		}
+		if err := rows.Err(); err != nil {
+			_ = err
 		}
 	}
 
@@ -461,7 +475,16 @@ type InspectLeakRequest struct {
 // InspectLeak analyzes a suspect file or secret UUID to uncover who leaked it
 func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r.Context())
-	_ = claims
+	actorID := ""
+	actorName := "Admin"
+	if claims != nil {
+		actorID = claims.UserID
+		if claims.Username != "" {
+			actorName = claims.Username
+		} else if claims.Email != "" {
+			actorName = claims.Email
+		}
+	}
 
 	var suspectBytes []byte
 	var queryStr string
@@ -548,7 +571,18 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 		result.MetadataSummary = fmt.Sprintf("Asset leaked from workspace. Originally uploaded by %s (%s).", uploaderName, uploaderEmail)
 
 		// Fetch download history for this file
-		result.DownloadHistory = h.getDownloadHistory("file", fileID, foundSecretUUID)
+		result.DownloadHistory = h.getDownloadHistory(fileID, foundSecretUUID)
+
+		// Record in audit log
+		db.LogActivity(
+			actorID,
+			actorName,
+			"forensic_inspect",
+			"file",
+			fileID,
+			fileName,
+			fmt.Sprintf("Forensic analysis run by @%s: Leaked asset matched! Uploader: %s (@%s), UUID: %s", actorName, uploaderName, uploaderUsername, foundSecretUUID),
+		)
 
 		utils.RespondJSON(w, http.StatusOK, result)
 		return
@@ -584,7 +618,18 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 		result.SignatureValid = true
 		result.MetadataSummary = fmt.Sprintf("Folder archive leaked. Originally created by %s (%s).", fUploaderName, fUploaderEmail)
 
-		result.DownloadHistory = h.getDownloadHistory("folder", folderID, foundSecretUUID)
+		result.DownloadHistory = h.getDownloadHistory(folderID, foundSecretUUID)
+
+		// Record in audit log
+		db.LogActivity(
+			actorID,
+			actorName,
+			"forensic_inspect",
+			"folder",
+			folderID,
+			folderName,
+			fmt.Sprintf("Forensic analysis run by @%s: Leaked folder matched! Creator: %s (@%s), UUID: %s", actorName, fUploaderName, fUploaderUsername, foundSecretUUID),
+		)
 
 		utils.RespondJSON(w, http.StatusOK, result)
 		return
@@ -594,14 +639,37 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 	if result.UploaderEmail != "" {
 		result.Matched = true
 		result.MetadataSummary = fmt.Sprintf("Forensic metadata embedded inside file confirms uploader was %s (%s). (Asset was subsequently removed from workspace database).", result.UploaderName, result.UploaderEmail)
+
+		// Record in audit log
+		db.LogActivity(
+			actorID,
+			actorName,
+			"forensic_inspect",
+			"forensic",
+			foundSecretUUID,
+			result.OriginalFilename,
+			fmt.Sprintf("Forensic trailer analysis by @%s: Confirmed uploader %s (%s) [UUID: %s]", actorName, result.UploaderName, result.UploaderEmail, foundSecretUUID),
+		)
+
 		utils.RespondJSON(w, http.StatusOK, result)
 		return
 	}
 
+	// Log unmatched forensic scan to activity audit logs
+	db.LogActivity(
+		actorID,
+		actorName,
+		"forensic_inspect",
+		"query",
+		foundSecretUUID,
+		queryStr,
+		fmt.Sprintf("Forensic analysis run by @%s for query '%s' [No matching asset found]", actorName, foundSecretUUID),
+	)
+
 	utils.RespondError(w, http.StatusNotFound, fmt.Sprintf("No workspace asset matched the Secret UUID or forensic fingerprint: %s", foundSecretUUID))
 }
 
-func (h *AdminHandler) getDownloadHistory(targetType, targetID, secretUUID string) []models.DownloadRecord {
+func (h *AdminHandler) getDownloadHistory(targetID, secretUUID string) []models.DownloadRecord {
 	history := make([]models.DownloadRecord, 0)
 	rows, err := db.DB.Query(`
 		SELECT id, target_type, target_id, COALESCE(secret_uuid, ''), user_id, user_name, user_email, ip_address, user_agent, downloaded_at
@@ -617,6 +685,9 @@ func (h *AdminHandler) getDownloadHistory(targetType, targetID, secretUUID strin
 			if err := rows.Scan(&rec.ID, &rec.TargetType, &rec.TargetID, &rec.SecretUUID, &rec.UserID, &rec.UserName, &rec.UserEmail, &rec.IPAddress, &rec.UserAgent, &rec.DownloadedAt); err == nil {
 				history = append(history, rec)
 			}
+		}
+		if err := rows.Err(); err != nil {
+			_ = err
 		}
 	}
 	return history
@@ -643,6 +714,9 @@ func (h *AdminHandler) GetSecurityStats(w http.ResponseWriter, r *http.Request) 
 				stats.RecentDownloads = append(stats.RecentDownloads, rec)
 			}
 		}
+		if err := rows.Err(); err != nil {
+			_ = err
+		}
 	}
 
 	// Recent tracked files
@@ -667,6 +741,9 @@ func (h *AdminHandler) GetSecurityStats(w http.ResponseWriter, r *http.Request) 
 				}
 				stats.RecentTrackedFiles = append(stats.RecentTrackedFiles, fl)
 			}
+		}
+		if err := fRows.Err(); err != nil {
+			_ = err
 		}
 	}
 

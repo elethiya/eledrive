@@ -62,6 +62,10 @@ func (h *TeamHandler) ListTeams(w http.ResponseWriter, r *http.Request) {
 			teams = append(teams, tm)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to read teams")
+		return
+	}
 
 	utils.RespondJSON(w, http.StatusOK, teams)
 }
@@ -199,6 +203,9 @@ func (h *TeamHandler) GetTeam(w http.ResponseWriter, r *http.Request) {
 			if err := membersRows.Scan(&m.ID, &m.TeamID, &m.UserID, &m.Name, &m.Username, &m.Email, &m.AvatarColor, &m.Role, &m.JoinedAt); err == nil {
 				tm.Members = append(tm.Members, m)
 			}
+		}
+		if err := membersRows.Err(); err != nil {
+			_ = err
 		}
 	}
 	tm.MembersCount = len(tm.Members)
@@ -365,6 +372,10 @@ func (h *TeamHandler) GetAvailableUsers(w http.ResponseWriter, r *http.Request) 
 		if err := rows.Scan(&u.ID, &u.Email, &u.Username, &u.Name, &u.AvatarColor); err == nil {
 			users = append(users, u)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to read users")
+		return
 	}
 
 	utils.RespondJSON(w, http.StatusOK, users)

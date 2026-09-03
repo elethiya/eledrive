@@ -252,8 +252,10 @@ export default function AdminPage({ onBackToDrive }) {
       if (res.data) {
         setInspectionResult(res.data);
       }
+      loadLogs();
     } catch (err) {
       setInspectError(err.response?.data?.error || err.message || 'Forensic analysis failed to find matching asset.');
+      loadLogs();
     } finally {
       setInspecting(false);
     }
@@ -1278,9 +1280,10 @@ export default function AdminPage({ onBackToDrive }) {
                 <select
                   value={logAction}
                   onChange={(e) => setLogAction(e.target.value)}
-                  className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-hidden"
+                  className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-hidden font-medium"
                 >
                   <option value="all">All Actions</option>
+                  <option value="forensic_inspect">Forensic Scans</option>
                   <option value="upload">Uploads</option>
                   <option value="download">Downloads</option>
                   <option value="share">Shares</option>
@@ -1334,9 +1337,21 @@ export default function AdminPage({ onBackToDrive }) {
                             {l.user_name}
                           </td>
                           <td className="py-3 px-4">
-                            <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 font-mono text-[10px] uppercase font-bold text-slate-300">
-                              {l.action}
-                            </span>
+                            {l.action === 'forensic_inspect' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 font-mono text-[10px] uppercase font-bold text-emerald-400 shadow-xs">
+                                <Fingerprint className="w-3 h-3 text-emerald-400" />
+                                <span>Forensic Scan</span>
+                              </span>
+                            ) : l.action === 'download' && l.details?.includes('Secret UUID') ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-500/15 border border-blue-500/30 font-mono text-[10px] uppercase font-bold text-blue-400">
+                                <Download className="w-3 h-3 text-blue-400" />
+                                <span>Download</span>
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 font-mono text-[10px] uppercase font-bold text-slate-300">
+                                {l.action}
+                              </span>
+                            )}
                           </td>
                           <td className="py-3 px-4 font-medium text-slate-100 truncate max-w-[200px]">
                             {l.item_name}
@@ -2037,13 +2052,18 @@ export default function AdminPage({ onBackToDrive }) {
 
                 {(() => {
                   const userLogs = (logs || []).filter(
-                    (l) => l.user_id === viewUserModal.id || l.user_name === viewUserModal.name || l.user_name === viewUserModal.username
-                  ).slice(0, 8);
+                    (l) =>
+                      l.user_id === viewUserModal.id ||
+                      l.user_name === viewUserModal.name ||
+                      l.user_name === viewUserModal.username ||
+                      l.details?.toLowerCase().includes(viewUserModal.username.toLowerCase()) ||
+                      l.details?.toLowerCase().includes(viewUserModal.email.toLowerCase())
+                  ).slice(0, 10);
 
                   if (userLogs.length === 0) {
                     return (
                       <div className="text-center py-4 text-xs text-slate-500">
-                        No forensic activity recorded for this user yet.
+                        No activity or forensic records logged for this user yet.
                       </div>
                     );
                   }
@@ -2056,9 +2076,16 @@ export default function AdminPage({ onBackToDrive }) {
                           className="flex items-center justify-between p-2 rounded-xl bg-slate-900/70 border border-slate-800/70 text-xs gap-2"
                         >
                           <div className="flex items-center gap-2 truncate min-w-0">
-                            <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono text-[10px] font-semibold uppercase shrink-0">
-                              {log.action}
-                            </span>
+                            {log.action === 'forensic_inspect' ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 font-mono text-[10px] font-bold uppercase shrink-0 border border-emerald-500/30">
+                                <Fingerprint className="w-2.5 h-2.5" />
+                                <span>Forensic</span>
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono text-[10px] font-semibold uppercase shrink-0">
+                                {log.action}
+                              </span>
+                            )}
                             <span className="text-slate-300 truncate font-medium">{log.item_name || log.details}</span>
                           </div>
                           <span className="text-[10px] text-slate-500 shrink-0">

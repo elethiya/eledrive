@@ -444,6 +444,10 @@ func (h *FileHandler) Search(w http.ResponseWriter, r *http.Request) {
 			files = append(files, f)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to read search files")
+		return
+	}
 
 	// Find matching folders
 	fRows, err := db.DB.Query(`
@@ -476,6 +480,9 @@ func (h *FileHandler) Search(w http.ResponseWriter, r *http.Request) {
 				}
 				folders = append(folders, f)
 			}
+		}
+		if err := fRows.Err(); err != nil {
+			_ = err
 		}
 	}
 

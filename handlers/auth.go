@@ -203,10 +203,11 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Verify account status
 	if user.Role != "admin" && user.Role != "owner" {
-		if user.Status == "pending" {
+		switch user.Status {
+		case "pending":
 			utils.RespondError(w, http.StatusForbidden, "Your account is pending administrator verification and approval. Please wait for an administrator to approve your account.")
 			return
-		} else if user.Status == "rejected" {
+		case "rejected":
 			utils.RespondError(w, http.StatusForbidden, "Your account registration was rejected by an administrator.")
 			return
 		}
@@ -289,6 +290,10 @@ func (h *AuthHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
 			users = append(users, u)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to read users")
+		return
+	}
 
 	utils.RespondJSON(w, http.StatusOK, users)
 }
@@ -311,6 +316,10 @@ func (h *AuthHandler) ListTeamMembers(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(&u.ID, &u.Email, &u.Username, &u.Name, &u.AvatarColor); err == nil {
 			users = append(users, u)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to read members")
+		return
 	}
 
 	utils.RespondJSON(w, http.StatusOK, users)

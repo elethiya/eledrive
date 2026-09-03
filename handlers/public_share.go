@@ -210,9 +210,6 @@ func (h *PublicShareHandler) GetPublicShareInfo(w http.ResponseWriter, r *http.R
 	}
 
 	link.HasPassword = pwHash.Valid
-	if expAt.Valid {
-		link.ExpiresAt = &expAt.Time
-	}
 
 	// Check password if provided in header or query
 	providedPw := r.Header.Get("X-Share-Password")
@@ -293,6 +290,9 @@ func (h *PublicShareHandler) GetPublicShareInfo(w http.ResponseWriter, r *http.R
 				files = append(files, fl)
 			}
 		}
+		if err := fileRows.Err(); err != nil {
+			_ = err
+		}
 	}
 
 	// Fetch subfolders in this folder
@@ -322,6 +322,9 @@ func (h *PublicShareHandler) GetPublicShareInfo(w http.ResponseWriter, r *http.R
 				}
 				subfolders = append(subfolders, sf)
 			}
+		}
+		if err := folderRows.Err(); err != nil {
+			_ = err
 		}
 	}
 

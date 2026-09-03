@@ -55,15 +55,16 @@ func (h *ShareHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify permissions on target
-	if req.TargetType == "drive" {
+	switch req.TargetType {
+	case "drive":
 		req.TargetID = claims.UserID
-	} else if req.TargetType == "folder" {
+	case "folder":
 		_, perm, err := CheckFolderAccess(claims.UserID, req.TargetID)
 		if err != nil || (perm != "owner" && perm != "editor") {
 			utils.RespondError(w, http.StatusForbidden, "No permission to share this folder")
 			return
 		}
-	} else if req.TargetType == "file" {
+	case "file":
 		_, perm, err := CheckFileAccess(claims.UserID, req.TargetID)
 		if err != nil || (perm != "owner" && perm != "editor") {
 			utils.RespondError(w, http.StatusForbidden, "No permission to share this file")
@@ -108,6 +109,9 @@ func (h *ShareHandler) Create(w http.ResponseWriter, r *http.Request) {
 				if err := memberRows.Scan(&mUID); err == nil {
 					memberIDs = append(memberIDs, mUID)
 				}
+			}
+			if err := memberRows.Err(); err != nil {
+				_ = err
 			}
 			memberRows.Close()
 		}
@@ -270,6 +274,9 @@ func (h *ShareHandler) GetSharedWithMe(w http.ResponseWriter, r *http.Request) {
 				folders = append(folders, f)
 			}
 		}
+		if err := folderRows.Err(); err != nil {
+			_ = err
+		}
 	}
 
 	// Shared files (includes direct shares and team shares)
@@ -307,6 +314,9 @@ func (h *ShareHandler) GetSharedWithMe(w http.ResponseWriter, r *http.Request) {
 				files = append(files, f)
 			}
 		}
+		if err := fileRows.Err(); err != nil {
+			_ = err
+		}
 	}
 
 	utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
@@ -327,15 +337,16 @@ func (h *ShareHandler) GetTargetShares(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check access
-	if targetType == "drive" {
+	switch targetType {
+	case "drive":
 		targetID = claims.UserID
-	} else if targetType == "folder" {
+	case "folder":
 		_, perm, err := CheckFolderAccess(claims.UserID, targetID)
 		if err != nil || (perm != "owner" && perm != "editor") {
 			utils.RespondError(w, http.StatusForbidden, "Access denied")
 			return
 		}
-	} else {
+	default:
 		_, perm, err := CheckFileAccess(claims.UserID, targetID)
 		if err != nil || (perm != "owner" && perm != "editor") {
 			utils.RespondError(w, http.StatusForbidden, "Access denied")
@@ -368,6 +379,10 @@ func (h *ShareHandler) GetTargetShares(w http.ResponseWriter, r *http.Request) {
 			s.SharedWith = &u
 			shares = append(shares, s)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to read shares")
+		return
 	}
 
 	utils.RespondJSON(w, http.StatusOK, shares)
