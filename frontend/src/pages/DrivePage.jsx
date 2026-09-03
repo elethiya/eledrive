@@ -7,7 +7,6 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import FileCard from '../components/FileCard';
 import {
   FolderPlus,
-  Upload,
   HardDrive,
   UploadCloud,
 } from 'lucide-react';
@@ -54,17 +53,14 @@ export default function DrivePage({
 
   const handleOpenItem = (item) => {
     if (item.mime_type === undefined) {
-      // It's a folder
       setCurrentFolderId(item.id);
     } else {
-      // It's a file
       onOpenPreview(item);
     }
   };
 
   const handleDownload = (item) => {
     if (item.mime_type === undefined) {
-      // Folder -> zip
       window.location.href = folderAPI.getDownloadZipUrl(item.id);
     } else {
       window.location.href = fileAPI.getDownloadUrl(item.id);
@@ -121,7 +117,7 @@ export default function DrivePage({
 
   return (
     <div
-      className="flex-1 flex flex-col h-full overflow-hidden relative"
+      className="flex-1 flex flex-col h-full overflow-hidden relative bg-slate-950 text-slate-100"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -136,10 +132,10 @@ export default function DrivePage({
 
       {/* Drag & Drop Visual Overlay */}
       {isDragOver && (
-        <div className="absolute inset-0 bg-blue-600/10 border-2 border-dashed border-blue-500 z-40 flex items-center justify-center pointer-events-none backdrop-blur-xs">
-          <div className="bg-white px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-blue-600 font-bold text-sm">
+        <div className="absolute inset-0 bg-blue-950/80 border-2 border-dashed border-blue-500 z-40 flex items-center justify-center pointer-events-none backdrop-blur-xs">
+          <div className="bg-slate-900 border border-blue-500/50 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 text-blue-400 font-bold text-sm">
             <UploadCloud className="w-6 h-6 animate-bounce" />
-            <span>Drop files or folders here to upload</span>
+            <span>Drop files or projects here to upload</span>
           </div>
         </div>
       )}
@@ -147,24 +143,24 @@ export default function DrivePage({
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
-          <div className="h-64 flex items-center justify-center text-slate-600 text-sm">
-            Loading folder contents...
+          <div className="h-64 flex items-center justify-center text-slate-500 text-xs">
+            Loading drive contents...
           </div>
         ) : isEmpty ? (
           <div className="h-96 flex flex-col items-center justify-center text-center max-w-sm mx-auto">
-            <div className="w-16 h-16 rounded-3xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
+            <div className="w-16 h-16 rounded-3xl bg-slate-900 border border-slate-800 text-blue-400 flex items-center justify-center mb-4 shadow-xl">
               <HardDrive className="w-8 h-8" />
             </div>
-            <h3 className="text-base font-bold text-slate-800 mb-1">This folder is empty</h3>
-            <p className="text-xs text-slate-600 mb-6">
-              Drag & drop files or folders here, or click below to get started.
+            <h3 className="text-base font-bold text-slate-100 mb-1">This folder is empty</h3>
+            <p className="text-xs text-slate-400 mb-6">
+              Drag & drop files or project folders here, or click below to create a new folder.
             </p>
             <div className="flex items-center gap-3">
               <button
                 onClick={onOpenNewFolder}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-all"
+                className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 rounded-xl text-xs font-semibold transition-all shadow-md"
               >
-                <FolderPlus className="w-4 h-4 text-amber-500" />
+                <FolderPlus className="w-4 h-4 text-amber-400" />
                 <span>New Folder</span>
               </button>
             </div>
@@ -174,7 +170,7 @@ export default function DrivePage({
             {/* Folders Section */}
             {subfolders.length > 0 && (
               <div>
-                <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">
+                <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
                   Folders ({subfolders.length})
                 </h3>
                 <div
@@ -207,7 +203,7 @@ export default function DrivePage({
             {/* Files Section */}
             {files.length > 0 && (
               <div>
-                <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">
+                <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
                   Files ({files.length})
                 </h3>
                 <div

@@ -7,6 +7,8 @@ import SharedWithMePage from './pages/SharedWithMePage';
 import RecentPage from './pages/RecentPage';
 import StarredPage from './pages/StarredPage';
 import TrashPage from './pages/TrashPage';
+import ProfilePage from './pages/ProfilePage';
+import AdminPage from './pages/AdminPage';
 import PublicSharePage from './pages/PublicSharePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -26,7 +28,9 @@ function AppContent() {
   const { user, loading, refreshUser } = useAuth();
 
   // Navigation & View state
-  const [currentView, setCurrentView] = useState('drive'); // 'drive' | 'shared' | 'recent' | 'starred' | 'trash'
+  const initialPath = window.location.pathname;
+  const isInitialAdmin = initialPath === '/admin' || initialPath.startsWith('/admin/');
+  const [currentView, setCurrentView] = useState(isInitialAdmin ? 'admin' : 'drive'); // 'drive' | 'shared' | 'recent' | 'starred' | 'trash' | 'profile' | 'admin'
   const [currentFolderId, setCurrentFolderId] = useState('');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
   const [authView, setAuthView] = useState('login'); // 'login' | 'register'
@@ -51,6 +55,33 @@ function AppContent() {
   // Upload status tracker
   const [uploadStatus, setUploadStatus] = useState(null);
 
+  // Sync browser URL with currentView (for /admin and /)
+  useEffect(() => {
+    if (currentView === 'admin') {
+      if (window.location.pathname !== '/admin') {
+        window.history.pushState({}, '', '/admin');
+      }
+    } else if (!window.location.pathname.startsWith('/share/')) {
+      if (window.location.pathname === '/admin') {
+        window.history.pushState({}, '', '/');
+      }
+    }
+  }, [currentView]);
+
+  // Handle browser popstate
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = window.location.pathname;
+      if (p === '/admin' || p.startsWith('/admin/')) {
+        setCurrentView('admin');
+      } else if (!p.startsWith('/share/')) {
+        setCurrentView('drive');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // Check if current URL is a public share link
   const path = window.location.pathname;
   const isShareRoute = path.startsWith('/share/');
@@ -70,10 +101,10 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-slate-50">
+      <div className="h-screen w-screen flex items-center justify-center bg-slate-950 text-slate-100">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-semibold text-slate-500">Loading EleDrive...</span>
+          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-semibold text-slate-400">Loading EleDrive...</span>
         </div>
       </div>
     );
@@ -83,9 +114,7 @@ function AppContent() {
     if (authView === 'register') {
       return <RegisterPage onNavigateLogin={() => setAuthView('login')} />;
     }
-    return <RegisterPage onNavigateLogin={() => setAuthView('login')} /> && (
-      <LoginPage onNavigateRegister={() => setAuthView('register')} />
-    );
+    return <LoginPage onNavigateRegister={() => setAuthView('register')} />;
   }
 
   // Handle Search
@@ -124,7 +153,6 @@ function AppContent() {
 
     filesList.forEach((file) => {
       formData.append('files', file);
-      // If folder upload, webkitRelativePath contains the nested path
       if (file.webkitRelativePath) {
         formData.append('paths', file.webkitRelativePath);
       }
@@ -147,7 +175,6 @@ function AppContent() {
       );
 
       refreshUser();
-      // Reload current view
       const temp = currentFolderId;
       setCurrentFolderId('__temp');
       setTimeout(() => setCurrentFolderId(temp), 50);
@@ -202,7 +229,7 @@ function AppContent() {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-sans">
+    <div className="dark bg-slate-950 text-slate-100 flex h-screen w-screen overflow-hidden font-sans select-none">
       {/* Left Sidebar */}
       <Sidebar
         currentView={currentView}
@@ -217,7 +244,7 @@ function AppContent() {
       />
 
       {/* Main Container */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-slate-950">
         {/* Top Navbar */}
         <Navbar
           searchQuery={searchQuery}
@@ -227,6 +254,8 @@ function AppContent() {
           viewMode={viewMode}
           setViewMode={setViewMode}
           onSearch={handleSearch}
+          onNavigateProfile={() => setCurrentView('profile')}
+          onNavigateAdmin={() => setCurrentView('admin')}
         />
 
         {/* View Pages */}
@@ -336,6 +365,12 @@ function AppContent() {
           )}
 
           {currentView === 'trash' && <TrashPage />}
+
+          {currentView === 'profile' && <ProfilePage />}
+
+          {currentView === 'admin' && (
+            <AdminPage onBackToDrive={() => setCurrentView('drive')} />
+          )}
         </div>
       </div>
 

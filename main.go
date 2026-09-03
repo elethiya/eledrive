@@ -39,6 +39,8 @@ func main() {
 	shareHandler := handlers.NewShareHandler(cfg, storageService)
 	publicShareHandler := handlers.NewPublicShareHandler(cfg, storageService)
 	statsHandler := handlers.NewStatsHandler(cfg, storageService)
+	profileHandler := handlers.NewProfileHandler()
+	adminHandler := handlers.NewAdminHandler(storageService)
 
 	r := chi.NewRouter()
 
@@ -73,6 +75,10 @@ func main() {
 			auth.Get("/auth/me", authHandler.Me)
 			auth.Get("/users/search", authHandler.SearchUsers)
 			auth.Get("/users", authHandler.ListTeamMembers)
+
+			// Profile Settings (Per User)
+			auth.Put("/user/profile", profileHandler.UpdateProfile)
+			auth.Put("/user/password", profileHandler.ChangePassword)
 
 			// Folders
 			auth.Get("/folders", folderHandler.GetContents)
@@ -117,6 +123,19 @@ func main() {
 			auth.Get("/starred", statsHandler.GetStarred)
 			auth.Get("/trash", statsHandler.GetTrash)
 			auth.Post("/trash/empty", statsHandler.EmptyTrash)
+
+			// Admin Panel Routes
+			auth.Group(func(admin chi.Router) {
+				admin.Use(adminHandler.RequireAdmin)
+				admin.Get("/admin/stats", adminHandler.GetStats)
+				admin.Get("/admin/logs", adminHandler.GetLogs)
+				admin.Delete("/admin/logs", adminHandler.ClearLogs)
+				admin.Get("/admin/users", adminHandler.ListUsers)
+				admin.Put("/admin/users/{id}", adminHandler.UpdateUser)
+				admin.Delete("/admin/users/{id}", adminHandler.DeleteUser)
+				admin.Get("/admin/settings", adminHandler.GetSettings)
+				admin.Put("/admin/settings", adminHandler.UpdateSettings)
+			})
 		})
 	})
 
@@ -126,7 +145,7 @@ func main() {
 		fileServer := http.FileServer(http.Dir(frontendDist))
 		spaHandler := func(w http.ResponseWriter, r *http.Request) {
 			path := filepath.Join(frontendDist, r.URL.Path)
-			if _, err := os.Stat(path); os.IsNotExist(err) || strings.HasPrefix(r.URL.Path, "/share/") {
+			if _, err := os.Stat(path); os.IsNotExist(err) || strings.HasPrefix(r.URL.Path, "/share/") || strings.HasPrefix(r.URL.Path, "/admin") {
 				http.ServeFile(w, r, filepath.Join(frontendDist, "index.html"))
 				return
 			}

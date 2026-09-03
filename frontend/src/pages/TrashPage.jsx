@@ -67,18 +67,18 @@ export default function TrashPage() {
   const isEmpty = data.folders.length === 0 && data.files.length === 0;
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950 text-slate-100">
       {/* Header */}
-      <div className="h-14 px-6 border-b border-slate-200/80 bg-slate-50/50 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
-          <Trash2 className="w-4 h-4 text-red-500" />
+      <div className="h-14 px-6 border-b border-slate-800 bg-slate-900/60 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 text-slate-100 font-bold text-xs">
+          <Trash2 className="w-4 h-4 text-rose-500" />
           <span>Trash</span>
         </div>
 
         {!isEmpty && (
           <button
             onClick={handleEmptyTrash}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-semibold shadow-xs transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>Empty Trash</span>
@@ -88,23 +88,23 @@ export default function TrashPage() {
 
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
-          <div className="h-64 flex items-center justify-center text-slate-600 text-sm">
+          <div className="h-64 flex items-center justify-center text-slate-500 text-xs">
             Loading trash...
           </div>
         ) : isEmpty ? (
           <div className="h-96 flex flex-col items-center justify-center text-center max-w-sm mx-auto">
-            <div className="w-16 h-16 rounded-3xl bg-slate-100 text-slate-600 flex items-center justify-center mb-4">
+            <div className="w-16 h-16 rounded-3xl bg-slate-900 border border-slate-800 text-slate-500 flex items-center justify-center mb-4 shadow-xl">
               <Trash2 className="w-8 h-8" />
             </div>
-            <h3 className="text-base font-bold text-slate-800 mb-1">Trash is empty</h3>
-            <p className="text-xs text-slate-600">
+            <h3 className="text-base font-bold text-slate-100 mb-1">Trash is empty</h3>
+            <p className="text-xs text-slate-400">
               Items moved to trash will appear here before being permanently removed.
             </p>
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3 flex items-center gap-2.5 text-xs text-amber-800 font-medium">
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <div className="bg-amber-950/30 border border-amber-500/30 rounded-2xl p-3 flex items-center gap-2.5 text-xs text-amber-300 font-medium">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
               <span>Items in trash will be permanently erased if you click Empty Trash.</span>
             </div>
 
@@ -113,20 +113,20 @@ export default function TrashPage() {
               {data.folders.map((f) => (
                 <div
                   key={f.id}
-                  className="flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-slate-100 text-xs"
+                  className="flex items-center justify-between px-4 py-3 bg-slate-900 rounded-xl border border-slate-800 text-xs text-slate-200"
                 >
                   <div className="flex items-center gap-3 truncate pr-4">
-                    <Folder className="w-5 h-5 text-amber-500 shrink-0" />
-                    <span className="font-semibold text-slate-800 truncate">{f.name}</span>
+                    <Folder className="w-5 h-5 text-amber-400 shrink-0" />
+                    <span className="font-semibold text-slate-200 truncate">{f.name}</span>
                   </div>
 
                   <div className="flex items-center gap-4 shrink-0">
-                    <span className="text-slate-600 hidden sm:inline">
+                    <span className="text-slate-500 hidden sm:inline text-[11px]">
                       Trashed {formatDate(f.trashed_at)}
                     </span>
                     <button
                       onClick={() => handleRestore(f, true)}
-                      className="flex items-center gap-1 text-blue-600 hover:text-blue-700 font-semibold px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors"
+                      className="flex items-center gap-1 text-blue-400 hover:text-blue-300 font-semibold px-2 py-1 rounded-lg hover:bg-slate-800 transition-colors"
                       title="Restore folder"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -134,7 +134,7 @@ export default function TrashPage() {
                     </button>
                     <button
                       onClick={() => handlePermanentDelete(f, true)}
-                      className="p-1.5 text-slate-600 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                      className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-colors"
                       title="Delete permanently"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -146,23 +146,23 @@ export default function TrashPage() {
               {data.files.map((fl) => (
                 <div
                   key={fl.id}
-                  className="flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-slate-100 text-xs"
+                  className="flex items-center justify-between px-4 py-3 bg-slate-900 rounded-xl border border-slate-800 text-xs text-slate-200"
                 >
                   <div className="flex items-center gap-3 truncate pr-4">
-                    <File className="w-5 h-5 text-slate-400 shrink-0" />
+                    <File className="w-5 h-5 text-slate-500 shrink-0" />
                     <div className="truncate">
-                      <span className="font-semibold text-slate-800 block truncate">{fl.name}</span>
-                      <span className="text-[10px] text-slate-600 block">{formatBytes(fl.size)}</span>
+                      <span className="font-semibold text-slate-200 block truncate">{fl.name}</span>
+                      <span className="text-[10px] text-slate-500 block">{formatBytes(fl.size)}</span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-4 shrink-0">
-                    <span className="text-slate-600 hidden sm:inline">
+                    <span className="text-slate-500 hidden sm:inline text-[11px]">
                       Trashed {formatDate(fl.trashed_at)}
                     </span>
                     <button
                       onClick={() => handleRestore(fl, false)}
-                      className="flex items-center gap-1 text-blue-600 hover:text-blue-700 font-semibold px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors"
+                      className="flex items-center gap-1 text-blue-400 hover:text-blue-300 font-semibold px-2 py-1 rounded-lg hover:bg-slate-800 transition-colors"
                       title="Restore file"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -170,7 +170,7 @@ export default function TrashPage() {
                     </button>
                     <button
                       onClick={() => handlePermanentDelete(fl, false)}
-                      className="p-1.5 text-slate-600 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                      className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-colors"
                       title="Delete permanently"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

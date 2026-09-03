@@ -15,9 +15,9 @@ export default function Breadcrumbs({
   };
 
   return (
-    <div className="flex items-center justify-between py-3 px-6 bg-slate-50/50 border-b border-slate-200/80">
+    <div className="flex items-center justify-between py-3 px-6 bg-slate-900/70 border-b border-slate-800 text-slate-200 shrink-0">
       {/* Path Breadcrumbs */}
-      <nav className="flex items-center gap-1.5 overflow-x-auto text-sm">
+      <nav className="flex items-center gap-1.5 overflow-x-auto text-xs">
         {breadcrumbs.map((crumb, idx) => {
           const isLast = idx === breadcrumbs.length - 1;
           const isRoot = idx === 0;
@@ -26,20 +26,20 @@ export default function Breadcrumbs({
             <React.Fragment key={crumb.id || 'root'}>
               <button
                 onClick={() => onNavigate(crumb.id)}
-                className={`flex items-center gap-1.5 py-1 px-2 rounded-lg transition-colors whitespace-nowrap ${
+                className={`flex items-center gap-1.5 py-1 px-2.5 rounded-lg transition-colors whitespace-nowrap ${
                   isLast
-                    ? 'font-bold text-slate-800 bg-white shadow-xs border border-slate-200/60'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 font-medium'
+                    ? 'font-bold text-slate-100 bg-slate-800 border border-slate-700 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 font-medium'
                 }`}
               >
                 {isRoot ? (
-                  <HardDrive className="w-4 h-4 text-blue-600" />
+                  <HardDrive className="w-3.5 h-3.5 text-blue-400" />
                 ) : (
-                  <Folder className="w-4 h-4 text-amber-500" />
+                  <Folder className="w-3.5 h-3.5 text-amber-400" />
                 )}
                 <span>{crumb.name}</span>
               </button>
-              {!isLast && <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />}
+              {!isLast && <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />}
             </React.Fragment>
           );
         })}
@@ -50,7 +50,7 @@ export default function Breadcrumbs({
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={onShareFolder}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-blue-50 text-blue-600 border border-blue-200 hover:border-blue-300 rounded-xl text-xs font-semibold shadow-xs transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-xl text-xs font-semibold shadow-xs transition-all"
             title="Share this folder with team or generate public link"
           >
             <Share2 className="w-3.5 h-3.5" />
@@ -59,10 +59,10 @@ export default function Breadcrumbs({
 
           <button
             onClick={handleDownloadZip}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold shadow-xs transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold shadow-xs transition-all"
             title="Download entire folder and subfolders as ZIP"
           >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
+            <Download className="w-3.5 h-3.5 text-slate-400" />
             <span>Download ZIP</span>
           </button>
         </div>

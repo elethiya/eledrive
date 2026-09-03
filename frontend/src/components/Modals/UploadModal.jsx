@@ -7,30 +7,30 @@ export default function UploadModal({ uploadStatus, onClose }) {
   const { isUploading, progress, totalFiles, success, error } = uploadStatus;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 max-w-sm w-full animate-in slide-in-from-bottom-5 duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 p-4">
+    <div className="fixed bottom-6 right-6 z-50 max-w-sm w-full animate-in slide-in-from-bottom-5 duration-200 text-slate-100">
+      <div className="bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 p-4">
         <div className="flex items-center justify-between pb-3">
           <div className="flex items-center gap-2.5">
             {isUploading && (
-              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center animate-pulse">
+              <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center animate-pulse">
                 <UploadCloud className="w-4 h-4" />
               </div>
             )}
             {success && (
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
                 <CheckCircle className="w-4 h-4" />
               </div>
             )}
             {error && (
-              <div className="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center">
                 <AlertCircle className="w-4 h-4" />
               </div>
             )}
             <div>
-              <h4 className="text-xs font-bold text-slate-800">
+              <h4 className="text-xs font-bold text-slate-100">
                 {isUploading ? 'Uploading Items' : success ? 'Upload Complete' : 'Upload Failed'}
               </h4>
-              <p className="text-[11px] text-slate-600">
+              <p className="text-[11px] text-slate-400">
                 {totalFiles} {totalFiles === 1 ? 'item' : 'items'}
               </p>
             </div>
@@ -39,7 +39,7 @@ export default function UploadModal({ uploadStatus, onClose }) {
           {!isUploading && (
             <button
               onClick={onClose}
-              className="p-1 text-slate-600 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+              className="p-1 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800"
             >
               <X className="w-4 h-4" />
             </button>
@@ -49,21 +49,21 @@ export default function UploadModal({ uploadStatus, onClose }) {
         {/* Progress bar */}
         {isUploading && (
           <div className="space-y-1.5">
-            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+            <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
               <div
-                className="h-full bg-blue-600 rounded-full transition-all duration-300"
+                className="h-full bg-blue-500 rounded-full transition-all duration-300 shadow-sm shadow-blue-500/50"
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <div className="flex justify-between text-[11px] text-slate-600 font-medium">
-              <span>Uploading to cloud...</span>
+            <div className="flex justify-between text-[11px] text-slate-400 font-medium">
+              <span>Uploading to cloud drive...</span>
               <span>{progress}%</span>
             </div>
           </div>
         )}
 
         {error && (
-          <p className="text-xs text-red-600 bg-red-50 p-2 rounded-xl mt-2 font-medium">
+          <p className="text-xs text-red-300 bg-red-950/50 border border-red-500/40 p-2.5 rounded-xl mt-2 font-medium">
             {error}
           </p>
         )}

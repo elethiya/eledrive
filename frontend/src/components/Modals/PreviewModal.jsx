@@ -27,7 +27,6 @@ export default function PreviewModal({ isOpen, onClose, file }) {
           })
           .finally(() => setLoading(false));
       } else {
-        // Image, video, audio, pdf served directly via download inline url
         setLoading(false);
       }
     }
@@ -40,12 +39,12 @@ export default function PreviewModal({ isOpen, onClose, file }) {
   const inlineUrl = fileAPI.getDownloadUrl(file.id, true);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-white rounded-3xl max-w-4xl w-full h-[85vh] shadow-2xl border border-slate-100 flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="bg-slate-900 rounded-3xl max-w-4xl w-full h-[85vh] shadow-2xl border border-slate-800 flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 text-slate-100">
         {/* Header */}
-        <div className="h-16 px-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
+        <div className="h-16 px-6 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-950/60">
           <div className="flex items-center gap-3 truncate pr-4">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
               {category === 'code' ? (
                 <Code2 className="w-5 h-5" />
               ) : category === 'document' ? (
@@ -55,8 +54,8 @@ export default function PreviewModal({ isOpen, onClose, file }) {
               )}
             </div>
             <div className="truncate">
-              <h3 className="text-sm font-bold text-slate-800 truncate">{file.name}</h3>
-              <p className="text-xs text-slate-600">
+              <h3 className="text-sm font-bold text-slate-100 truncate">{file.name}</h3>
+              <p className="text-xs text-slate-400">
                 {formatBytes(file.size)} • {file.mime_type || 'Unknown type'}
               </p>
             </div>
@@ -66,14 +65,14 @@ export default function PreviewModal({ isOpen, onClose, file }) {
             <a
               href={downloadUrl}
               download={file.name}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-xs transition-all"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Download</span>
             </a>
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-600 hover:text-slate-600 rounded-xl hover:bg-slate-200/60 transition-colors"
+              className="p-1.5 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-800 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -81,19 +80,19 @@ export default function PreviewModal({ isOpen, onClose, file }) {
         </div>
 
         {/* Content Viewer */}
-        <div className="flex-1 bg-slate-900 text-slate-100 overflow-auto flex items-center justify-center relative">
+        <div className="flex-1 bg-slate-950 text-slate-100 overflow-auto flex items-center justify-center relative">
           {loading && (
-            <div className="text-center text-slate-400 text-sm">Loading preview...</div>
+            <div className="text-center text-slate-400 text-xs">Loading preview...</div>
           )}
 
           {error && (
-            <div className="text-center text-red-400 text-sm p-6 max-w-md">
+            <div className="text-center text-red-400 text-xs p-6 max-w-md">
               <p className="font-semibold mb-1">Preview unavailable</p>
-              <p className="text-xs text-slate-400 mb-4">{error}</p>
+              <p className="text-[11px] text-slate-400 mb-4">{error}</p>
               <a
                 href={downloadUrl}
                 download={file.name}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold"
               >
                 Download to view
               </a>
@@ -141,7 +140,7 @@ export default function PreviewModal({ isOpen, onClose, file }) {
 
               {/* Audio Preview */}
               {category === 'audio' && (
-                <div className="p-8 bg-slate-800 rounded-3xl shadow-xl flex flex-col items-center gap-4">
+                <div className="p-8 bg-slate-900 rounded-3xl border border-slate-800 shadow-xl flex flex-col items-center gap-4">
                   <p className="text-sm font-semibold text-white">{file.name}</p>
                   <audio src={inlineUrl} controls className="w-80" />
                 </div>
@@ -152,7 +151,7 @@ export default function PreviewModal({ isOpen, onClose, file }) {
                 <iframe
                   src={inlineUrl}
                   title={file.name}
-                  className="w-full h-full border-0 bg-white"
+                  className="w-full h-full border-0 bg-slate-900"
                 />
               )}
 
@@ -164,7 +163,7 @@ export default function PreviewModal({ isOpen, onClose, file }) {
                 category !== 'pdf' &&
                 !file.mime_type?.startsWith('text/') && (
                   <div className="text-center p-8">
-                    <File className="w-16 h-16 text-slate-500 mx-auto mb-3" />
+                    <File className="w-16 h-16 text-slate-600 mx-auto mb-3" />
                     <h4 className="text-sm font-bold text-white mb-1">No instant preview for this file type</h4>
                     <p className="text-xs text-slate-400 mb-4 max-w-xs mx-auto">
                       Download the file to open it with your system's native application.
@@ -172,7 +171,7 @@ export default function PreviewModal({ isOpen, onClose, file }) {
                     <a
                       href={downloadUrl}
                       download={file.name}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-md"
                     >
                       <Download className="w-4 h-4" />
                       Download File

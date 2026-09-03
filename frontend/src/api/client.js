@@ -111,4 +111,21 @@ export const statsAPI = {
   emptyTrash: () => api.post('/trash/empty'),
 };
 
+export const profileAPI = {
+  updateProfile: (data) => api.put('/user/profile', data),
+  changePassword: (data) => api.put('/user/password', data),
+};
+
+export const adminAPI = {
+  getStats: () => api.get('/admin/stats'),
+  getLogs: (action = '', q = '') =>
+    api.get(`/admin/logs?action=${encodeURIComponent(action)}&q=${encodeURIComponent(q)}`),
+  clearLogs: () => api.delete('/admin/logs'),
+  listUsers: () => api.get('/admin/users'),
+  updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
+  deleteUser: (id) => api.delete(`/admin/users/${id}`),
+  getSettings: () => api.get('/admin/settings'),
+  updateSettings: (data) => api.put('/admin/settings', data),
+};
+
 export default api;

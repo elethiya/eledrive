@@ -137,6 +137,8 @@ func (h *UploadHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		storageUsed += writtenBytes
+		db.LogActivity(claims.UserID, claims.Username, "upload", "file", fileID, filename, fmt.Sprintf("Uploaded %s (%d bytes)", filename, writtenBytes))
+
 		uploadedFiles = append(uploadedFiles, models.File{
 			ID:           fileID,
 			Name:         filename,

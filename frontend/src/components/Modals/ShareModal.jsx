@@ -10,7 +10,6 @@ import {
   Lock,
   UploadCloud,
   Eye,
-  Clock,
   Shield,
 } from 'lucide-react';
 import { shareAPI, publicShareAPI, authAPI } from '../../api/client';
@@ -18,7 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 
 export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' }) {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('team'); // 'team' | 'link'
+  const [activeTab, setActiveTab] = useState('team');
 
   // Team Share state
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,7 +42,6 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
     }
   }, [isOpen, item]);
 
-  // Search users with debounce
   useEffect(() => {
     if (!searchQuery.trim() || searchQuery.length < 2) {
       setSearchResults([]);
@@ -82,7 +80,6 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
 
   if (!isOpen || !item) return null;
 
-  // Add team member share
   const handleAddMember = async () => {
     if (!selectedUser) return;
     setTeamLoading(true);
@@ -103,7 +100,6 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
     }
   };
 
-  // Remove team member share
   const handleRemoveShare = async (shareId) => {
     try {
       await shareAPI.deleteShare(shareId);
@@ -113,7 +109,6 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
     }
   };
 
-  // Create public link
   const handleCreateLink = async () => {
     setLinkLoading(true);
     try {
@@ -134,7 +129,6 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
     }
   };
 
-  // Delete public link
   const handleDeleteLink = async () => {
     if (!linkInfo?.link?.id) return;
     setLinkLoading(true);
@@ -157,40 +151,40 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 p-6 animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="bg-slate-900 rounded-3xl max-w-lg w-full shadow-2xl border border-slate-800 p-6 animate-in zoom-in-95 duration-150 text-slate-100">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
               <Share2 className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-800">Share</h3>
-                <span className="text-[11px] font-semibold uppercase px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                <h3 className="text-sm font-bold text-slate-100">Share</h3>
+                <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700">
                   {itemType}
                 </span>
               </div>
-              <p className="text-xs text-slate-600 truncate max-w-[260px]">{item.name}</p>
+              <p className="text-xs text-slate-400 truncate max-w-[260px]">{item.name}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-600 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
+            className="p-1.5 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-800 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-100 mt-3">
+        <div className="flex border-b border-slate-800 mt-3 text-xs">
           <button
             onClick={() => setActiveTab('team')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all ${
+            className={`flex items-center gap-2 px-4 py-2.5 font-semibold border-b-2 transition-all ${
               activeTab === 'team'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Users className="w-4 h-4" />
@@ -198,10 +192,10 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
           </button>
           <button
             onClick={() => setActiveTab('link')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all ${
+            className={`flex items-center gap-2 px-4 py-2.5 font-semibold border-b-2 transition-all ${
               activeTab === 'link'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <LinkIcon className="w-4 h-4" />
@@ -212,27 +206,26 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
         {/* Tab 1: Team Members */}
         {activeTab === 'team' && (
           <div className="mt-4 space-y-4">
-            {/* Search & Add Member */}
             <div className="relative">
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                 Add Team Member
               </label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <input
                     type="text"
-                    placeholder="Search by name or email (e.g. alex@eledrive.local)"
+                    placeholder="Search name or email..."
                     value={selectedUser ? `${selectedUser.name} (${selectedUser.email})` : searchQuery}
                     onChange={(e) => {
                       setSelectedUser(null);
                       setSearchQuery(e.target.value);
                     }}
-                    className="w-full text-xs px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none"
+                    className="w-full text-xs px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:border-blue-500 outline-none"
                   />
                   {selectedUser && (
                     <button
                       onClick={() => setSelectedUser(null)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-600"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -242,7 +235,7 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                 <select
                   value={memberPermission}
                   onChange={(e) => setMemberPermission(e.target.value)}
-                  className="text-xs px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium text-slate-700"
+                  className="text-xs px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl outline-none text-slate-200"
                 >
                   <option value="editor">Can Edit & Upload</option>
                   <option value="viewer">Can View Only</option>
@@ -251,15 +244,15 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                 <button
                   disabled={!selectedUser || teamLoading}
                   onClick={handleAddMember}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-xs transition-all"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-xs transition-all"
                 >
                   {teamLoading ? '...' : 'Add'}
                 </button>
               </div>
 
-              {/* Search Suggestions Dropdown */}
+              {/* Suggestions dropdown */}
               {!selectedUser && searchResults.length > 0 && (
-                <div className="absolute left-0 right-0 top-16 bg-white border border-slate-100 rounded-xl shadow-xl z-20 p-1">
+                <div className="absolute left-0 right-0 top-16 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-20 p-1">
                   {searchResults.map((u) => (
                     <button
                       key={u.id}
@@ -267,7 +260,7 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                         setSelectedUser(u);
                         setSearchResults([]);
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-blue-50 rounded-lg text-left transition-colors"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-800 rounded-lg text-left transition-colors"
                     >
                       <div
                         className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[11px] font-bold"
@@ -276,8 +269,8 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                         {u.name.charAt(0)}
                       </div>
                       <div className="truncate">
-                        <span className="text-xs font-semibold text-slate-800 block">{u.name}</span>
-                        <span className="text-[10px] text-slate-600 block">{u.email}</span>
+                        <span className="text-xs font-semibold text-slate-100 block">{u.name}</span>
+                        <span className="text-[10px] text-slate-400 block">{u.email}</span>
                       </div>
                     </button>
                   ))}
@@ -285,14 +278,13 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
               )}
             </div>
 
-            {/* List of People with Access */}
             <div>
-              <span className="text-xs font-semibold text-slate-700 block mb-2">
+              <span className="text-xs font-semibold text-slate-300 block mb-2">
                 People with access
               </span>
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {/* Owner */}
-                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50">
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800">
                   <div className="flex items-center gap-2.5">
                     <div
                       className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
@@ -301,22 +293,22 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                       {user?.name?.charAt(0) || 'U'}
                     </div>
                     <div>
-                      <span className="text-xs font-semibold text-slate-800 block">
+                      <span className="text-xs font-semibold text-slate-200 block">
                         {user?.name} (You)
                       </span>
-                      <span className="text-[10px] text-slate-600 block">{user?.email}</span>
+                      <span className="text-[10px] text-slate-500 block">{user?.email}</span>
                     </div>
                   </div>
-                  <span className="text-[11px] font-semibold text-slate-600 px-2 py-1 bg-slate-200/60 rounded-lg">
+                  <span className="text-[10px] font-bold text-slate-400 px-2 py-0.5 bg-slate-800 rounded-md">
                     Owner
                   </span>
                 </div>
 
-                {/* Collaborators */}
+                {/* Shared users */}
                 {sharedList.map((s) => (
                   <div
                     key={s.id}
-                    className="flex items-center justify-between p-2 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 hover:border-slate-700 transition-colors"
                   >
                     <div className="flex items-center gap-2.5 truncate mr-2">
                       <div
@@ -326,10 +318,10 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                         {s.shared_with?.name?.charAt(0) || 'M'}
                       </div>
                       <div className="truncate">
-                        <span className="text-xs font-semibold text-slate-800 block truncate">
+                        <span className="text-xs font-semibold text-slate-200 block truncate">
                           {s.shared_with?.name}
                         </span>
-                        <span className="text-[10px] text-slate-600 block truncate">
+                        <span className="text-[10px] text-slate-500 block truncate">
                           {s.shared_with?.email}
                         </span>
                       </div>
@@ -337,17 +329,17 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
 
                     <div className="flex items-center gap-2 shrink-0">
                       <span
-                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-lg ${
+                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${
                           s.permission === 'editor'
-                            ? 'bg-blue-50 text-blue-700'
-                            : 'bg-slate-100 text-slate-600'
+                            ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                            : 'bg-slate-800 text-slate-400 border-slate-700'
                         }`}
                       >
                         {s.permission === 'editor' ? 'Can Edit' : 'Viewer'}
                       </span>
                       <button
                         onClick={() => handleRemoveShare(s.id)}
-                        className="p-1 text-slate-600 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                        className="p-1 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-colors"
                         title="Remove access"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -362,18 +354,18 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
 
         {/* Tab 2: Public Share Link */}
         {activeTab === 'link' && (
-          <div className="mt-4 space-y-4">
+          <div className="mt-4 space-y-4 text-xs">
             {linkInfo ? (
-              <div className="space-y-3.5 bg-blue-50/50 border border-blue-100 p-4 rounded-2xl">
+              <div className="space-y-3.5 bg-slate-950 border border-slate-800 p-4 rounded-2xl">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-blue-600" />
-                    <span className="text-xs font-bold text-blue-900">Share Link is Active</span>
+                    <Shield className="w-4 h-4 text-blue-400" />
+                    <span className="font-bold text-slate-200">Share Link is Active</span>
                   </div>
                   <button
                     onClick={handleDeleteLink}
                     disabled={linkLoading}
-                    className="text-xs font-medium text-red-600 hover:underline"
+                    className="font-medium text-rose-400 hover:underline"
                   >
                     Disable Link
                   </button>
@@ -384,23 +376,23 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                     type="text"
                     readOnly
                     value={linkInfo.url}
-                    className="flex-1 text-xs px-3 py-2 bg-white border border-blue-200 rounded-xl text-slate-700 select-all outline-none"
+                    className="flex-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 select-all outline-none"
                   />
                   <button
                     onClick={copyToClipboard}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-all shrink-0"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold shadow-xs transition-all shrink-0"
                   >
                     {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{copied ? 'Copied!' : 'Copy'}</span>
                   </button>
                 </div>
 
-                <div className="text-[11px] text-slate-600 flex flex-wrap gap-3 pt-1">
+                <div className="text-[11px] text-slate-400 flex flex-wrap gap-3 pt-1">
                   <span className="flex items-center gap-1">
                     {linkInfo.link?.permission === 'upload_and_view' ? (
                       <>
-                        <UploadCloud className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Anyone can view and <b>upload files</b></span>
+                        <UploadCloud className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Anyone can view & <b>upload files</b></span>
                       </>
                     ) : (
                       <>
@@ -410,7 +402,7 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                     )}
                   </span>
                   {linkInfo.link?.has_password && (
-                    <span className="flex items-center gap-1 text-amber-700">
+                    <span className="flex items-center gap-1 text-amber-400">
                       <Lock className="w-3 h-3" /> Password protected
                     </span>
                   )}
@@ -418,15 +410,14 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
               </div>
             ) : (
               <div className="space-y-4">
-                <p className="text-xs text-slate-600">
+                <p className="text-slate-400">
                   Generate a shareable link that anyone with the URL can access.
                   {itemType === 'folder' && ' You can allow collaborators to upload files into this folder.'}
                 </p>
 
-                {/* Permission select */}
                 {itemType === 'folder' && (
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    <label className="block font-semibold text-slate-300 mb-1.5">
                       Link Permissions
                     </label>
                     <div className="grid grid-cols-2 gap-2">
@@ -435,15 +426,15 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                         onClick={() => setLinkPermission('upload_and_view')}
                         className={`p-3 rounded-2xl border text-left transition-all ${
                           linkPermission === 'upload_and_view'
-                            ? 'border-blue-600 bg-blue-50/50 text-blue-900 font-semibold'
-                            : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                            ? 'border-blue-500 bg-blue-500/10 text-blue-300 font-semibold'
+                            : 'border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700'
                         }`}
                       >
-                        <div className="flex items-center gap-1.5 text-xs font-bold mb-1">
-                          <UploadCloud className="w-3.5 h-3.5 text-blue-600" />
+                        <div className="flex items-center gap-1.5 font-bold mb-1">
+                          <UploadCloud className="w-3.5 h-3.5 text-blue-400" />
                           <span>Allow Uploads</span>
                         </div>
-                        <p className="text-[11px] text-slate-600 font-normal">
+                        <p className="text-[10px] text-slate-500 font-normal">
                           Teammates can view, download & upload files directly
                         </p>
                       </button>
@@ -453,15 +444,15 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                         onClick={() => setLinkPermission('view')}
                         className={`p-3 rounded-2xl border text-left transition-all ${
                           linkPermission === 'view'
-                            ? 'border-blue-600 bg-blue-50/50 text-blue-900 font-semibold'
-                            : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                            ? 'border-blue-500 bg-blue-500/10 text-blue-300 font-semibold'
+                            : 'border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700'
                         }`}
                       >
-                        <div className="flex items-center gap-1.5 text-xs font-bold mb-1">
-                          <Eye className="w-3.5 h-3.5 text-slate-600" />
+                        <div className="flex items-center gap-1.5 font-bold mb-1">
+                          <Eye className="w-3.5 h-3.5 text-slate-400" />
                           <span>View & Download</span>
                         </div>
-                        <p className="text-[11px] text-slate-600 font-normal">
+                        <p className="text-[10px] text-slate-500 font-normal">
                           Read-only access to files and ZIP download
                         </p>
                       </button>
@@ -469,32 +460,30 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                   </div>
                 )}
 
-                {/* Optional password */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block font-semibold text-slate-300 mb-1">
                     Optional Password Protection
                   </label>
                   <div className="relative">
-                    <Lock className="w-3.5 h-3.5 text-slate-600 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Lock className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="password"
                       placeholder="Leave blank for public link"
                       value={linkPassword}
                       onChange={(e) => setLinkPassword(e.target.value)}
-                      className="w-full text-xs pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 outline-none"
+                      className="w-full pl-8 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:border-blue-500 outline-none"
                     />
                   </div>
                 </div>
 
-                {/* Expiry */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block font-semibold text-slate-300 mb-1">
                     Link Expiration
                   </label>
                   <select
                     value={linkExpireDays}
                     onChange={(e) => setLinkExpireDays(Number(e.target.value))}
-                    className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-700"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl outline-none text-slate-200"
                   >
                     <option value={7}>7 Days</option>
                     <option value={30}>30 Days</option>
@@ -506,7 +495,7 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                 <button
                   onClick={handleCreateLink}
                   disabled={linkLoading}
-                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 transition-all"
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-md shadow-blue-600/20 transition-all"
                 >
                   {linkLoading ? 'Creating...' : 'Create Share Link'}
                 </button>
@@ -515,10 +504,10 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
           </div>
         )}
 
-        <div className="flex items-center justify-end pt-4 mt-5 border-t border-slate-100">
+        <div className="flex items-center justify-end pt-4 mt-5 border-t border-slate-800">
           <button
             onClick={onClose}
-            className="px-5 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+            className="px-5 py-2 text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors"
           >
             Done
           </button>

@@ -121,6 +121,8 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:    now,
 	}
 
+	db.LogActivity(userID, req.Username, "register", "user", userID, req.Name, "New account registered")
+
 	utils.RespondJSON(w, http.StatusCreated, AuthResponse{
 		Token: token,
 		User:  user,
@@ -174,6 +176,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		utils.RespondError(w, http.StatusInternalServerError, "Failed to generate token")
 		return
 	}
+
+	db.LogActivity(user.ID, user.Username, "login", "user", user.ID, user.Name, "User logged in successfully")
 
 	utils.RespondJSON(w, http.StatusOK, AuthResponse{
 		Token: token,

@@ -55,27 +55,27 @@ export default function StarredPage({
   const isEmpty = data.folders.length === 0 && data.files.length === 0;
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden">
-      <div className="h-14 px-6 border-b border-slate-200/80 bg-slate-50/50 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
-          <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950 text-slate-100">
+      <div className="h-14 px-6 border-b border-slate-800 bg-slate-900/60 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 text-slate-100 font-bold text-xs">
+          <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
           <span>Starred</span>
         </div>
-        <span className="text-xs text-slate-600">Quick access to marked files & folders</span>
+        <span className="text-xs text-slate-400">Quick access to marked files & folders</span>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
-          <div className="h-64 flex items-center justify-center text-slate-600 text-sm">
+          <div className="h-64 flex items-center justify-center text-slate-500 text-xs">
             Loading starred items...
           </div>
         ) : isEmpty ? (
           <div className="h-96 flex flex-col items-center justify-center text-center max-w-sm mx-auto">
-            <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-500 flex items-center justify-center mb-4">
+            <div className="w-16 h-16 rounded-3xl bg-slate-900 border border-slate-800 text-amber-400 flex items-center justify-center mb-4 shadow-xl">
               <Star className="w-8 h-8" />
             </div>
-            <h3 className="text-base font-bold text-slate-800 mb-1">No starred items</h3>
-            <p className="text-xs text-slate-600">
+            <h3 className="text-base font-bold text-slate-100 mb-1">No starred items</h3>
+            <p className="text-xs text-slate-400">
               Click the star icon on any file or folder to find it quickly here.
             </p>
           </div>
@@ -83,7 +83,7 @@ export default function StarredPage({
           <div className="space-y-6">
             {data.folders.length > 0 && (
               <div>
-                <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">
+                <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
                   Folders ({data.folders.length})
                 </h3>
                 <div
@@ -114,7 +114,7 @@ export default function StarredPage({
 
             {data.files.length > 0 && (
               <div>
-                <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">
+                <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
                   Files ({data.files.length})
                 </h3>
                 <div

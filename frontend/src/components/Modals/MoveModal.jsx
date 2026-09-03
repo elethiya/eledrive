@@ -20,7 +20,6 @@ export default function MoveModal({ isOpen, onClose, item, onMove }) {
     try {
       const res = await folderAPI.getContents(folderId);
       if (res.data) {
-        // Exclude moving item itself if it's a folder
         const subs = (res.data.subfolders || []).filter((f) => f.id !== item?.id);
         setFolders(subs);
         setBreadcrumbs(res.data.breadcrumbs || [{ id: '', name: 'My Drive' }]);
@@ -49,21 +48,21 @@ export default function MoveModal({ isOpen, onClose, item, onMove }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 p-6 animate-in zoom-in-95 duration-150">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="bg-slate-900 rounded-3xl max-w-md w-full shadow-2xl border border-slate-800 p-6 animate-in zoom-in-95 duration-150 text-slate-100">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
               <FolderInput className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-800">Move Item</h3>
-              <p className="text-xs text-slate-600 truncate max-w-[240px]">{item.name}</p>
+              <h3 className="text-sm font-bold text-slate-100">Move Item</h3>
+              <p className="text-xs text-slate-400 truncate max-w-[240px]">{item.name}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-600 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
+            className="p-1.5 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-800 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -71,12 +70,12 @@ export default function MoveModal({ isOpen, onClose, item, onMove }) {
 
         {/* Directory Navigator */}
         <div className="mt-4">
-          <div className="flex items-center gap-1 text-xs text-slate-600 mb-2 overflow-x-auto pb-1">
+          <div className="flex items-center gap-1 text-xs text-slate-400 mb-2 overflow-x-auto pb-1">
             {breadcrumbs.map((b, idx) => (
               <React.Fragment key={b.id || 'root'}>
                 <button
                   onClick={() => loadFolders(b.id)}
-                  className="hover:text-blue-600 font-medium whitespace-nowrap"
+                  className="hover:text-blue-400 font-medium whitespace-nowrap"
                 >
                   {b.name}
                 </button>
@@ -85,34 +84,36 @@ export default function MoveModal({ isOpen, onClose, item, onMove }) {
             ))}
           </div>
 
-          <div className="border border-slate-200 rounded-2xl p-2 max-h-56 overflow-y-auto space-y-1">
+          <div className="border border-slate-800 rounded-2xl p-2 max-h-56 overflow-y-auto space-y-1 bg-slate-950">
             <button
               onClick={() => setSelectedFolderId(currentParent)}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
                 selectedFolderId === currentParent
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-slate-700 hover:bg-slate-50'
+                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                  : 'text-slate-300 hover:bg-slate-800'
               }`}
             >
-              <HardDrive className="w-4 h-4 text-blue-500" />
+              <HardDrive className="w-4 h-4 text-blue-400" />
               <span>Current Folder ({breadcrumbs[breadcrumbs.length - 1]?.name})</span>
             </button>
 
             {folders.length === 0 && !loading && (
-              <p className="text-center py-4 text-xs text-slate-600">No subfolders here</p>
+              <p className="text-center py-4 text-xs text-slate-500">No subfolders here</p>
             )}
 
             {folders.map((f) => (
               <div
                 key={f.id}
                 className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium cursor-pointer transition-colors ${
-                  selectedFolderId === f.id ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'
+                  selectedFolderId === f.id
+                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                    : 'hover:bg-slate-800 text-slate-300'
                 }`}
                 onClick={() => setSelectedFolderId(f.id)}
                 onDoubleClick={() => loadFolders(f.id)}
               >
                 <div className="flex items-center gap-2.5 truncate">
-                  <Folder className="w-4 h-4 text-amber-500 shrink-0" />
+                  <Folder className="w-4 h-4 text-amber-400 shrink-0" />
                   <span className="truncate">{f.name}</span>
                 </div>
                 <button
@@ -120,7 +121,7 @@ export default function MoveModal({ isOpen, onClose, item, onMove }) {
                     e.stopPropagation();
                     loadFolders(f.id);
                   }}
-                  className="text-[11px] text-blue-600 hover:underline px-2 py-0.5"
+                  className="text-[11px] text-blue-400 hover:underline px-2 py-0.5"
                 >
                   Open →
                 </button>
@@ -129,11 +130,11 @@ export default function MoveModal({ isOpen, onClose, item, onMove }) {
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2.5 pt-4 mt-4 border-t border-slate-100">
+        <div className="flex items-center justify-end gap-2.5 pt-4 mt-4 border-t border-slate-800">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+            className="px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-slate-800 rounded-xl transition-colors"
           >
             Cancel
           </button>
@@ -141,7 +142,7 @@ export default function MoveModal({ isOpen, onClose, item, onMove }) {
             type="button"
             disabled={loading}
             onClick={handleConfirm}
-            className="px-5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl shadow-md shadow-blue-600/20 transition-all"
+            className="px-5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl shadow-md shadow-blue-600/20 transition-all"
           >
             {loading ? 'Moving...' : 'Move Here'}
           </button>

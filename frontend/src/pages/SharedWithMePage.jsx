@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { shareAPI, folderAPI, fileAPI } from '../api/client';
 import FileCard from '../components/FileCard';
-import { Users, User } from 'lucide-react';
+import { Users } from 'lucide-react';
 
 export default function SharedWithMePage({
   viewMode,
@@ -52,30 +52,30 @@ export default function SharedWithMePage({
   const isEmpty = data.folders.length === 0 && data.files.length === 0;
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950 text-slate-100">
       {/* Header */}
-      <div className="h-14 px-6 border-b border-slate-200/80 bg-slate-50/50 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
-          <Users className="w-4 h-4 text-blue-600" />
+      <div className="h-14 px-6 border-b border-slate-800 bg-slate-900/60 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 text-slate-100 font-bold text-xs">
+          <Users className="w-4 h-4 text-blue-400" />
           <span>Shared with me</span>
         </div>
-        <span className="text-xs text-slate-600">
+        <span className="text-xs text-slate-400">
           Items teammates have shared with you
         </span>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
-          <div className="h-64 flex items-center justify-center text-slate-600 text-sm">
+          <div className="h-64 flex items-center justify-center text-slate-500 text-xs">
             Loading shared items...
           </div>
         ) : isEmpty ? (
           <div className="h-96 flex flex-col items-center justify-center text-center max-w-sm mx-auto">
-            <div className="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4">
+            <div className="w-16 h-16 rounded-3xl bg-slate-900 border border-slate-800 text-indigo-400 flex items-center justify-center mb-4 shadow-xl">
               <Users className="w-8 h-8" />
             </div>
-            <h3 className="text-base font-bold text-slate-800 mb-1">No shared files yet</h3>
-            <p className="text-xs text-slate-600">
+            <h3 className="text-base font-bold text-slate-100 mb-1">No shared files yet</h3>
+            <p className="text-xs text-slate-400">
               When a team member shares a folder, project, or file with you, it will appear here.
             </p>
           </div>
@@ -83,7 +83,7 @@ export default function SharedWithMePage({
           <div className="space-y-6">
             {data.folders.length > 0 && (
               <div>
-                <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">
+                <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
                   Shared Folders ({data.folders.length})
                 </h3>
                 <div
@@ -113,7 +113,7 @@ export default function SharedWithMePage({
 
             {data.files.length > 0 && (
               <div>
-                <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">
+                <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
                   Shared Files ({data.files.length})
                 </h3>
                 <div
