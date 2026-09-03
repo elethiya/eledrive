@@ -1,0 +1,139 @@
+import React, { useState } from 'react';
+import { HardDrive, ArrowRight, Lock, Mail } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+
+export default function LoginPage({ onNavigateRegister }) {
+  const { login } = useAuth();
+  const [emailOrUser, setEmailOrUser] = useState('admin@eledrive.local');
+  const [password, setPassword] = useState('password123');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await login(emailOrUser, password);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleQuickFill = (email) => {
+    setEmailOrUser(email);
+    setPassword('password123');
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-slate-100">
+        {/* Brand */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/25">
+            <HardDrive className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              EleDrive
+            </h1>
+            <p className="text-xs text-slate-600">Team Drive & Project Sharing</p>
+          </div>
+        </div>
+
+        <h2 className="text-lg font-bold text-slate-800 mb-1">Welcome back</h2>
+        <p className="text-xs text-slate-600 mb-6">
+          Sign in to access your projects, shared folders, and drive.
+        </p>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-2xl text-xs font-semibold">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Email or Username
+            </label>
+            <div className="relative">
+              <Mail className="w-4 h-4 text-slate-600 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                required
+                value={emailOrUser}
+                onChange={(e) => setEmailOrUser(e.target.value)}
+                placeholder="admin@eledrive.local"
+                className="w-full text-xs pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Password
+            </label>
+            <div className="relative">
+              <Lock className="w-4 h-4 text-slate-600 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full text-xs pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/25 transition-all"
+          >
+            <span>{loading ? 'Signing in...' : 'Sign In'}</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </form>
+
+        {/* Demo Fast Login Buttons */}
+        <div className="mt-6 pt-5 border-t border-slate-100">
+          <span className="text-[11px] font-semibold text-slate-600 block mb-2 text-center uppercase tracking-wider">
+            Quick Test Accounts
+          </span>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <button
+              type="button"
+              onClick={() => handleQuickFill('admin@eledrive.local')}
+              className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-left transition-colors"
+            >
+              <span className="block font-bold text-blue-600">Admin User</span>
+              <span className="text-[10px] text-slate-600">admin@eledrive.local</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickFill('alex@eledrive.local')}
+              className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-left transition-colors"
+            >
+              <span className="block font-bold text-emerald-600">Alex (Teammate)</span>
+              <span className="text-[10px] text-slate-600">alex@eledrive.local</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 text-center text-xs text-slate-600">
+          Don't have an account?{' '}
+          <button
+            onClick={onNavigateRegister}
+            className="text-blue-600 font-bold hover:underline"
+          >
+            Create Team Account
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
