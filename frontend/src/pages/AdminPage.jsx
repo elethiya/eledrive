@@ -66,6 +66,7 @@ export default function AdminPage({ onBackToDrive }) {
   const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'pending' | 'approved' | 'rejected'
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [editUserModal, setEditUserModal] = useState(null);
+  const [viewUserModal, setViewUserModal] = useState(null);
 
   // Logs Tab
   const [logs, setLogs] = useState([]);
@@ -576,23 +577,27 @@ export default function AdminPage({ onBackToDrive }) {
                         return (
                           <tr key={u.id} className="hover:bg-slate-850/50 transition-colors">
                             <td className="py-3.5 px-4">
-                              <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => setViewUserModal(u)}
+                                className="flex items-center gap-3 text-left group hover:opacity-95 focus:outline-hidden"
+                                title="Click to view full user profile & activity"
+                              >
                                 <div
-                                  className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-sm shrink-0"
+                                  className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-sm shrink-0 ring-2 ring-slate-800 group-hover:ring-blue-500/50 transition-all shadow-xs"
                                   style={{ backgroundColor: u.avatar_color || '#3b82f6' }}
                                 >
                                   {u.name?.charAt(0).toUpperCase() || 'U'}
                                 </div>
                                 <div className="truncate max-w-[200px]">
-                                  <div className="font-semibold text-slate-100 flex items-center gap-1.5">
+                                  <div className="font-semibold text-slate-100 flex items-center gap-1.5 group-hover:text-blue-400 transition-colors">
                                     <span>{u.name}</span>
-                                    {u.role === 'owner' && <Crown className="w-3.5 h-3.5 text-amber-400" />}
+                                    {u.role === 'owner' && <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
                                   </div>
                                   <div className="text-[11px] text-slate-400 truncate">
                                     @{u.username} • {u.email}
                                   </div>
                                 </div>
-                              </div>
+                              </button>
                             </td>
                             <td className="py-3.5 px-4">
                               <span
@@ -659,6 +664,13 @@ export default function AdminPage({ onBackToDrive }) {
                                     </button>
                                   </>
                                 )}
+                                <button
+                                  onClick={() => setViewUserModal(u)}
+                                  className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors"
+                                  title="View User Full Details & Activity"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
                                 {u.role === 'owner' && user?.role !== 'owner' ? (
                                   <span
                                     className="p-1.5 rounded-lg bg-slate-900/60 text-slate-600 cursor-not-allowed inline-flex items-center justify-center"
@@ -1513,6 +1525,289 @@ export default function AdminPage({ onBackToDrive }) {
                 className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold"
               >
                 Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Profile View Floating Window */}
+      {viewUserModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
+          <div className="relative bg-slate-900 rounded-3xl max-w-2xl w-full shadow-2xl shadow-black/80 border border-slate-800 p-5 sm:p-7 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[90vh] overflow-y-auto flex flex-col space-y-5">
+            {/* Ambient Top Glow */}
+            <div className="absolute -top-16 -left-16 w-44 h-44 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Header with Close */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 relative z-10">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-blue-400" />
+                <h3 className="text-sm font-bold text-slate-100">User Profile Overview</h3>
+              </div>
+              <button
+                onClick={() => setViewUserModal(null)}
+                className="text-slate-400 hover:text-slate-200 p-1 rounded-lg hover:bg-slate-800 transition-colors"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Hero Profile Banner */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/70 border border-slate-800/90 flex flex-col sm:flex-row items-center sm:items-start gap-4 relative z-10">
+              <div
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl flex items-center justify-center font-bold text-white text-2xl sm:text-3xl shadow-xl ring-4 ring-slate-800/80 shrink-0"
+                style={{ backgroundColor: viewUserModal.avatar_color || '#3b82f6' }}
+              >
+                {viewUserModal.name?.charAt(0).toUpperCase() || 'U'}
+              </div>
+
+              <div className="flex-1 text-center sm:text-left min-w-0">
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
+                  <h4 className="text-lg font-bold text-slate-100 truncate">{viewUserModal.name}</h4>
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                      viewUserModal.role === 'owner'
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                        : viewUserModal.role === 'admin'
+                        ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                        : 'bg-slate-800 text-slate-300 border-slate-700'
+                    }`}
+                  >
+                    {viewUserModal.role === 'owner' ? 'Workspace Owner' : viewUserModal.role === 'admin' ? 'Administrator' : 'Team Member'}
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                      viewUserModal.status === 'approved'
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                        : viewUserModal.status === 'pending'
+                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                        : 'bg-red-500/10 text-red-400 border-red-500/30'
+                    }`}
+                  >
+                    {viewUserModal.status}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-400 truncate mb-2">{viewUserModal.email}</p>
+
+                {/* Copyable User ID pill */}
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-[11px] text-slate-400">
+                  <span className="font-mono text-slate-300 bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-800 truncate max-w-[240px]">
+                    ID: {viewUserModal.id}
+                  </span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(viewUserModal.id);
+                      toast.success('User ID copied to clipboard!');
+                    }}
+                    className="p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+                    title="Copy User ID"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Metrics Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10">
+              <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                  Active Files
+                </span>
+                <span className="text-sm font-bold text-slate-100 mt-1 block">
+                  {viewUserModal.files_count || 0}
+                </span>
+              </div>
+              <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                  Storage Used
+                </span>
+                <span className="text-sm font-bold text-blue-400 mt-1 block">
+                  {formatBytes(viewUserModal.storage_used || 0)}
+                </span>
+              </div>
+              <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                  Storage Quota
+                </span>
+                <span className="text-sm font-bold text-purple-400 mt-1 block">
+                  {formatBytes(viewUserModal.storage_limit || 0)}
+                </span>
+              </div>
+              <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                  Quota Left
+                </span>
+                <span className="text-sm font-bold text-emerald-400 mt-1 block">
+                  {formatBytes(Math.max(0, (viewUserModal.storage_limit || 0) - (viewUserModal.storage_used || 0)))}
+                </span>
+              </div>
+            </div>
+
+            {/* Storage Meter Visual Bar */}
+            <div className="p-4 bg-slate-950/50 border border-slate-800/80 rounded-2xl space-y-2 relative z-10">
+              {(() => {
+                const usedBytes = viewUserModal.storage_used || 0;
+                const limitBytes = viewUserModal.storage_limit || 1;
+                const pct = Math.min(100, Math.round((usedBytes / limitBytes) * 100));
+                return (
+                  <>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                        <HardDrive className="w-3.5 h-3.5 text-blue-400" />
+                        Storage Quota Utilization
+                      </span>
+                      <span className="font-mono text-[11px] text-slate-400">{pct}% utilized</span>
+                    </div>
+                    <div className="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          pct > 90 ? 'bg-red-500 shadow-sm shadow-red-500/50' : pct > 75 ? 'bg-amber-500' : 'bg-gradient-to-r from-blue-500 to-indigo-500'
+                        }`}
+                        style={{ width: `${Math.max(pct, 2)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[11px] text-slate-500 font-medium">
+                      <span>{formatBytes(usedBytes)} used</span>
+                      <span>{formatBytes(limitBytes)} total</span>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Comprehensive Detail Field Tiles */}
+            <div className="p-4 bg-slate-950/50 border border-slate-800/80 rounded-2xl space-y-3 relative z-10">
+              <h5 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Account Specifications</h5>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/80 border border-slate-800">
+                  <span className="text-slate-400">Username</span>
+                  <span className="font-semibold text-slate-200 font-mono">@{viewUserModal.username}</span>
+                </div>
+                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/80 border border-slate-800">
+                  <span className="text-slate-400">Email</span>
+                  <span className="font-semibold text-slate-200 truncate max-w-[150px]">{viewUserModal.email}</span>
+                </div>
+                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/80 border border-slate-800">
+                  <span className="text-slate-400">Registered On</span>
+                  <span className="font-semibold text-slate-200">{formatDate(viewUserModal.created_at)}</span>
+                </div>
+                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/80 border border-slate-800">
+                  <span className="text-slate-400">Last Profile Update</span>
+                  <span className="font-semibold text-slate-200">{formatDate(viewUserModal.updated_at)}</span>
+                </div>
+                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/80 border border-slate-800">
+                  <span className="text-slate-400">Role Privilege</span>
+                  <span className="font-semibold text-slate-200">{viewUserModal.role?.toUpperCase()}</span>
+                </div>
+                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/80 border border-slate-800">
+                  <span className="text-slate-400">Forensic Attribution</span>
+                  <span className="font-semibold text-emerald-400 font-mono text-[11px]">ACTIVE</span>
+                </div>
+              </div>
+            </div>
+
+            {/* User Activity Logs Audit Trail */}
+            <div className="p-4 bg-slate-950/50 border border-slate-800/80 rounded-2xl space-y-3 relative z-10">
+              <div className="flex items-center justify-between">
+                <h5 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <ScrollText className="w-3.5 h-3.5 text-blue-400" />
+                  Recent Activity Audit Trail
+                </h5>
+                <span className="text-[10px] text-slate-500">Last recorded events</span>
+              </div>
+
+              {(() => {
+                const userLogs = (logs || []).filter(
+                  (l) => l.user_id === viewUserModal.id || l.user_name === viewUserModal.name || l.user_name === viewUserModal.username
+                ).slice(0, 5);
+
+                if (userLogs.length === 0) {
+                  return (
+                    <div className="text-center py-4 text-xs text-slate-500">
+                      No forensic activity recorded for this user yet.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {userLogs.map((log) => (
+                      <div
+                        key={log.id}
+                        className="flex items-center justify-between p-2 rounded-xl bg-slate-900/70 border border-slate-800/70 text-xs"
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono text-[10px] font-semibold uppercase">
+                            {log.action}
+                          </span>
+                          <span className="text-slate-300 truncate font-medium">{log.item_name || log.details}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 shrink-0 ml-2">
+                          {formatDate(log.created_at)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Action Footer */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800 relative z-10">
+              <div className="flex items-center gap-2">
+                {viewUserModal.status === 'pending' && (
+                  <>
+                    <button
+                      onClick={async () => {
+                        await handleApproveUser(viewUserModal.id);
+                        setViewUserModal(null);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Approve</span>
+                    </button>
+                    <button
+                      onClick={async () => {
+                        await handleRejectUser(viewUserModal.id);
+                        setViewUserModal(null);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-red-600/30 text-red-300 hover:bg-red-600/40 border border-red-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Reject</span>
+                    </button>
+                  </>
+                )}
+                {viewUserModal.role === 'owner' && user?.role !== 'owner' ? (
+                  <span className="text-[11px] text-amber-400 flex items-center gap-1">
+                    <Lock className="w-3 h-3" />
+                    <span>Owner account protected</span>
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => {
+                      const u = viewUserModal;
+                      setViewUserModal(null);
+                      setEditUserModal(u);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                    <span>Edit User / Quota</span>
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViewUserModal(null)}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors"
+              >
+                Done
               </button>
             </div>
           </div>

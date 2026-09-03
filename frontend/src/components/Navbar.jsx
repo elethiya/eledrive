@@ -14,6 +14,7 @@ import {
   User,
   ShieldCheck,
   Sparkles,
+  Crown,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useRealtime } from '../context/RealtimeContext';
@@ -211,17 +212,23 @@ export default function Navbar({
         <div className="relative shrink-0">
           <button
             onClick={() => setProfileOpen(!profileOpen)}
-            className="flex items-center gap-2 p-1 sm:pr-2.5 rounded-full hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-700"
+            className="flex items-center gap-2 p-1 sm:px-2.5 sm:py-1 rounded-full md:border md:border-slate-700/80 md:bg-slate-950/60 md:shadow-xs md:hover:border-slate-500 md:hover:bg-slate-900/90 transition-all hover:bg-slate-800 border border-transparent"
+            title="Profile Menu"
           >
             <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md ring-2 ring-slate-800"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md ring-2 ring-slate-700 md:ring-slate-600/90 shrink-0"
               style={{ backgroundColor: user?.avatar_color || '#3b82f6' }}
             >
               {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
             </div>
-            <span className="text-xs font-semibold text-slate-200 max-w-[100px] truncate hidden md:inline">
-              {user?.name || 'User'}
-            </span>
+            <div className="flex items-center gap-1.5 hidden md:flex">
+              <span className="text-xs font-semibold text-slate-200 max-w-[110px] truncate">
+                {user?.name || 'User'}
+              </span>
+              {user?.role === 'owner' && (
+                <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" title="Workspace Owner" />
+              )}
+            </div>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:inline" />
           </button>
 
