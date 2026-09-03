@@ -15,9 +15,11 @@ import {
   Archive,
 } from 'lucide-react';
 import { publicShareAPI } from '../api/client';
+import { useToast } from '../context/ToastContext';
 import { formatBytes, getFileTypeCategory } from '../utils/formatters';
 
 export default function PublicSharePage({ token, onBackToDrive }) {
+  const toast = useToast();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [password, setPassword] = useState('');
@@ -88,8 +90,9 @@ export default function PublicSharePage({ token, onBackToDrive }) {
       setUploadSuccess(true);
       setTimeout(() => setUploadSuccess(false), 3000);
       loadShareInfo(password);
+      toast.success('Files uploaded successfully!');
     } catch (err) {
-      alert('Upload failed: ' + err.message);
+      toast.error('Upload failed: ' + err.message);
     } finally {
       setIsUploading(false);
     }

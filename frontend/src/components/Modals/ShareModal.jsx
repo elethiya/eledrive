@@ -14,9 +14,11 @@ import {
 } from 'lucide-react';
 import { shareAPI, publicShareAPI, authAPI, teamAPI } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 
 export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' }) {
   const { user } = useAuth();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('team');
 
   // Team Share state
@@ -102,7 +104,7 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
       setSearchQuery('');
       await loadTeamShares();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setTeamLoading(false);
     }
@@ -118,9 +120,9 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
         permission: memberPermission,
       });
       await loadTeamShares();
-      alert(`Successfully shared ${itemType === 'drive' ? 'My Drive' : item.name} with team "${t.name}"!`);
+      toast.success(`Successfully shared ${itemType === 'drive' ? 'My Drive' : item.name} with team "${t.name}"!`);
     } catch (err) {
-      alert(err.response?.data?.error || err.message || 'Failed to share with team');
+      toast.error(err.response?.data?.error || err.message || 'Failed to share with team');
     } finally {
       setTeamLoading(false);
     }
@@ -130,8 +132,9 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
     try {
       await shareAPI.deleteShare(shareId);
       await loadTeamShares();
+      toast.success('Share access removed');
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -147,9 +150,10 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
       });
       if (res.data) {
         setLinkInfo({ link: res.data, url: res.data.url });
+        toast.success('Public share link created!');
       }
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setLinkLoading(false);
     }
@@ -161,8 +165,9 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
     try {
       await publicShareAPI.deleteLink(linkInfo.link.id);
       setLinkInfo(null);
+      toast.success('Public share link deactivated');
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setLinkLoading(false);
     }
@@ -172,6 +177,7 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
     if (linkInfo?.url) {
       navigator.clipboard.writeText(linkInfo.url);
       setCopied(true);
+      toast.success('Share link copied to clipboard!');
       setTimeout(() => setCopied(false), 2000);
     }
   };

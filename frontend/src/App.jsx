@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ConfirmProvider } from './context/ConfirmContext';
 import { RealtimeProvider } from './context/RealtimeContext';
+import { ToastProvider } from './context/ToastContext';
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 import DrivePage from './pages/DrivePage';
@@ -532,7 +533,9 @@ export default function App() {
     <AuthProvider>
       <ConfirmProvider>
         <RealtimeProvider>
-          <AppContent />
+          <ToastProvider>
+            <AppContent />
+          </ToastProvider>
         </RealtimeProvider>
       </ConfirmProvider>
     </AuthProvider>

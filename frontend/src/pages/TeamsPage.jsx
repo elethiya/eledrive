@@ -20,6 +20,7 @@ import {
 import { teamAPI } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useConfirm } from '../context/ConfirmContext';
+import { useToast } from '../context/ToastContext';
 import { useRealtimeEvent } from '../context/RealtimeContext';
 import { formatDate } from '../utils/formatters';
 
@@ -36,6 +37,7 @@ const TEAM_COLORS = [
 export default function TeamsPage() {
   const { user } = useAuth();
   const confirm = useConfirm();
+  const toast = useToast();
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -108,7 +110,7 @@ export default function TeamsPage() {
         setActiveTeam(res.data);
       }
     } catch (err) {
-      alert(err.response?.data?.error || err.message);
+      toast.error(err.response?.data?.error || err.message);
     } finally {
       setLoadingTeamDetails(false);
     }
@@ -126,18 +128,17 @@ export default function TeamsPage() {
     try {
       const res = await teamAPI.createTeam({
         name: newTeamName.trim(),
-        description: newTeamDesc.trim(),
+        description: newTeamDesc.trim() || undefined,
         avatar_color: newTeamColor,
       });
 
       const createdTeam = res.data;
-      // Add initial members if selected
-      if (createdTeam && selectedInitialMembers.length > 0) {
+      if (selectedInitialMembers.length > 0 && createdTeam?.id) {
         for (const userId of selectedInitialMembers) {
           try {
             await teamAPI.addMember(createdTeam.id, { user_id: userId, role: 'member' });
-          } catch (e) {
-            console.error(e);
+          } catch (mErr) {
+            console.warn('Failed to add initial member:', mErr);
           }
         }
       }
@@ -147,8 +148,10 @@ export default function TeamsPage() {
       setNewTeamDesc('');
       setSelectedInitialMembers([]);
       loadTeams();
+      toast.success(`Team "${createdTeam?.name || 'New Team'}" created successfully!`);
     } catch (err) {
       setCreateError(err.response?.data?.error || err.message || 'Failed to create team');
+      toast.error(err.response?.data?.error || err.message || 'Failed to create team');
     } finally {
       setCreating(false);
     }
@@ -160,8 +163,9 @@ export default function TeamsPage() {
       await teamAPI.addMember(activeTeam.id, { user_id: userId, role: 'member' });
       handleOpenTeam(activeTeam.id);
       loadTeams();
+      toast.success('Member added to team!');
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to add member');
+      toast.error(err.response?.data?.error || 'Failed to add member');
     }
   };
 
@@ -179,8 +183,9 @@ export default function TeamsPage() {
       await teamAPI.removeMember(activeTeam.id, userId);
       handleOpenTeam(activeTeam.id);
       loadTeams();
+      toast.success('Member removed from team');
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to remove member');
+      toast.error(err.response?.data?.error || 'Failed to remove member');
     }
   };
 
@@ -197,8 +202,9 @@ export default function TeamsPage() {
       await teamAPI.deleteTeam(teamId);
       if (activeTeam?.id === teamId) setActiveTeam(null);
       loadTeams();
+      toast.success('Team deleted successfully');
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to delete team');
+      toast.error(err.response?.data?.error || 'Failed to delete team');
     }
   };
 

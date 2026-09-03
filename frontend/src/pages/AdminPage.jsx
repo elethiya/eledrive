@@ -36,11 +36,13 @@ import {
 import { adminAPI } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useConfirm } from '../context/ConfirmContext';
+import { useToast } from '../context/ToastContext';
 import { formatBytes, formatDate } from '../utils/formatters';
 
 export default function AdminPage({ onBackToDrive }) {
   const { user } = useAuth();
   const confirm = useConfirm();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('users'); // 'users' | 'security' | 'logs' | 'settings'
 
   // Admin Stats
@@ -239,8 +241,9 @@ export default function AdminPage({ onBackToDrive }) {
       await adminAPI.approveUser(id);
       loadUsers();
       loadStats();
+      toast.success('User account approved!');
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to approve user');
+      toast.error(err.response?.data?.error || 'Failed to approve user');
     }
   };
 
@@ -257,8 +260,9 @@ export default function AdminPage({ onBackToDrive }) {
       await adminAPI.rejectUser(id);
       loadUsers();
       loadStats();
+      toast.success('User account request rejected');
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to reject user');
+      toast.error(err.response?.data?.error || 'Failed to reject user');
     }
   };
 
@@ -275,8 +279,9 @@ export default function AdminPage({ onBackToDrive }) {
       await adminAPI.deleteUser(id);
       loadUsers();
       loadStats();
+      toast.success('User account deleted');
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to delete user');
+      toast.error(err.response?.data?.error || 'Failed to delete user');
     }
   };
 
@@ -292,8 +297,9 @@ export default function AdminPage({ onBackToDrive }) {
     try {
       await adminAPI.clearLogs();
       loadLogs();
+      toast.success('Activity logs cleared');
     } catch (err) {
-      alert('Failed to clear logs');
+      toast.error('Failed to clear logs');
     }
   };
 
@@ -1487,8 +1493,9 @@ export default function AdminPage({ onBackToDrive }) {
                     });
                     setEditUserModal(null);
                     loadUsers();
+                    toast.success('User updated successfully');
                   } catch (err) {
-                    alert(err.response?.data?.error || 'Failed to update user');
+                    toast.error(err.response?.data?.error || 'Failed to update user');
                   }
                 }}
                 className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold"

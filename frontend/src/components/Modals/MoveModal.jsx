@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { X, FolderInput, Folder, HardDrive, ChevronRight } from 'lucide-react';
 import { folderAPI } from '../../api/client';
+import { useToast } from '../../context/ToastContext';
 
 export default function MoveModal({ isOpen, onClose, item, onMove }) {
+  const toast = useToast();
   const [folders, setFolders] = useState([]);
   const [currentParent, setCurrentParent] = useState('');
   const [breadcrumbs, setBreadcrumbs] = useState([{ id: '', name: 'My Drive' }]);
@@ -39,9 +41,10 @@ export default function MoveModal({ isOpen, onClose, item, onMove }) {
     setLoading(true);
     try {
       await onMove(item, selectedFolderId || null);
+      toast.success(`Moved "${item.name}" successfully!`);
       onClose();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }

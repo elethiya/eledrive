@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, Edit3 } from 'lucide-react';
+import { useToast } from '../../context/ToastContext';
 
 export default function RenameModal({ isOpen, onClose, item, onRename }) {
+  const toast = useToast();
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -23,9 +25,10 @@ export default function RenameModal({ isOpen, onClose, item, onRename }) {
     setLoading(true);
     try {
       await onRename(item, name.trim());
+      toast.success(`Renamed to "${name.trim()}"`);
       onClose();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }

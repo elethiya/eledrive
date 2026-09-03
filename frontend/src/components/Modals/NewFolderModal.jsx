@@ -10,7 +10,10 @@ const COLORS = [
   { label: 'Rose', hex: '#f43f5e' },
 ];
 
+import { useToast } from '../../context/ToastContext';
+
 export default function NewFolderModal({ isOpen, onClose, onCreate }) {
+  const toast = useToast();
   const [name, setName] = useState('');
   const [selectedColor, setSelectedColor] = useState(COLORS[0].hex);
   const [loading, setLoading] = useState(false);
@@ -23,10 +26,11 @@ export default function NewFolderModal({ isOpen, onClose, onCreate }) {
     setLoading(true);
     try {
       await onCreate(name.trim(), selectedColor);
+      toast.success(`Folder "${name.trim()}" created successfully!`);
       setName('');
       onClose();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
