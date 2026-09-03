@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { statsAPI, fileAPI } from '../api/client';
 import { useRealtimeEvent } from '../context/RealtimeContext';
 import FileCard from '../components/FileCard';
-import { Clock } from 'lucide-react';
+import { Clock, RefreshCw } from 'lucide-react';
 
 export default function RecentPage({
   onOpenPreview,
@@ -13,6 +13,7 @@ export default function RecentPage({
 }) {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     loadRecent();
@@ -46,7 +47,29 @@ export default function RecentPage({
           <Clock className="w-4 h-4 text-blue-400" />
           <span>Recent Files</span>
         </div>
-        <span className="text-xs text-slate-400">Files opened or uploaded recently</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-400 hidden sm:inline">Files opened or uploaded recently</span>
+          <button
+            onClick={async () => {
+              setIsRefreshing(true);
+              try {
+                await loadRecent();
+              } finally {
+                setTimeout(() => setIsRefreshing(false), 600);
+              }
+            }}
+            disabled={isRefreshing}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-slate-100 border border-slate-800 rounded-xl text-xs font-semibold transition-all group disabled:opacity-60 shadow-xs"
+            title="Refresh recent files"
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 transition-transform duration-500 ${
+                isRefreshing ? 'animate-spin text-blue-400' : 'group-hover:rotate-180 text-slate-400 group-hover:text-slate-200'
+              }`}
+            />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3.5 sm:p-6">

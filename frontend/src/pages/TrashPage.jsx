@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { statsAPI, folderAPI, fileAPI } from '../api/client';
-import { Trash2, RotateCcw, AlertTriangle, Folder, File } from 'lucide-react';
+import { Trash2, RotateCcw, AlertTriangle, Folder, File, RefreshCw } from 'lucide-react';
 import { formatBytes, formatDate } from '../utils/formatters';
 
 import { useConfirm } from '../context/ConfirmContext';
@@ -9,6 +9,7 @@ import { useRealtimeEvent } from '../context/RealtimeContext';
 export default function TrashPage() {
   const [data, setData] = useState({ folders: [], files: [] });
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const confirm = useConfirm();
 
   useEffect(() => {
@@ -94,15 +95,38 @@ export default function TrashPage() {
           <span>Trash</span>
         </div>
 
-        {!isEmpty && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={handleEmptyTrash}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+            onClick={async () => {
+              setIsRefreshing(true);
+              try {
+                await loadTrash();
+              } finally {
+                setTimeout(() => setIsRefreshing(false), 600);
+              }
+            }}
+            disabled={isRefreshing}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-slate-100 border border-slate-800 rounded-xl text-xs font-semibold transition-all group disabled:opacity-60 shadow-xs"
+            title="Refresh trash"
           >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Empty Trash</span>
+            <RefreshCw
+              className={`w-3.5 h-3.5 transition-transform duration-500 ${
+                isRefreshing ? 'animate-spin text-blue-400' : 'group-hover:rotate-180 text-slate-400 group-hover:text-slate-200'
+              }`}
+            />
+            <span className="hidden sm:inline">Refresh</span>
           </button>
-        )}
+
+          {!isEmpty && (
+            <button
+              onClick={handleEmptyTrash}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Empty Trash</span>
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3.5 sm:p-6">

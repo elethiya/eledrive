@@ -26,6 +26,7 @@ import {
   Code2,
   Archive,
   Layers,
+  RefreshCw,
 } from 'lucide-react';
 import { formatBytes, formatDate, getFileTypeCategory } from '../utils/formatters';
 
@@ -56,6 +57,16 @@ export default function DrivePage({
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortField, setSortField] = useState('name'); // 'name', 'size', 'updated_at', 'type'
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc', 'desc'
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadContent(false);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 600);
+    }
+  };
 
   // Load Folder Contents
   const loadContent = useCallback(async (showLoading = false) => {
@@ -284,86 +295,84 @@ export default function DrivePage({
         onShareFolder={() => onOpenShare(folder || { id: 'root', name: 'My Drive' }, folder ? 'folder' : 'drive')}
       />
 
-      {/* Modern Content Listing Toolbar */}
-      {!isEmpty && (
-        <div className="border-b border-slate-800/80 bg-slate-900/40 backdrop-blur-md shrink-0">
-          <div className="px-3.5 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
-            {/* Left: Folder Content Stats & Filter Indicator */}
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <span className="text-[11px] text-slate-400 font-mono whitespace-nowrap bg-slate-950/60 border border-slate-800/80 px-2.5 py-1 rounded-xl shadow-inner">
-                {filteredFolders.length} {filteredFolders.length === 1 ? 'folder' : 'folders'}, {filteredFiles.length} {filteredFiles.length === 1 ? 'file' : 'files'}
-                {totalBytes > 0 && ` · ${formatBytes(totalBytes)}`}
-              </span>
+      {/* Modern Content Listing Toolbar (Always in same row as counting section) */}
+      <div className="border-b border-slate-800/80 bg-slate-900/40 backdrop-blur-md shrink-0">
+        <div className="px-3.5 sm:px-6 py-2 flex items-center justify-between gap-2.5 overflow-x-auto no-scrollbar">
+          {/* Left: Folder Content Stats (Counting Section) & Filter Indicator */}
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[11px] text-slate-400 font-mono whitespace-nowrap bg-slate-950/60 border border-slate-800/80 px-2.5 py-1 rounded-xl shadow-inner">
+              {filteredFolders.length} {filteredFolders.length === 1 ? 'folder' : 'folders'}, {filteredFiles.length} {filteredFiles.length === 1 ? 'file' : 'files'}
+              {totalBytes > 0 && ` · ${formatBytes(totalBytes)}`}
+            </span>
 
-              {filterText && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 border border-blue-500/25 text-blue-400 text-xs rounded-xl">
-                  <span>Filtered: <strong className="text-slate-200">"{filterText}"</strong></span>
-                  {onClearSearch && (
-                    <button
-                      onClick={onClearSearch}
-                      className="text-slate-400 hover:text-slate-200 p-0.5 transition-colors"
-                      title="Clear filter"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Right: Actions & Sort Controls */}
-            <div className="flex items-center gap-2 shrink-0">
-              {/* New Folder quick button */}
-              <button
-                onClick={onOpenNewFolder}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-850 active:bg-slate-800 text-slate-200 border border-slate-800 rounded-xl text-xs font-semibold transition-colors shadow-xs"
-                title="Create a new folder"
-              >
-                <FolderPlus className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden sm:inline">New Folder</span>
-              </button>
-
-              {/* Share Drive with Team button (when in root My Drive) */}
-              {!currentFolderId && (
-                <button
-                  onClick={() => onOpenShare({ id: 'root', name: 'My Drive' }, 'drive')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded-xl text-xs font-semibold transition-colors shadow-xs"
-                  title="Share entire My Drive with a team"
-                >
-                  <Users className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Share Drive</span>
-                </button>
-              )}
-
-              {/* Sort Controls */}
-              <div className="flex items-center bg-slate-950/80 border border-slate-800 rounded-xl p-0.5 shadow-inner">
-                <select
-                  value={sortField}
-                  onChange={(e) => setSortField(e.target.value)}
-                  className="bg-transparent text-xs text-slate-300 px-2 py-1 outline-hidden cursor-pointer"
-                >
-                  <option value="name" className="bg-slate-900">Name</option>
-                  <option value="updated_at" className="bg-slate-900">Modified</option>
-                  <option value="size" className="bg-slate-900">Size</option>
-                  <option value="type" className="bg-slate-900">Type</option>
-                </select>
-
-                <button
-                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                  className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition-colors"
-                  title={`Sort ${sortOrder === 'asc' ? 'Ascending' : 'Descending'}`}
-                >
-                  {sortOrder === 'asc' ? (
-                    <ArrowUp className="w-3.5 h-3.5 text-blue-400" />
-                  ) : (
-                    <ArrowDown className="w-3.5 h-3.5 text-blue-400" />
-                  )}
-                </button>
+            {filterText && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 border border-blue-500/25 text-blue-400 text-xs rounded-xl shrink-0">
+                <span>Filtered: <strong className="text-slate-200">"{filterText}"</strong></span>
+                {onClearSearch && (
+                  <button
+                    onClick={onClearSearch}
+                    className="text-slate-400 hover:text-slate-200 p-0.5 transition-colors"
+                    title="Clear filter"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Quick Category Filter Pills */}
+          {/* Right: New Folder, Share Drive, Name (Sort) & Animated Refresh in the SAME ROW */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* New Folder quick button */}
+            <button
+              onClick={onOpenNewFolder}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-slate-900 hover:bg-slate-850 active:bg-slate-800 text-slate-200 border border-slate-800 rounded-xl text-xs font-semibold transition-colors shadow-xs shrink-0"
+              title="Create a new folder"
+            >
+              <FolderPlus className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">New Folder</span>
+            </button>
+
+            {/* Share Drive with Team button (when in root My Drive) or Share Folder */}
+            {!currentFolderId ? (
+              <button
+                onClick={() => onOpenShare({ id: 'root', name: 'My Drive' }, 'drive')}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded-xl text-xs font-semibold transition-colors shadow-xs shrink-0"
+                title="Share entire My Drive with a team"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Share Drive</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => onOpenShare(folder, 'folder')}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded-xl text-xs font-semibold transition-colors shadow-xs shrink-0"
+                title="Share this folder with a team"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Share Folder</span>
+              </button>
+            )}
+
+            {/* Refresh button with Animation */}
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-900 hover:bg-slate-850 active:bg-slate-800 text-slate-300 hover:text-slate-100 border border-slate-800 rounded-xl text-xs font-semibold transition-all shadow-xs shrink-0 group disabled:opacity-60"
+              title="Refresh contents"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 transition-transform duration-500 ${
+                  isRefreshing ? 'animate-spin text-blue-400' : 'group-hover:rotate-180 text-slate-400 group-hover:text-slate-200'
+                }`}
+              />
+              <span className="hidden md:inline text-[11px]">Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Category Filter Pills */}
+        {!isEmpty && (
           <div className="flex items-center gap-1.5 overflow-x-auto px-3.5 sm:px-6 pb-2 pt-0 text-xs no-scrollbar">
             <button
               onClick={() => setCategoryFilter('all')}
@@ -461,8 +470,8 @@ export default function DrivePage({
               </button>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Drag & Drop Visual Overlay */}
       {isDragOver && (
@@ -521,32 +530,37 @@ export default function DrivePage({
           </div>
         ) : (
           <div className="space-y-5">
-            {/* Table List Header */}
-            <div className="hidden sm:flex items-center justify-between px-4 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800/80 select-none bg-slate-900/30 rounded-xl">
+            {/* Table List Header (Unified single Name & Sort header on desktop and mobile) */}
+            <div className="flex items-center justify-between px-3 sm:px-4 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800/80 select-none bg-slate-900/30 rounded-xl">
               <button
                 onClick={() => handleHeaderSort('name')}
-                className="flex items-center gap-1.5 hover:text-slate-200 transition-colors flex-1 text-left"
+                className="flex items-center gap-1.5 hover:text-slate-200 transition-colors flex-1 text-left font-bold"
+                title="Sort by Name"
               >
                 <span>Name</span>
-                {sortField === 'name' && (
-                  <span className="text-blue-400">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                {sortField === 'name' ? (
+                  <span className="text-blue-400 font-bold">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                ) : (
+                  <ArrowUpDown className="w-3 h-3 text-slate-600 hover:text-slate-400" />
                 )}
               </button>
 
               <div className="flex items-center gap-3 sm:gap-6 shrink-0">
                 <button
                   onClick={() => handleHeaderSort('size')}
-                  className="w-20 sm:w-24 text-right hover:text-slate-200 transition-colors"
+                  className="text-right hover:text-slate-200 transition-colors font-bold flex items-center justify-end gap-1"
+                  title="Sort by Size"
                 >
                   <span>Size</span>
                   {sortField === 'size' && (
-                    <span className="text-blue-400 ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    <span className="text-blue-400 font-bold">{sortOrder === 'asc' ? '↑' : '↓'}</span>
                   )}
                 </button>
 
                 <button
                   onClick={() => handleHeaderSort('updated_at')}
-                  className="w-24 sm:w-28 text-right hidden md:inline hover:text-slate-200 transition-colors"
+                  className="w-24 sm:w-28 text-right hidden sm:inline hover:text-slate-200 transition-colors"
+                  title="Sort by Modified Date"
                 >
                   <span>Modified</span>
                   {sortField === 'updated_at' && (
@@ -554,7 +568,7 @@ export default function DrivePage({
                   )}
                 </button>
 
-                <span className="w-20 text-right pr-2">Actions</span>
+                <span className="w-16 sm:w-20 text-right pr-2 hidden sm:inline">Actions</span>
               </div>
             </div>
 

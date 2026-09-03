@@ -66,6 +66,7 @@ export default function AdminPage({ onBackToDrive }) {
   // Admin Stats
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [isRefreshingStats, setIsRefreshingStats] = useState(false);
 
   // Security & Forensic Leak Tracker
   const [securityStats, setSecurityStats] = useState(null);
@@ -401,15 +402,28 @@ export default function AdminPage({ onBackToDrive }) {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => {
-              loadStats();
-              loadUsers();
-              loadLogs();
-              loadSecurityStats();
+            onClick={async () => {
+              setIsRefreshingStats(true);
+              try {
+                await Promise.all([
+                  loadStats(),
+                  loadUsers(),
+                  loadLogs(),
+                  loadSecurityStats(),
+                ]);
+              } finally {
+                setTimeout(() => setIsRefreshingStats(false), 600);
+              }
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors"
+            disabled={isRefreshingStats}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-all group disabled:opacity-60"
+            title="Refresh dashboard metrics & data"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
+            <RefreshCw
+              className={`w-3.5 h-3.5 transition-transform duration-500 ${
+                isRefreshingStats ? 'animate-spin text-blue-400' : 'group-hover:rotate-180 text-slate-400 group-hover:text-slate-200'
+              }`}
+            />
             <span className="hidden sm:inline">Refresh</span>
           </button>
         </div>

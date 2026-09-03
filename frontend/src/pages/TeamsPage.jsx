@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Users,
   Plus,
@@ -11,6 +11,7 @@ import {
   Check,
   X,
   RefreshCw,
+  ArrowUpDown,
   Folder,
   ArrowLeft,
   Settings,
@@ -40,7 +41,10 @@ export default function TeamsPage() {
   const toast = useToast();
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortField, setSortField] = useState('name');
+  const [sortOrder, setSortOrder] = useState('asc');
 
   // Create Team Modal
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -216,32 +220,81 @@ export default function TeamsPage() {
         ((t.description || '').toLowerCase().includes(searchQuery.toLowerCase())))
   );
 
+  const sortedTeams = useMemo(() => {
+    const list = [...filteredTeams];
+    list.sort((a, b) => {
+      let comparison = 0;
+      if (sortField === 'name') {
+        comparison = (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' });
+      } else if (sortField === 'members') {
+        comparison = (a.members_count || 0) - (b.members_count || 0);
+      } else if (sortField === 'created_at') {
+        comparison = new Date(a.created_at || 0) - new Date(b.created_at || 0);
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+    return list;
+  }, [filteredTeams, sortField, sortOrder]);
+
+  const handleHeaderSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950 text-slate-100">
       {/* Header */}
-      <div className="p-6 border-b border-slate-800 bg-slate-900/60 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold shadow-md shadow-blue-600/20">
-              <Users className="w-4 h-4" />
-            </div>
-            <h1 className="text-base font-bold text-slate-100">Teams & Workspaces</h1>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400">
-              {teams.length} {teams.length === 1 ? 'Team' : 'Teams'}
-            </span>
+      <div className="px-4 sm:px-6 py-3.5 border-b border-slate-800 bg-slate-900/60 backdrop-blur-md flex items-center justify-between gap-3 shrink-0">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold shadow-md shadow-blue-600/20 shrink-0">
+            <Users className="w-4 h-4" />
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Create project teams, organize teammates, and collaborate with unified permissions
-          </p>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm sm:text-base font-bold text-slate-100 truncate">Teams & Workspaces</h1>
+              <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 shrink-0">
+                {teams.length} {teams.length === 1 ? 'Team' : 'Teams'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 hidden sm:block truncate mt-0.5">
+              Create project teams, organize teammates, and collaborate with unified permissions
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={async () => {
+              setIsRefreshing(true);
+              try {
+                await loadTeams();
+              } finally {
+                setTimeout(() => setIsRefreshing(false), 600);
+              }
+            }}
+            disabled={isRefreshing}
+            className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-2 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-slate-100 border border-slate-800 rounded-xl text-xs font-semibold transition-all group disabled:opacity-60 shadow-xs"
+            title="Refresh teams"
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 transition-transform duration-500 ${
+                isRefreshing ? 'animate-spin text-blue-400' : 'group-hover:rotate-180 text-slate-400 group-hover:text-slate-200'
+              }`}
+            />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+
           <button
             onClick={() => setCreateModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/20 transition-all transform hover:-translate-y-0.5"
+            className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/20 transition-all transform hover:-translate-y-0.5"
+            title="Create New Team"
           >
             <Plus className="w-4 h-4" />
-            <span>Create New Team</span>
+            <span className="hidden sm:inline">Create New Team</span>
           </button>
         </div>
       </div>
@@ -294,20 +347,53 @@ export default function TeamsPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {/* Table Header */}
-            <div className="hidden sm:flex items-center justify-between px-4 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800/80 select-none bg-slate-900/30 rounded-xl">
-              <span className="flex-1">Team Workspace & Details</span>
-              <div className="flex items-center gap-4 sm:gap-6 shrink-0">
+            {/* Table Header (Unified single Team Name & Sort header on desktop and mobile) */}
+            <div className="flex items-center justify-between px-4 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800/80 select-none bg-slate-900/30 rounded-xl">
+              <button
+                onClick={() => handleHeaderSort('name')}
+                className="flex items-center gap-1.5 hover:text-slate-200 transition-colors flex-1 text-left font-bold"
+                title="Sort by Team Name"
+              >
+                <span>Team Name</span>
+                {sortField === 'name' ? (
+                  <span className="text-blue-400 font-bold">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                ) : (
+                  <ArrowUpDown className="w-3 h-3 text-slate-600 hover:text-slate-400" />
+                )}
+              </button>
+
+              <div className="flex items-center gap-3 sm:gap-6 shrink-0">
                 <span className="w-24 text-center hidden sm:inline">Role</span>
-                <span className="w-24 text-center">Members</span>
-                <span className="w-28 text-right hidden md:inline">Created</span>
-                <span className="w-20 text-right pr-2">Actions</span>
+
+                <button
+                  onClick={() => handleHeaderSort('members')}
+                  className="w-16 sm:w-24 text-center hover:text-slate-200 transition-colors font-bold flex items-center justify-center gap-1"
+                  title="Sort by Members"
+                >
+                  <span>Members</span>
+                  {sortField === 'members' && (
+                    <span className="text-blue-400 font-bold">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => handleHeaderSort('created_at')}
+                  className="w-28 text-right hidden md:inline hover:text-slate-200 transition-colors font-bold"
+                  title="Sort by Created Date"
+                >
+                  <span>Created</span>
+                  {sortField === 'created_at' && (
+                    <span className="text-blue-400 ml-1 font-bold">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </button>
+
+                <span className="w-16 sm:w-20 text-right pr-2 hidden sm:inline">Actions</span>
               </div>
             </div>
 
             {/* List Rows */}
             <div className="space-y-1.5">
-              {filteredTeams.map((t) => {
+              {sortedTeams.map((t) => {
                 const isLeader = t.user_role === 'leader' || t.created_by_user_id === user?.id;
                 return (
                   <div
