@@ -86,7 +86,7 @@ func (h *TeamHandler) CreateTeam(w http.ResponseWriter, r *http.Request) {
 	}
 
 	teamID := uuid.New().String()
-	now := time.Now()
+	now := time.Now().UTC().Truncate(time.Second)
 
 	tx, err := db.DB.Begin()
 	if err != nil {
@@ -251,7 +251,7 @@ func (h *TeamHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 	}
 
 	memberID := uuid.New().String()
-	now := time.Now()
+	now := time.Now().UTC().Truncate(time.Second)
 
 	_, err = db.DB.Exec(`
 		INSERT INTO main.team_members (id, team_id, user_id, role, joined_at)

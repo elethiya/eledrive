@@ -21,6 +21,7 @@ import {
   Clock,
   Sparkles,
   ChevronDown,
+  Users,
 } from 'lucide-react';
 import { formatBytes, formatDate } from '../utils/formatters';
 
@@ -203,7 +204,7 @@ export default function DrivePage({
         breadcrumbs={breadcrumbs}
         currentFolder={folder}
         onNavigate={(id) => setCurrentFolderId(id)}
-        onShareFolder={() => onOpenShare(folder, 'folder')}
+        onShareFolder={() => onOpenShare(folder || { id: 'root', name: 'My Drive' }, folder ? 'folder' : 'drive')}
       />
 
       {/* Modern Content Listing Toolbar */}
@@ -238,6 +239,18 @@ export default function DrivePage({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {/* Share Drive with Team button (when in root My Drive) */}
+            {!currentFolderId && (
+              <button
+                onClick={() => onOpenShare({ id: 'root', name: 'My Drive' }, 'drive')}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded-xl text-xs font-semibold transition-colors"
+                title="Share entire My Drive with a team"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Share Drive</span>
+              </button>
+            )}
+
             {/* Sort Controls */}
             <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-0.5">
               <select

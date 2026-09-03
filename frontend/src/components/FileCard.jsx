@@ -38,11 +38,11 @@ export default function FileCard({
 
   const category = !isFolder ? getFileTypeCategory(item.mime_type, item.extension) : 'folder';
 
-  const renderIcon = () => {
+  const renderIcon = (sizeClass = 'w-5 h-5') => {
     if (isFolder) {
       return (
         <Folder
-          className="w-7 h-7 sm:w-8 sm:h-8 transition-transform group-hover:scale-105"
+          className={`${sizeClass} transition-transform group-hover:scale-105`}
           style={{ color: item.color || '#f59e0b' }}
         />
       );
@@ -50,20 +50,20 @@ export default function FileCard({
 
     switch (category) {
       case 'image':
-        return <ImageIcon className="w-7 h-7 sm:w-8 sm:h-8 text-pink-400" />;
+        return <ImageIcon className={`${sizeClass} text-pink-400`} />;
       case 'video':
-        return <Film className="w-7 h-7 sm:w-8 sm:h-8 text-rose-400" />;
+        return <Film className={`${sizeClass} text-rose-400`} />;
       case 'audio':
-        return <Music className="w-7 h-7 sm:w-8 sm:h-8 text-violet-400" />;
+        return <Music className={`${sizeClass} text-violet-400`} />;
       case 'document':
       case 'pdf':
-        return <FileText className="w-7 h-7 sm:w-8 sm:h-8 text-blue-400" />;
+        return <FileText className={`${sizeClass} text-blue-400`} />;
       case 'code':
-        return <Code2 className="w-7 h-7 sm:w-8 sm:h-8 text-emerald-400" />;
+        return <Code2 className={`${sizeClass} text-emerald-400`} />;
       case 'archive':
-        return <Archive className="w-7 h-7 sm:w-8 sm:h-8 text-amber-500" />;
+        return <Archive className={`${sizeClass} text-amber-500`} />;
       default:
-        return <File className="w-7 h-7 sm:w-8 sm:h-8 text-slate-400" />;
+        return <File className={`${sizeClass} text-slate-400`} />;
     }
   };
 
@@ -81,8 +81,8 @@ export default function FileCard({
       >
         {/* Top bar with icon and more menu */}
         <div className="flex items-start justify-between">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-slate-950 flex items-center justify-center border border-slate-800/80 shrink-0">
-            {renderIcon()}
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-950 flex items-center justify-center border border-slate-800/80 shrink-0 shadow-inner">
+            {renderIcon('w-4.5 h-4.5 sm:w-5 sm:h-5')}
           </div>
 
           <div className="flex items-center gap-0.5 sm:gap-1">
@@ -263,8 +263,8 @@ export default function FileCard({
       className="group flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 bg-slate-900 hover:bg-slate-800/80 active:bg-slate-800 rounded-xl border border-slate-800 hover:border-slate-700 transition-colors select-none cursor-pointer text-xs text-slate-200"
     >
       <div className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0 pr-2 sm:pr-4">
-        <div className="w-8 h-8 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0">
-          {renderIcon()}
+        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 shadow-inner">
+          {renderIcon('w-3.5 h-3.5 sm:w-4 sm:h-4')}
         </div>
         <div className="truncate">
           <span className="font-semibold text-slate-200 truncate block group-hover:text-blue-400">

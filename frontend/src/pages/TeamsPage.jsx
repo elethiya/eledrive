@@ -62,9 +62,14 @@ export default function TeamsPage() {
     setLoading(true);
     try {
       const res = await teamAPI.listTeams();
-      if (res.data) setTeams(res.data);
+      if (Array.isArray(res.data)) {
+        setTeams(res.data);
+      } else {
+        setTeams([]);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load teams:', err);
+      setTeams([]);
     } finally {
       setLoading(false);
     }
@@ -74,9 +79,14 @@ export default function TeamsPage() {
     setLoadingUsers(true);
     try {
       const res = await teamAPI.getAvailableUsers();
-      if (res.data) setAvailableUsers(res.data);
+      if (Array.isArray(res.data)) {
+        setAvailableUsers(res.data);
+      } else {
+        setAvailableUsers([]);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load available users:', err);
+      setAvailableUsers([]);
     } finally {
       setLoadingUsers(false);
     }
@@ -170,10 +180,12 @@ export default function TeamsPage() {
     }
   };
 
-  const filteredTeams = teams.filter(
+  const safeTeams = Array.isArray(teams) ? teams : [];
+  const filteredTeams = safeTeams.filter(
     (t) =>
-      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      t &&
+      (((t.name || '').toLowerCase().includes(searchQuery.toLowerCase())) ||
+        ((t.description || '').toLowerCase().includes(searchQuery.toLowerCase())))
   );
 
   return (

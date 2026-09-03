@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight, Download, Share2, Folder, HardDrive } from 'lucide-react';
+import { ChevronRight, Download, Share2, Folder, HardDrive, Users } from 'lucide-react';
 import { folderAPI } from '../api/client';
 
 export default function Breadcrumbs({
@@ -45,8 +45,8 @@ export default function Breadcrumbs({
         })}
       </nav>
 
-      {/* Action Buttons for current folder */}
-      {currentFolder && (
+      {/* Action Buttons for current folder or whole drive */}
+      {currentFolder ? (
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             onClick={onShareFolder}
@@ -64,6 +64,17 @@ export default function Breadcrumbs({
           >
             <Download className="w-3.5 h-3.5 text-slate-400" />
             <span className="hidden sm:inline">ZIP</span>
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={onShareFolder}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 hover:from-blue-600/30 hover:to-indigo-600/30 text-blue-400 border border-blue-500/30 rounded-xl text-xs font-semibold shadow-xs transition-all"
+            title="Share entire My Drive with team"
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Share Drive with Team</span>
           </button>
         </div>
       )}

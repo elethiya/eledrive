@@ -90,6 +90,17 @@ func CheckFolderAccess(userID string, folderID string) (*models.Folder, string, 
 		return &f, permission, nil
 	}
 
+	// Check team share (direct folder or shared drive)
+	err = db.DB.QueryRow(`
+		SELECT ts.permission FROM team_shares ts
+		JOIN main.team_members tm ON ts.team_id = tm.team_id
+		WHERE ((ts.target_type = 'folder' AND ts.target_id = ?) OR (ts.target_type = 'drive' AND ts.shared_by_user_id = ?))
+		  AND tm.user_id = ?
+	`, folderID, f.OwnerID, userID).Scan(&permission)
+	if err == nil {
+		return &f, permission, nil
+	}
+
 	// Check recursive parent share
 	currParent := f.ParentID
 	for currParent != nil {

@@ -111,26 +111,16 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
   const handleShareWithTeam = async (t) => {
     setTeamLoading(true);
     try {
-      const res = await teamAPI.getTeam(t.id);
-      if (res.data && res.data.members) {
-        for (const m of res.data.members) {
-          if (m.user_id !== user?.id) {
-            try {
-              await shareAPI.createShare({
-                target_type: itemType,
-                target_id: item.id,
-                user_id: m.user_id,
-                permission: memberPermission,
-              });
-            } catch (err) {
-              console.error(err);
-            }
-          }
-        }
-        await loadTeamShares();
-      }
+      await shareAPI.createShare({
+        target_type: itemType,
+        target_id: item.id || 'root',
+        team_id: t.id,
+        permission: memberPermission,
+      });
+      await loadTeamShares();
+      alert(`Successfully shared ${itemType === 'drive' ? 'My Drive' : item.name} with team "${t.name}"!`);
     } catch (err) {
-      alert(err.message || 'Failed to share with team');
+      alert(err.response?.data?.error || err.message || 'Failed to share with team');
     } finally {
       setTeamLoading(false);
     }
@@ -197,12 +187,16 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-100">Share</h3>
-                <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700">
-                  {itemType}
+                <h3 className="text-sm font-bold text-slate-100">
+                  {itemType === 'drive' ? 'Share My Entire Drive' : 'Share'}
+                </h3>
+                <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                  {itemType === 'drive' ? 'Full Drive' : itemType}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 truncate max-w-[200px] sm:max-w-[260px]">{item.name}</p>
+              <p className="text-xs text-slate-400 truncate max-w-[200px] sm:max-w-[260px]">
+                {itemType === 'drive' ? 'Collaborate on all files & projects with team' : item.name}
+              </p>
             </div>
           </div>
           <button

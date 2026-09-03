@@ -80,6 +80,17 @@ func CheckFileAccess(userID string, fileID string) (*models.File, string, error)
 		return &f, directPerm, nil
 	}
 
+	// Check team share (direct file or shared drive)
+	err = db.DB.QueryRow(`
+		SELECT ts.permission FROM team_shares ts
+		JOIN main.team_members tm ON ts.team_id = tm.team_id
+		WHERE ((ts.target_type = 'file' AND ts.target_id = ?) OR (ts.target_type = 'drive' AND ts.shared_by_user_id = ?))
+		  AND tm.user_id = ?
+	`, fileID, f.OwnerID, userID).Scan(&directPerm)
+	if err == nil {
+		return &f, directPerm, nil
+	}
+
 	// If file is inside a folder, check folder hierarchy share
 	if f.FolderID != nil {
 		_, parentPerm, err := CheckFolderAccess(userID, *f.FolderID)
