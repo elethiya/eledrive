@@ -18,17 +18,28 @@ A modern, high-performance, self-hosted team cloud drive built with **Golang**, 
 - **Responsive 2-Column Grid**: Tighter mobile grid layout (`grid-cols-2`) and compact list views.
 - **Responsive Modals**: Modals fit mobile viewports with scrollable containers and touch-friendly controls.
 
-### ⚙️ 3. Admin Panel (`<url>/admin`)
+### 🛡️ 3. Manual Account Verification & Admin Approval
+- **Admin-Governed Access**: All newly registered accounts are set to `pending` status by default.
+- **No Unapproved Access**: Users cannot sign in until an administrator reviews and approves their account.
+- **Pending Review Screen**: When a new user registers, they are presented with a clear review confirmation stating that an administrator must manually verify the account.
+- **Approval Actions in Admin Panel**:
+  - **Pending Review Metric & Alert**: Shows how many user applications need administrator action.
+  - **Quick 1-Click Approve / Reject**: Approve or reject accounts with dedicated buttons directly from the Users table.
+  - **Status Filter**: Easily filter between *All*, *Pending*, *Approved*, and *Rejected* users.
+- **Clean Authentication**: Removed pre-filled demo accounts and auto-switching; login fields are blank by default for authentic user authentication.
+
+### ⚙️ 4. Admin Panel (`<url>/admin`)
 - Accessible directly at **`http://localhost:8080/admin`** (or via the Sidebar/Navbar for Admin accounts).
-- **System Metrics**: Real-time overview of total users, total files, total storage consumed, and active share links.
+- **System Metrics**: Real-time overview of total users, pending approvals, total files, total storage consumed, and active share links.
 - **User Management & Per-User Profiles**:
   - View all registered team members in a searchable table.
-  - Edit any user's profile: Display Name, Email, System Role (`admin` vs `member`).
+  - Approve or reject pending user applications.
+  - Edit any user's profile: Display Name, Email, System Role (`admin` vs `member`), and Approval Status (`approved`, `pending`, `rejected`).
   - Adjust storage quota limits per user (e.g., 10 GB, 25 GB, 50 GB, 100 GB).
   - Admin password override / reset.
   - Delete user accounts with automatic disk and database cleanup.
 - **Audit & Activity Logs**:
-  - Live table of system events: Logins, Uploads, Downloads, Deletions, Shares, Password Changes, and Administrative Updates.
+  - Live table of system events: Logins, Uploads, Downloads, Deletions, Shares, Password Changes, and Administrative Approvals/Rejections.
   - Filter logs by action type or search by keyword.
   - Clear logs action.
 - **System Settings**:
@@ -123,9 +134,41 @@ eledrive/
 │       ├── pages/       # Drive, Shared, Recent, Starred, Trash, Admin, Profile
 │       └── utils/       # Formatters (bytes, dates, icons)
 ├── main.go              # Entrypoint, route mounting, and SPA fallback
-├── start.sh             # Startup script (builds frontend & runs server)
+├── build.sh             # Full automated build & compile script (flags: -f, -b, -c)
+├── Makefile             # Standard build commands (make build, make run, etc.)
+├── start.sh             # Startup script (checks build & runs server)
 ├── .gitignore           # Complete ignore rules for Go, Node, Vite, and SQLite
 └── README.md
+```
+
+---
+
+## 🛠️ Building & Compiling
+
+EleDrive includes an automated build script (`build.sh`) and a `Makefile`:
+
+### Using `build.sh`
+```bash
+# Build both frontend and backend (recommended)
+./build.sh
+
+# Clean previous builds and rebuild from scratch
+./build.sh --clean
+
+# Build only the frontend
+./build.sh --frontend-only
+
+# Compile only the Go backend
+./build.sh --backend-only
+```
+
+### Using `make`
+```bash
+make build       # Compile frontend and backend
+make frontend    # Build React Vite bundle
+make backend     # Compile Go binary (eledrive-app)
+make run         # Build and start server
+make clean       # Remove build output
 ```
 
 ---
@@ -139,19 +182,9 @@ chmod +x start.sh
 ./start.sh
 ```
 
-### 2. Manual Setup (Alternative)
-
-**Build Frontend:**
+### 2. Manual Run
+After building with `./build.sh` (or `make build`):
 ```bash
-cd frontend
-npm install
-npm run build
-cd ..
-```
-
-**Run Go Backend:**
-```bash
-go build -o eledrive-app .
 ./eledrive-app
 ```
 

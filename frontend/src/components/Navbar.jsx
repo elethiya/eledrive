@@ -43,22 +43,6 @@ export default function Navbar({
     { id: 'archive', label: 'Archives (ZIP/TAR)', icon: Archive },
   ];
 
-  const demoAccounts = [
-    { email: 'admin@eledrive.local', name: 'Admin User', role: 'Admin' },
-    { email: 'alex@eledrive.local', name: 'Alex Miller', role: 'Teammate' },
-    { email: 'sarah@eledrive.local', name: 'Sarah Connor', role: 'Teammate' },
-  ];
-
-  const handleSwitchAccount = async (email) => {
-    try {
-      await login(email, 'password123');
-      setProfileOpen(false);
-      window.location.reload();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
   return (
     <header className="h-16 border-b border-slate-800 bg-slate-900 px-4 sm:px-6 flex items-center justify-between gap-2.5 sm:gap-4 select-none shrink-0 text-slate-100 relative">
       {/* Left: Mobile hamburger menu & Search toggle */}
@@ -265,34 +249,6 @@ export default function Navbar({
                       </span>
                     </button>
                   )}
-                </div>
-
-                {/* Switch Account Quick Helper */}
-                <div className="p-2">
-                  <span className="text-[10px] font-semibold text-slate-400 px-2 uppercase tracking-wider block mb-1">
-                    Switch Teammate
-                  </span>
-                  {demoAccounts.map((acc) => {
-                    const isCurrent = user?.email === acc.email;
-                    return (
-                      <button
-                        key={acc.email}
-                        disabled={isCurrent}
-                        onClick={() => handleSwitchAccount(acc.email)}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between transition-colors ${
-                          isCurrent
-                            ? 'bg-slate-800/80 text-slate-400 cursor-default'
-                            : 'hover:bg-slate-800 text-slate-300 font-medium'
-                        }`}
-                      >
-                        <div>
-                          <span className="block font-medium">{acc.name}</span>
-                          <span className="text-[10px] text-slate-500 block">{acc.email}</span>
-                        </div>
-                        {isCurrent && <UserCheck className="w-3.5 h-3.5 text-emerald-400" />}
-                      </button>
-                    );
-                  })}
                 </div>
 
                 <div className="border-t border-slate-800 pt-1">

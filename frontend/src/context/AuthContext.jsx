@@ -48,8 +48,8 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('eledrive_user', JSON.stringify(res.data.user));
       setToken(res.data.token);
       setUser(res.data.user);
-      return res.data.user;
     }
+    return res.data;
   };
 
   const logout = () => {

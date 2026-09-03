@@ -4,8 +4,8 @@ import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage({ onNavigateRegister }) {
   const { login } = useAuth();
-  const [emailOrUser, setEmailOrUser] = useState('admin@eledrive.local');
-  const [password, setPassword] = useState('password123');
+  const [emailOrUser, setEmailOrUser] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -20,11 +20,6 @@ export default function LoginPage({ onNavigateRegister }) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickFill = (email) => {
-    setEmailOrUser(email);
-    setPassword('password123');
   };
 
   return (
@@ -53,8 +48,12 @@ export default function LoginPage({ onNavigateRegister }) {
         </p>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-950/40 border border-red-500/40 text-red-300 rounded-2xl text-xs font-semibold">
-            {error}
+          <div className={`mb-4 p-3.5 rounded-2xl text-xs font-semibold flex items-start gap-2.5 ${
+            error.toLowerCase().includes('pending')
+              ? 'bg-amber-950/40 border border-amber-500/40 text-amber-300'
+              : 'bg-red-950/40 border border-red-500/40 text-red-300'
+          }`}>
+            <span>{error}</span>
           </div>
         )}
 
@@ -70,7 +69,7 @@ export default function LoginPage({ onNavigateRegister }) {
                 required
                 value={emailOrUser}
                 onChange={(e) => setEmailOrUser(e.target.value)}
-                placeholder="admin@eledrive.local"
+                placeholder="name@company.com or username"
                 className="w-full text-xs pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 text-slate-100 outline-none"
               />
             </div>
@@ -102,31 +101,6 @@ export default function LoginPage({ onNavigateRegister }) {
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
-
-        {/* Demo Fast Login Buttons */}
-        <div className="mt-6 pt-5 border-t border-slate-800">
-          <span className="text-[10px] font-semibold text-slate-400 block mb-2 text-center uppercase tracking-wider">
-            Quick Test Accounts
-          </span>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => handleQuickFill('admin@eledrive.local')}
-              className="p-2 rounded-xl border border-slate-800 bg-slate-950/80 hover:bg-slate-800 text-slate-300 font-medium text-left transition-colors"
-            >
-              <span className="block font-bold text-blue-400">Admin User</span>
-              <span className="text-[10px] text-slate-500">admin@eledrive.local</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickFill('alex@eledrive.local')}
-              className="p-2 rounded-xl border border-slate-800 bg-slate-950/80 hover:bg-slate-800 text-slate-300 font-medium text-left transition-colors"
-            >
-              <span className="block font-bold text-emerald-400">Alex (Teammate)</span>
-              <span className="text-[10px] text-slate-500">alex@eledrive.local</span>
-            </button>
-          </div>
-        </div>
 
         <div className="mt-6 text-center text-xs text-slate-400">
           Don't have an account?{' '}

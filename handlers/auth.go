@@ -81,6 +81,14 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if public registration is enabled in system settings
+	var allowReg bool
+	err = db.DB.QueryRow("SELECT allow_public_registration FROM system_settings WHERE id = 'default'").Scan(&allowReg)
+	if err == nil && !allowReg {
+		utils.RespondError(w, http.StatusForbidden, "Public user registration is currently disabled by administrator")
+		return
+	}
+
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, "Failed to hash password")
@@ -93,18 +101,12 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 
 	_, err = db.DB.Exec(`
-		INSERT INTO users (id, email, username, password_hash, name, avatar_color, role, storage_limit, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, 'member', ?, ?, ?)
+		INSERT INTO users (id, email, username, password_hash, name, avatar_color, role, status, storage_limit, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, 'member', 'pending', ?, ?, ?)
 	`, userID, req.Email, req.Username, string(hashedPassword), req.Name, avatarColor, int64(10*1024*1024*1024), now, now)
 
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, "Failed to create user account")
-		return
-	}
-
-	token, err := middleware.GenerateToken(userID, req.Username, req.Email, "member", h.cfg)
-	if err != nil {
-		utils.RespondError(w, http.StatusInternalServerError, "Failed to generate token")
 		return
 	}
 
@@ -115,17 +117,20 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		Name:         req.Name,
 		AvatarColor:  avatarColor,
 		Role:         "member",
+		Status:       "pending",
 		StorageUsed:  0,
 		StorageLimit: int64(10 * 1024 * 1024 * 1024),
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
 
-	db.LogActivity(userID, req.Username, "register", "user", userID, req.Name, "New account registered")
+	db.LogActivity(userID, req.Username, "register", "user", userID, req.Name, "New account registered (pending administrator approval)")
 
-	utils.RespondJSON(w, http.StatusCreated, AuthResponse{
-		Token: token,
-		User:  user,
+	utils.RespondJSON(w, http.StatusCreated, map[string]interface{}{
+		"success": true,
+		"message": "Account created successfully! Your account is pending administrator verification and approval before you can sign in.",
+		"status":  "pending",
+		"user":    user,
 	})
 }
 
@@ -144,12 +149,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	var user models.User
 	err := db.DB.QueryRow(`
-		SELECT id, email, username, password_hash, name, avatar_color, role, storage_used, storage_limit, created_at, updated_at
+		SELECT id, email, username, password_hash, name, avatar_color, role, status, storage_used, storage_limit, created_at, updated_at
 		FROM users
 		WHERE email = ? OR username = ?
 	`, req.EmailOrUsername, req.EmailOrUsername).Scan(
 		&user.ID, &user.Email, &user.Username, &user.PasswordHash, &user.Name,
-		&user.AvatarColor, &user.Role, &user.StorageUsed, &user.StorageLimit,
+		&user.AvatarColor, &user.Role, &user.Status, &user.StorageUsed, &user.StorageLimit,
 		&user.CreatedAt, &user.UpdatedAt,
 	)
 
@@ -164,6 +169,17 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		utils.RespondError(w, http.StatusUnauthorized, "Invalid email/username or password")
 		return
+	}
+
+	// Verify account status
+	if user.Role != "admin" {
+		if user.Status == "pending" {
+			utils.RespondError(w, http.StatusForbidden, "Your account is pending administrator verification and approval. Please wait for an administrator to approve your account.")
+			return
+		} else if user.Status == "rejected" {
+			utils.RespondError(w, http.StatusForbidden, "Your account registration was rejected by an administrator.")
+			return
+		}
 	}
 
 	// Update storage used
@@ -194,12 +210,12 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 
 	var user models.User
 	err := db.DB.QueryRow(`
-		SELECT id, email, username, name, avatar_color, role, storage_used, storage_limit, created_at, updated_at
+		SELECT id, email, username, name, avatar_color, role, status, storage_used, storage_limit, created_at, updated_at
 		FROM users
 		WHERE id = ?
 	`, claims.UserID).Scan(
 		&user.ID, &user.Email, &user.Username, &user.Name,
-		&user.AvatarColor, &user.Role, &user.StorageUsed, &user.StorageLimit,
+		&user.AvatarColor, &user.Role, &user.Status, &user.StorageUsed, &user.StorageLimit,
 		&user.CreatedAt, &user.UpdatedAt,
 	)
 	if err != nil {

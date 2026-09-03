@@ -59,6 +59,7 @@ func migrate() error {
 		name TEXT NOT NULL,
 		avatar_color TEXT DEFAULT '#3b82f6',
 		role TEXT DEFAULT 'member',
+		status TEXT DEFAULT 'pending', -- 'approved', 'pending', 'rejected'
 		storage_used INTEGER DEFAULT 0,
 		storage_limit INTEGER DEFAULT 10737418240, -- 10GB
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -152,7 +153,20 @@ func migrate() error {
 	`
 
 	_, err := DB.Exec(schema)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Ensure status column exists for users
+	var colCount int
+	_ = DB.QueryRow("SELECT COUNT(*) FROM pragma_table_info('users') WHERE name='status'").Scan(&colCount)
+	if colCount == 0 {
+		_, _ = DB.Exec("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'pending'")
+	}
+	// Existing users and admins are set to approved
+	_, _ = DB.Exec("UPDATE users SET status = 'approved' WHERE status IS NULL OR status = '' OR role = 'admin'")
+
+	return nil
 }
 
 func seedDefaultData() error {
@@ -174,8 +188,8 @@ func seedDefaultData() error {
 
 	adminID := uuid.New().String()
 	_, err = DB.Exec(`
-		INSERT INTO users (id, email, username, password_hash, name, avatar_color, role, storage_limit, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO users (id, email, username, password_hash, name, avatar_color, role, status, storage_limit, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?, ?)
 	`, adminID, "admin@eledrive.local", "admin", string(hashedPw), "Admin User", "#3b82f6", "admin", int64(20*1024*1024*1024), time.Now(), time.Now())
 	if err != nil {
 		return err
@@ -183,8 +197,8 @@ func seedDefaultData() error {
 
 	alexID := uuid.New().String()
 	_, err = DB.Exec(`
-		INSERT INTO users (id, email, username, password_hash, name, avatar_color, role, storage_limit, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO users (id, email, username, password_hash, name, avatar_color, role, status, storage_limit, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?, ?)
 	`, alexID, "alex@eledrive.local", "alex", string(hashedPw), "Alex Miller", "#10b981", "member", int64(10*1024*1024*1024), time.Now(), time.Now())
 	if err != nil {
 		return err
@@ -192,8 +206,8 @@ func seedDefaultData() error {
 
 	sarahID := uuid.New().String()
 	_, err = DB.Exec(`
-		INSERT INTO users (id, email, username, password_hash, name, avatar_color, role, storage_limit, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO users (id, email, username, password_hash, name, avatar_color, role, status, storage_limit, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?, ?)
 	`, sarahID, "sarah@eledrive.local", "sarah", string(hashedPw), "Sarah Connor", "#8b5cf6", "member", int64(10*1024*1024*1024), time.Now(), time.Now())
 	if err != nil {
 		return err

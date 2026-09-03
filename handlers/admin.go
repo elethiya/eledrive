@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -51,6 +52,7 @@ func (h *AdminHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 
 	_ = db.DB.QueryRow("SELECT COUNT(*) FROM share_links").Scan(&stats.TotalShareLinks)
 	_ = db.DB.QueryRow("SELECT COUNT(*) FROM shares").Scan(&stats.TotalDirectShares)
+	_ = db.DB.QueryRow("SELECT COUNT(*) FROM users WHERE status = 'pending'").Scan(&stats.PendingApprovals)
 
 	utils.RespondJSON(w, http.StatusOK, stats)
 }
@@ -115,7 +117,8 @@ func (h *AdminHandler) ClearLogs(w http.ResponseWriter, r *http.Request) {
 
 func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.DB.Query(`
-		SELECT u.id, u.email, u.username, u.name, u.avatar_color, u.role, u.storage_used, u.storage_limit,
+		SELECT u.id, u.email, u.username, u.name, u.avatar_color, u.role, COALESCE(u.status, 'approved') AS status,
+		       u.storage_used, u.storage_limit,
 		       (SELECT COUNT(*) FROM files WHERE owner_id = u.id AND is_trashed = 0) AS files_count,
 		       u.created_at, u.updated_at
 		FROM users u
@@ -131,7 +134,7 @@ func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var u models.AdminUserDetail
 		if err := rows.Scan(
-			&u.ID, &u.Email, &u.Username, &u.Name, &u.AvatarColor, &u.Role,
+			&u.ID, &u.Email, &u.Username, &u.Name, &u.AvatarColor, &u.Role, &u.Status,
 			&u.StorageUsed, &u.StorageLimit, &u.FilesCount, &u.CreatedAt, &u.UpdatedAt,
 		); err == nil {
 			users = append(users, u)
@@ -145,6 +148,7 @@ type UpdateUserAdminRequest struct {
 	Name         string  `json:"name"`
 	Email        string  `json:"email"`
 	Role         string  `json:"role"`
+	Status       *string `json:"status,omitempty"`
 	StorageLimit *int64  `json:"storage_limit"`
 	Password     *string `json:"password,omitempty"`
 }
@@ -176,6 +180,10 @@ func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Status != nil && (*req.Status == "approved" || *req.Status == "pending" || *req.Status == "rejected") {
+		_, _ = db.DB.Exec("UPDATE users SET status = ? WHERE id = ?", *req.Status, targetUserID)
+	}
+
 	if req.StorageLimit != nil && *req.StorageLimit > 0 {
 		_, _ = db.DB.Exec("UPDATE users SET storage_limit = ? WHERE id = ?", *req.StorageLimit, targetUserID)
 	}
@@ -187,9 +195,53 @@ func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	db.LogActivity(claims.UserID, claims.Username, "admin_user_update", "user", targetUserID, req.Name, "Admin modified user profile/quota")
+	db.LogActivity(claims.UserID, claims.Username, "admin_user_update", "user", targetUserID, req.Name, "Admin modified user profile/quota/status")
 
 	utils.RespondSuccess(w, http.StatusOK, "User updated successfully", nil)
+}
+
+func (h *AdminHandler) ApproveUser(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+	targetUserID := chi.URLParam(r, "id")
+
+	var userName, username string
+	err := db.DB.QueryRow("SELECT name, username FROM users WHERE id = ?", targetUserID).Scan(&userName, &username)
+	if err != nil {
+		utils.RespondError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	_, err = db.DB.Exec("UPDATE users SET status = 'approved', updated_at = CURRENT_TIMESTAMP WHERE id = ?", targetUserID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to approve user")
+		return
+	}
+
+	db.LogActivity(claims.UserID, claims.Username, "admin_user_approve", "user", targetUserID, userName, fmt.Sprintf("Admin approved account for user @%s", username))
+
+	utils.RespondSuccess(w, http.StatusOK, "User account approved successfully", nil)
+}
+
+func (h *AdminHandler) RejectUser(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+	targetUserID := chi.URLParam(r, "id")
+
+	var userName, username string
+	err := db.DB.QueryRow("SELECT name, username FROM users WHERE id = ?", targetUserID).Scan(&userName, &username)
+	if err != nil {
+		utils.RespondError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	_, err = db.DB.Exec("UPDATE users SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = ?", targetUserID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to reject user")
+		return
+	}
+
+	db.LogActivity(claims.UserID, claims.Username, "admin_user_reject", "user", targetUserID, userName, fmt.Sprintf("Admin rejected account for user @%s", username))
+
+	utils.RespondSuccess(w, http.StatusOK, "User account rejected", nil)
 }
 
 func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {

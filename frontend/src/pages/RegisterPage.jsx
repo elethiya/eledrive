@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { HardDrive, ArrowRight, Lock, Mail, User, AtSign } from 'lucide-react';
+import { HardDrive, ArrowRight, Lock, Mail, User, AtSign, Clock, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function RegisterPage({ onNavigateLogin }) {
@@ -10,13 +9,17 @@ export default function RegisterPage({ onNavigateLogin }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [pendingSuccess, setPendingSuccess] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await register(name, username, email, password);
+      const res = await register(name, username, email, password);
+      if (res && res.status === 'pending') {
+        setPendingSuccess(res.message || 'Account created successfully! An administrator must manually verify and approve your account before you can sign in.');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -42,18 +45,50 @@ export default function RegisterPage({ onNavigateLogin }) {
           </div>
         </div>
 
-        <h2 className="text-lg font-bold text-slate-100 mb-1">Create an account</h2>
-        <p className="text-xs text-slate-400 mb-6">
-          Get 10 GB free team cloud storage to collaborate and share files.
-        </p>
+        {pendingSuccess ? (
+          <div className="text-center py-2 animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-3xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-4 border border-amber-500/30 shadow-lg shadow-amber-500/10">
+              <Clock className="w-8 h-8" />
+            </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-950/40 border border-red-500/40 text-red-300 rounded-2xl text-xs font-semibold">
-            {error}
+            <h2 className="text-lg font-bold text-slate-100 mb-2">
+              Registration Under Review
+            </h2>
+            <p className="text-xs text-slate-300 leading-relaxed mb-4">
+              Your account for <strong className="text-amber-300">@{username}</strong> ({email}) was created successfully.
+            </p>
+
+            <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-slate-400 text-left mb-6 space-y-1.5">
+              <div className="flex items-center gap-2 text-amber-400 font-semibold text-[11px] uppercase tracking-wider">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Manual Admin Verification</span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                To protect team workspaces and data, an administrator must manually verify and approve your account before you can sign in.
+              </p>
+            </div>
+
+            <button
+              onClick={onNavigateLogin}
+              className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/25 transition-all"
+            >
+              Return to Sign In
+            </button>
           </div>
-        )}
+        ) : (
+          <>
+            <h2 className="text-lg font-bold text-slate-100 mb-1">Create an account</h2>
+            <p className="text-xs text-slate-400 mb-6">
+              Get 10 GB free team cloud storage to collaborate and share files.
+            </p>
 
-        <form onSubmit={handleSubmit} className="space-y-3.5">
+            {error && (
+              <div className="mb-4 p-3 bg-red-950/40 border border-red-500/40 text-red-300 rounded-2xl text-xs font-semibold">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-3.5">
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5">
               Full Name
@@ -141,6 +176,8 @@ export default function RegisterPage({ onNavigateLogin }) {
             Sign In
           </button>
         </div>
+          </>
+        )}
       </div>
     </div>
   );

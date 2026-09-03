@@ -18,6 +18,10 @@ import {
   KeyRound,
   Shield,
   Save,
+  Check,
+  XCircle,
+  Clock,
+  UserCheck,
 } from 'lucide-react';
 import { adminAPI } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -34,6 +38,7 @@ export default function AdminPage({ onBackToDrive }) {
   // Users Tab
   const [users, setUsers] = useState([]);
   const [userSearch, setUserSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'pending' | 'approved' | 'rejected'
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [editUserModal, setEditUserModal] = useState(null);
 
@@ -155,14 +160,46 @@ export default function AdminPage({ onBackToDrive }) {
     }
   };
 
+  const handleApproveUser = async (u) => {
+    try {
+      await adminAPI.approveUser(u.id);
+      loadStats();
+      loadUsers();
+    } catch (err) {
+      alert(err.message || 'Failed to approve user');
+    }
+  };
+
+  const handleRejectUser = async (u) => {
+    if (!confirm(`Are you sure you want to reject account application for "${u.name}" (@${u.username})?`)) return;
+    try {
+      await adminAPI.rejectUser(u.id);
+      loadStats();
+      loadUsers();
+    } catch (err) {
+      alert(err.message || 'Failed to reject user');
+    }
+  };
+
+  const pendingCount = users.filter((u) => u.status === 'pending').length;
+
   const filteredUsers = users.filter((u) => {
-    if (!userSearch) return true;
     const match = userSearch.toLowerCase();
-    return (
+    const matchesSearch =
+      !userSearch ||
       u.name?.toLowerCase().includes(match) ||
       u.email?.toLowerCase().includes(match) ||
-      u.username?.toLowerCase().includes(match)
-    );
+      u.username?.toLowerCase().includes(match);
+
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'pending'
+        ? u.status === 'pending'
+        : statusFilter === 'approved'
+        ? (u.status === 'approved' || !u.status)
+        : u.status === statusFilter);
+
+    return matchesSearch && matchesStatus;
   });
 
   return (
@@ -234,7 +271,7 @@ export default function AdminPage({ onBackToDrive }) {
       {/* Main Content */}
       <div className="p-3.5 sm:p-6 md:p-8 max-w-6xl w-full mx-auto space-y-5 sm:space-y-6 flex-1">
         {/* Metric Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
           <div className="bg-slate-900 border border-slate-800 p-3.5 sm:p-4 rounded-2xl shadow-lg">
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider">Total Users</span>
@@ -243,25 +280,46 @@ export default function AdminPage({ onBackToDrive }) {
             <span className="text-2xl font-bold text-slate-100">{stats?.total_users || 0}</span>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg">
+          <div className={`p-3.5 sm:p-4 rounded-2xl shadow-lg border transition-all ${
+            (stats?.pending_approvals || 0) > 0
+              ? 'bg-amber-950/30 border-amber-500/50 shadow-amber-500/10'
+              : 'bg-slate-900 border-slate-800'
+          }`}>
             <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Files & Projects</span>
+              <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider">Pending Review</span>
+              <Clock className={`w-4 h-4 ${(stats?.pending_approvals || 0) > 0 ? 'text-amber-400 animate-pulse' : 'text-slate-500'}`} />
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className={`text-2xl font-bold ${(stats?.pending_approvals || 0) > 0 ? 'text-amber-400' : 'text-slate-100'}`}>
+                {stats?.pending_approvals || 0}
+              </span>
+              {(stats?.pending_approvals || 0) > 0 && (
+                <span className="text-[9px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">
+                  Action Needed
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 p-3.5 sm:p-4 rounded-2xl shadow-lg">
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider">Files & Projects</span>
               <FileText className="w-4 h-4 text-emerald-400" />
             </div>
             <span className="text-2xl font-bold text-slate-100">{stats?.total_files || 0}</span>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg">
+          <div className="bg-slate-900 border border-slate-800 p-3.5 sm:p-4 rounded-2xl shadow-lg">
             <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Storage Consumed</span>
+              <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider">Storage Consumed</span>
               <HardDrive className="w-4 h-4 text-indigo-400" />
             </div>
             <span className="text-2xl font-bold text-slate-100">{formatBytes(stats?.total_storage_used || 0)}</span>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg">
+          <div className="bg-slate-900 border border-slate-800 p-3.5 sm:p-4 rounded-2xl shadow-lg col-span-2 lg:col-span-1">
             <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Active Links</span>
+              <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider">Active Links</span>
               <Share2 className="w-4 h-4 text-amber-400" />
             </div>
             <span className="text-2xl font-bold text-slate-100">{stats?.total_share_links || 0}</span>
@@ -271,44 +329,100 @@ export default function AdminPage({ onBackToDrive }) {
         {/* TAB 1: USERS MANAGEMENT & PROFILES */}
         {activeTab === 'users' && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl shadow-xl overflow-hidden">
-            <div className="p-4 md:p-6 border-b border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="p-4 md:p-6 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <h3 className="text-sm font-bold text-slate-100">All User Profiles & Quotas</h3>
+                <h3 className="text-sm font-bold text-slate-100">User Profiles & Account Approvals</h3>
                 <p className="text-xs text-slate-400">
-                  Manage individual team members, roles, quotas, and account settings
+                  Verify new accounts, approve access, modify roles, and manage quotas
                 </p>
               </div>
 
-              <div className="relative w-full sm:w-64">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Filter users..."
-                  value={userSearch}
-                  onChange={(e) => setUserSearch(e.target.value)}
-                  className="w-full text-xs pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:border-purple-500 text-slate-100 outline-none"
-                />
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                {/* Status Filter Pills */}
+                <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs overflow-x-auto">
+                  <button
+                    onClick={() => setStatusFilter('all')}
+                    className={`px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                      statusFilter === 'all'
+                        ? 'bg-purple-600/30 text-purple-300 font-bold border border-purple-500/40'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    All ({users.length})
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter('pending')}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                      statusFilter === 'pending'
+                        ? 'bg-amber-600/30 text-amber-300 font-bold border border-amber-500/40'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <span>Pending</span>
+                    {pendingCount > 0 && (
+                      <span className="bg-amber-500 text-slate-950 px-1.5 py-0.2 rounded-full font-extrabold text-[10px]">
+                        {pendingCount}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter('approved')}
+                    className={`px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                      statusFilter === 'approved'
+                        ? 'bg-emerald-600/30 text-emerald-300 font-bold border border-emerald-500/40'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Approved
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter('rejected')}
+                    className={`px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                      statusFilter === 'rejected'
+                        ? 'bg-rose-600/30 text-rose-300 font-bold border border-rose-500/40'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Rejected
+                  </button>
+                </div>
+
+                {/* Search */}
+                <div className="relative w-full sm:w-56">
+                  <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Filter users..."
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    className="w-full text-xs pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:border-purple-500 text-slate-100 outline-none"
+                  />
+                </div>
               </div>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-xs min-w-[700px]">
                 <thead className="bg-slate-950/60 text-slate-400 font-semibold border-b border-slate-800 uppercase text-[10px] tracking-wider">
                   <tr>
-                    <th className="py-3 px-6">User</th>
-                    <th className="py-3 px-4">Role</th>
+                    <th className="py-3 px-5">User</th>
+                    <th className="py-3 px-3">Role</th>
+                    <th className="py-3 px-3">Status</th>
                     <th className="py-3 px-4">Storage Quota</th>
-                    <th className="py-3 px-4">Files</th>
-                    <th className="py-3 px-4">Joined</th>
-                    <th className="py-3 px-6 text-right">Actions</th>
+                    <th className="py-3 px-3">Files</th>
+                    <th className="py-3 px-4">Registered</th>
+                    <th className="py-3 px-5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 text-slate-200">
                   {filteredUsers.map((u) => {
                     const pct = Math.min(100, Math.round((u.storage_used / u.storage_limit) * 100));
+                    const isPending = u.status === 'pending';
+                    const isRejected = u.status === 'rejected';
+
                     return (
                       <tr key={u.id} className="hover:bg-slate-800/40 transition-colors">
-                        <td className="py-3.5 px-6 flex items-center gap-3">
+                        <td className="py-3.5 px-5 flex items-center gap-3">
                           <div
                             className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0"
                             style={{ backgroundColor: u.avatar_color }}
@@ -321,7 +435,7 @@ export default function AdminPage({ onBackToDrive }) {
                           </div>
                         </td>
 
-                        <td className="py-3.5 px-4">
+                        <td className="py-3.5 px-3">
                           <span
                             className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
                               u.role === 'admin'
@@ -333,7 +447,26 @@ export default function AdminPage({ onBackToDrive }) {
                           </span>
                         </td>
 
-                        <td className="py-3.5 px-4 w-48">
+                        <td className="py-3.5 px-3">
+                          {isPending ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">
+                              <Clock className="w-3 h-3 text-amber-400" />
+                              <span>Pending Review</span>
+                            </span>
+                          ) : isRejected ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                              <XCircle className="w-3 h-3 text-rose-400" />
+                              <span>Rejected</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              <Check className="w-3 h-3 text-emerald-400" />
+                              <span>Approved</span>
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4 w-44">
                           <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden mb-1">
                             <div
                               className={`h-full rounded-full ${pct > 80 ? 'bg-red-500' : 'bg-blue-500'}`}
@@ -346,7 +479,7 @@ export default function AdminPage({ onBackToDrive }) {
                           </div>
                         </td>
 
-                        <td className="py-3.5 px-4 text-slate-300 font-medium">
+                        <td className="py-3.5 px-3 text-slate-300 font-medium">
                           {u.files_count || 0}
                         </td>
 
@@ -354,14 +487,37 @@ export default function AdminPage({ onBackToDrive }) {
                           {formatDate(u.created_at)}
                         </td>
 
-                        <td className="py-3.5 px-6 text-right">
-                          <button
-                            onClick={() => setEditUserModal(u)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors"
-                          >
-                            <Edit className="w-3.5 h-3.5 text-purple-400" />
-                            <span>Edit Settings</span>
-                          </button>
+                        <td className="py-3.5 px-5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {isPending && (
+                              <>
+                                <button
+                                  onClick={() => handleApproveUser(u)}
+                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors"
+                                  title="Approve user"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Approve</span>
+                                </button>
+                                <button
+                                  onClick={() => handleRejectUser(u)}
+                                  className="px-2.5 py-1 bg-rose-950/60 hover:bg-rose-900 border border-rose-500/30 text-rose-300 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
+                                  title="Reject user"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  <span>Reject</span>
+                                </button>
+                              </>
+                            )}
+
+                            <button
+                              onClick={() => setEditUserModal(u)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors"
+                            >
+                              <Edit className="w-3.5 h-3.5 text-purple-400" />
+                              <span className={isPending ? 'hidden sm:inline' : ''}>Edit</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -645,6 +801,7 @@ function EditUserAdminModal({ user, onClose, onUpdated }) {
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
   const [role, setRole] = useState(user.role);
+  const [status, setStatus] = useState(user.status || 'approved');
   const [quotaGB, setQuotaGB] = useState(Math.round(user.storage_limit / (1024 * 1024 * 1024)));
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -659,6 +816,7 @@ function EditUserAdminModal({ user, onClose, onUpdated }) {
       name: name.trim(),
       email: email.trim(),
       role: role,
+      status: status,
       storage_limit: quotaGB * 1024 * 1024 * 1024,
     };
     if (newPassword.trim()) {
@@ -751,15 +909,28 @@ function EditUserAdminModal({ user, onClose, onUpdated }) {
             </div>
 
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Storage Quota (GB)</label>
-              <input
-                type="number"
-                min={1}
-                value={quotaGB}
-                onChange={(e) => setQuotaGB(parseInt(e.target.value) || 10)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 outline-none"
-              />
+              <label className="block text-slate-300 font-semibold mb-1">Approval Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 outline-none font-medium"
+              >
+                <option value="approved">Approved & Active</option>
+                <option value="pending">Pending Review</option>
+                <option value="rejected">Rejected</option>
+              </select>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Storage Quota (GB)</label>
+            <input
+              type="number"
+              min={1}
+              value={quotaGB}
+              onChange={(e) => setQuotaGB(parseInt(e.target.value) || 10)}
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 outline-none"
+            />
           </div>
 
           <div>

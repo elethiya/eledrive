@@ -10,6 +10,7 @@ type User struct {
 	Name         string    `json:"name"`
 	AvatarColor  string    `json:"avatar_color"`
 	Role         string    `json:"role"`
+	Status       string    `json:"status"` // 'approved', 'pending', 'rejected'
 	StorageUsed  int64     `json:"storage_used"`
 	StorageLimit int64     `json:"storage_limit"`
 	CreatedAt    time.Time `json:"created_at"`
@@ -138,6 +139,7 @@ type AdminStats struct {
 	TotalStorageUsed  int64 `json:"total_storage_used"`
 	TotalShareLinks   int   `json:"total_share_links"`
 	TotalDirectShares int   `json:"total_direct_shares"`
+	PendingApprovals  int   `json:"pending_approvals"`
 }
 
 type AdminUserDetail struct {
@@ -147,6 +149,7 @@ type AdminUserDetail struct {
 	Name         string    `json:"name"`
 	AvatarColor  string    `json:"avatar_color"`
 	Role         string    `json:"role"`
+	Status       string    `json:"status"`
 	StorageUsed  int64     `json:"storage_used"`
 	StorageLimit int64     `json:"storage_limit"`
 	FilesCount   int       `json:"files_count"`

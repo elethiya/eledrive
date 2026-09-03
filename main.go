@@ -132,6 +132,8 @@ func main() {
 				admin.Delete("/admin/logs", adminHandler.ClearLogs)
 				admin.Get("/admin/users", adminHandler.ListUsers)
 				admin.Put("/admin/users/{id}", adminHandler.UpdateUser)
+				admin.Post("/admin/users/{id}/approve", adminHandler.ApproveUser)
+				admin.Post("/admin/users/{id}/reject", adminHandler.RejectUser)
 				admin.Delete("/admin/users/{id}", adminHandler.DeleteUser)
 				admin.Get("/admin/settings", adminHandler.GetSettings)
 				admin.Put("/admin/settings", adminHandler.UpdateSettings)
