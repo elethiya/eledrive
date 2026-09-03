@@ -160,18 +160,18 @@ export default function ProfilePage() {
     <div className="flex-1 overflow-y-auto bg-slate-950 text-slate-100 p-3.5 sm:p-6 md:p-8">
       <div className="max-w-4xl mx-auto space-y-5 sm:space-y-6">
         {/* Profile Banner */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 md:p-8 flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 shadow-xl">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 md:p-8 flex items-center sm:items-start gap-3.5 sm:gap-6 shadow-xl">
           <div
-            className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl flex items-center justify-center text-white text-2xl sm:text-3xl font-bold shadow-2xl ring-4 ring-slate-800/80 shrink-0"
+            className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl flex items-center justify-center text-white text-xl sm:text-3xl font-bold shadow-2xl ring-2 sm:ring-4 ring-slate-800/80 shrink-0"
             style={{ backgroundColor: avatarColor }}
           >
             {name ? name.charAt(0).toUpperCase() : 'U'}
           </div>
 
-          <div className="flex-1 text-center sm:text-left">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
-              <h1 className="text-xl md:text-2xl font-bold text-slate-100">{user?.name}</h1>
-              <span className={`self-center sm:self-auto px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full border ${
+          <div className="flex-1 min-w-0 text-left">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <h1 className="text-base sm:text-xl md:text-2xl font-bold text-slate-100 truncate">{user?.name}</h1>
+              <span className={`px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full border shrink-0 ${
                 user?.role === 'owner'
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
                   : user?.role === 'admin'
@@ -182,15 +182,15 @@ export default function ProfilePage() {
               </span>
             </div>
 
-            <p className="text-xs text-slate-400 mb-3">{user?.email}</p>
+            <p className="text-xs text-slate-400 mb-2 sm:mb-3 truncate">{user?.email}</p>
 
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 text-xs text-slate-400">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-[11px] sm:text-xs text-slate-400">
               <div className="flex items-center gap-1.5">
-                <AtSign className="w-3.5 h-3.5 text-slate-500" />
+                <AtSign className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                 <span>@{user?.username}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                <Calendar className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                 <span>Joined {formatDate(user?.created_at)}</span>
               </div>
             </div>

@@ -239,18 +239,26 @@ export default function Navbar({
                 onClick={() => setProfileOpen(false)}
               />
               <div className="absolute right-0 top-12 w-64 bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 p-2 z-30 animate-in fade-in zoom-in-95 duration-100">
-                <div className="px-3 py-2.5 border-b border-slate-800">
-                  <p className="text-xs font-bold text-slate-100 truncate">{user?.name}</p>
-                  <p className="text-[11px] text-slate-400 truncate">{user?.email}</p>
-                  <span className={`mt-1.5 inline-block px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full border ${
-                    user?.role === 'owner'
-                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                      : user?.role === 'admin'
-                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-                      : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-                  }`}>
-                    {user?.role === 'owner' ? 'Workspace Owner' : user?.role === 'admin' ? 'Administrator' : 'Team Member'}
-                  </span>
+                <div className="p-3 border-b border-slate-800 flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-md ring-2 ring-slate-700 shrink-0"
+                    style={{ backgroundColor: user?.avatar_color || '#3b82f6' }}
+                  >
+                    {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-slate-100 truncate">{user?.name}</p>
+                    <p className="text-[11px] text-slate-400 truncate">{user?.email}</p>
+                    <span className={`mt-1 inline-block px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full border ${
+                      user?.role === 'owner'
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                        : user?.role === 'admin'
+                        ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                        : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                    }`}>
+                      {user?.role === 'owner' ? 'Workspace Owner' : user?.role === 'admin' ? 'Administrator' : 'Team Member'}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Direct Links */}

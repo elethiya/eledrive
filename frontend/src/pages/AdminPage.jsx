@@ -1835,19 +1835,19 @@ export default function AdminPage({ onBackToDrive }) {
             </div>
 
             {/* Hero Profile Banner */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/70 border border-slate-800/90 flex flex-col sm:flex-row items-center sm:items-start gap-4 relative z-10">
+            <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/70 border border-slate-800/90 flex items-center sm:items-start gap-3.5 sm:gap-4 relative z-10">
               <div
-                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl flex items-center justify-center font-bold text-white text-2xl sm:text-3xl shadow-xl ring-4 ring-slate-800/80 shrink-0"
+                className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl flex items-center justify-center font-bold text-white text-xl sm:text-3xl shadow-xl ring-2 sm:ring-4 ring-slate-800/80 shrink-0"
                 style={{ backgroundColor: viewUserModal.avatar_color || '#3b82f6' }}
               >
                 {viewUserModal.name?.charAt(0).toUpperCase() || 'U'}
               </div>
 
-              <div className="flex-1 text-center sm:text-left min-w-0">
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
-                  <h4 className="text-lg font-bold text-slate-100 truncate">{viewUserModal.name}</h4>
+              <div className="flex-1 text-left min-w-0">
+                <div className="flex flex-wrap items-center justify-start gap-2 mb-1">
+                  <h4 className="text-base sm:text-lg font-bold text-slate-100 truncate">{viewUserModal.name}</h4>
                   <span
-                    className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                    className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border shrink-0 ${
                       viewUserModal.role === 'owner'
                         ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
                         : viewUserModal.role === 'admin'
@@ -1858,7 +1858,7 @@ export default function AdminPage({ onBackToDrive }) {
                     {viewUserModal.role === 'owner' ? 'Workspace Owner' : viewUserModal.role === 'admin' ? 'Administrator' : 'Team Member'}
                   </span>
                   <span
-                    className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                    className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border shrink-0 ${
                       viewUserModal.status === 'approved'
                         ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                         : viewUserModal.status === 'pending'
@@ -1873,8 +1873,8 @@ export default function AdminPage({ onBackToDrive }) {
                 <p className="text-xs text-slate-400 truncate mb-2">{viewUserModal.email}</p>
 
                 {/* Copyable User ID pill */}
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-[11px] text-slate-400">
-                  <span className="font-mono text-slate-300 bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-800 truncate max-w-[240px]">
+                <div className="flex flex-wrap items-center justify-start gap-2 text-[11px] text-slate-400">
+                  <span className="font-mono text-slate-300 bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-800 truncate max-w-[200px] sm:max-w-[240px]">
                     ID: {viewUserModal.id}
                   </span>
                   <button
