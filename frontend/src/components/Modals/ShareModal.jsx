@@ -12,7 +12,7 @@ import {
   Eye,
   Shield,
 } from 'lucide-react';
-import { shareAPI, publicShareAPI, authAPI } from '../../api/client';
+import { shareAPI, publicShareAPI, authAPI, teamAPI } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 
 export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' }) {
@@ -26,6 +26,8 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
   const [memberPermission, setMemberPermission] = useState('editor');
   const [sharedList, setSharedList] = useState([]);
   const [teamLoading, setTeamLoading] = useState(false);
+  const [availableTeammates, setAvailableTeammates] = useState([]);
+  const [availableTeams, setAvailableTeams] = useState([]);
 
   // Link Share state
   const [linkInfo, setLinkInfo] = useState(null);
@@ -39,6 +41,12 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
     if (isOpen && item) {
       loadTeamShares();
       loadPublicLink();
+      teamAPI.getAvailableUsers().then((res) => {
+        if (res.data) setAvailableTeammates(res.data);
+      }).catch(console.error);
+      teamAPI.listTeams().then((res) => {
+        if (res.data) setAvailableTeams(res.data);
+      }).catch(console.error);
     }
   }, [isOpen, item]);
 
@@ -95,6 +103,34 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
       await loadTeamShares();
     } catch (err) {
       alert(err.message);
+    } finally {
+      setTeamLoading(false);
+    }
+  };
+
+  const handleShareWithTeam = async (t) => {
+    setTeamLoading(true);
+    try {
+      const res = await teamAPI.getTeam(t.id);
+      if (res.data && res.data.members) {
+        for (const m of res.data.members) {
+          if (m.user_id !== user?.id) {
+            try {
+              await shareAPI.createShare({
+                target_type: itemType,
+                target_id: item.id,
+                user_id: m.user_id,
+                permission: memberPermission,
+              });
+            } catch (err) {
+              console.error(err);
+            }
+          }
+        }
+        await loadTeamShares();
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to share with team');
     } finally {
       setTeamLoading(false);
     }
@@ -274,6 +310,60 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                       </div>
                     </button>
                   ))}
+                </div>
+              )}
+
+              {/* Quick Share with Teams */}
+              {availableTeams.length > 0 && !selectedUser && (
+                <div className="pt-2">
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1.5">
+                    Share with Entire Team:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availableTeams.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => handleShareWithTeam(t)}
+                        disabled={teamLoading}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-xs text-slate-200 transition-colors"
+                      >
+                        <span
+                          className="w-2.5 h-2.5 rounded-full inline-block"
+                          style={{ backgroundColor: t.avatar_color || '#3b82f6' }}
+                        />
+                        <span>{t.name}</span>
+                        <span className="text-[10px] text-slate-500">({t.members_count})</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Teammates Suggestions */}
+              {!searchQuery && !selectedUser && availableTeammates.length > 0 && (
+                <div className="pt-2">
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1.5">
+                    Workspace Teammates:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                    {availableTeammates.slice(0, 8).map((u) => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => setSelectedUser(u)}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-xs text-slate-200 transition-colors"
+                      >
+                        <div
+                          className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] font-bold"
+                          style={{ backgroundColor: u.avatar_color || '#3b82f6' }}
+                        >
+                          {u.name.charAt(0)}
+                        </div>
+                        <span>{u.name}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

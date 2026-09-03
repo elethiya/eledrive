@@ -80,6 +80,7 @@ func main() {
 	statsHandler := handlers.NewStatsHandler(cfg, storageService)
 	profileHandler := handlers.NewProfileHandler()
 	adminHandler := handlers.NewAdminHandler(cfg, storageService)
+	teamHandler := handlers.NewTeamHandler(cfg)
 
 	r := chi.NewRouter()
 
@@ -172,6 +173,15 @@ func main() {
 			auth.Get("/starred", statsHandler.GetStarred)
 			auth.Get("/trash", statsHandler.GetTrash)
 			auth.Post("/trash/empty", statsHandler.EmptyTrash)
+
+			// Teams Management & Workspaces
+			auth.Get("/teams", teamHandler.ListTeams)
+			auth.Post("/teams", teamHandler.CreateTeam)
+			auth.Get("/teams/{id}", teamHandler.GetTeam)
+			auth.Post("/teams/{id}/members", teamHandler.AddMember)
+			auth.Delete("/teams/{id}/members/{userId}", teamHandler.RemoveMember)
+			auth.Delete("/teams/{id}", teamHandler.DeleteTeam)
+			auth.Get("/team-members/available", teamHandler.GetAvailableUsers)
 
 			// Admin Panel Routes
 			auth.Group(func(admin chi.Router) {

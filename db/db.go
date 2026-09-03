@@ -158,9 +158,31 @@ func migrate() error {
 		downloaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
+	CREATE TABLE IF NOT EXISTS main.teams (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		description TEXT DEFAULT '',
+		avatar_color TEXT DEFAULT '#3b82f6',
+		created_by_user_id TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS main.team_members (
+		id TEXT PRIMARY KEY,
+		team_id TEXT NOT NULL,
+		user_id TEXT NOT NULL,
+		role TEXT DEFAULT 'member', -- 'leader', 'member'
+		joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(team_id, user_id)
+	);
+
 	CREATE INDEX IF NOT EXISTS main.idx_activity_logs_created ON activity_logs(created_at DESC);
 	CREATE INDEX IF NOT EXISTS main.idx_download_logs_target ON download_logs(target_id, downloaded_at DESC);
 	CREATE INDEX IF NOT EXISTS main.idx_download_logs_uuid ON download_logs(secret_uuid);
+	CREATE INDEX IF NOT EXISTS main.idx_teams_creator ON teams(created_by_user_id);
+	CREATE INDEX IF NOT EXISTS main.idx_team_members_team ON team_members(team_id);
+	CREATE INDEX IF NOT EXISTS main.idx_team_members_user ON team_members(user_id);
 	`
 
 	if _, err := DB.Exec(accountSchema); err != nil {
@@ -215,6 +237,17 @@ func migrate() error {
 		UNIQUE(target_type, target_id, shared_with_user_id)
 	);
 
+	CREATE TABLE IF NOT EXISTS drive.team_shares (
+		id TEXT PRIMARY KEY,
+		team_id TEXT NOT NULL,
+		target_type TEXT NOT NULL, -- 'folder' or 'file'
+		target_id TEXT NOT NULL,
+		shared_by_user_id TEXT NOT NULL,
+		permission TEXT NOT NULL DEFAULT 'viewer', -- 'viewer' or 'editor'
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(team_id, target_type, target_id)
+	);
+
 	CREATE TABLE IF NOT EXISTS drive.share_links (
 		id TEXT PRIMARY KEY,
 		token TEXT UNIQUE NOT NULL,
@@ -231,6 +264,8 @@ func migrate() error {
 	CREATE INDEX IF NOT EXISTS drive.idx_folders_owner ON folders(owner_id, parent_id, is_trashed);
 	CREATE INDEX IF NOT EXISTS drive.idx_files_owner ON files(owner_id, folder_id, is_trashed);
 	CREATE INDEX IF NOT EXISTS drive.idx_shares_user ON shares(shared_with_user_id);
+	CREATE INDEX IF NOT EXISTS drive.idx_team_shares_team ON team_shares(team_id);
+	CREATE INDEX IF NOT EXISTS drive.idx_team_shares_target ON team_shares(target_type, target_id);
 	CREATE INDEX IF NOT EXISTS drive.idx_share_links_token ON share_links(token);
 	`
 

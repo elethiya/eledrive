@@ -40,7 +40,7 @@ func GenerateSecretUUID() string {
 // ComputeForensicHMAC computes a verifiable digital signature for the watermark
 func ComputeForensicHMAC(secretUUID, uploaderID, timestamp, secretKey string) string {
 	h := hmac.New(sha256.New, []byte(secretKey))
-	h.Write([]byte(fmt.Sprintf("%s:%s:%s", secretUUID, uploaderID, timestamp)))
+	h.Write(fmt.Appendf(nil, "%s:%s:%s", secretUUID, uploaderID, timestamp))
 	return hex.EncodeToString(h.Sum(nil))
 }
 
@@ -61,7 +61,7 @@ func BuildForensicMeta(secretUUID, uploaderID, uploaderEmail, uploaderName, file
 	}
 
 	metaJSON, _ := json.Marshal(payload)
-	block := []byte(fmt.Sprintf("%s%s%s", ForensicTagStart, string(metaJSON), ForensicTagEnd))
+	block := fmt.Appendf(nil, "%s%s%s", ForensicTagStart, string(metaJSON), ForensicTagEnd)
 
 	return string(metaJSON), block
 }

@@ -139,4 +139,14 @@ export const adminAPI = {
   getSecurityStats: () => api.get('/admin/security/stats'),
 };
 
+export const teamAPI = {
+  listTeams: () => api.get('/teams'),
+  createTeam: (data) => api.post('/teams', data),
+  getTeam: (id) => api.get(`/teams/${id}`),
+  addMember: (teamId, data) => api.post(`/teams/${teamId}/members`, data),
+  removeMember: (teamId, userId) => api.delete(`/teams/${teamId}/members/${userId}`),
+  deleteTeam: (id) => api.delete(`/teams/${id}`),
+  getAvailableUsers: () => api.get('/team-members/available'),
+};
+
 export default api;

@@ -10,6 +10,7 @@ import TrashPage from './pages/TrashPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
 import PublicSharePage from './pages/PublicSharePage';
+import TeamsPage from './pages/TeamsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 
@@ -290,6 +291,8 @@ function AppContent() {
               onOpenNewFolder={() => setNewFolderOpen(true)}
             />
           )}
+
+          {currentView === 'teams' && <TeamsPage />}
 
           {currentView === 'shared' && (
             <SharedWithMePage

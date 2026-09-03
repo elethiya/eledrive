@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import {
   HardDrive,
   Users,
+  Share2,
   Clock,
   Star,
   Trash2,
@@ -39,7 +40,8 @@ export default function Sidebar({
 
   const navItems = [
     { id: 'drive', label: 'My Drive', icon: HardDrive },
-    { id: 'shared', label: 'Shared with me', icon: Users },
+    { id: 'teams', label: 'Teams', icon: Users },
+    { id: 'shared', label: 'Shared with me', icon: Share2 },
     { id: 'recent', label: 'Recent', icon: Clock },
     { id: 'starred', label: 'Starred', icon: Star },
     { id: 'trash', label: 'Trash', icon: Trash2 },

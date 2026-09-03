@@ -200,3 +200,41 @@ type SecurityStats struct {
 	RecentDownloads      []DownloadRecord `json:"recent_downloads"`
 	RecentTrackedFiles   []File           `json:"recent_tracked_files"`
 }
+
+type Team struct {
+	ID              string       `json:"id"`
+	Name            string       `json:"name"`
+	Description     string       `json:"description"`
+	AvatarColor     string       `json:"avatar_color"`
+	CreatedByUserID string       `json:"created_by_user_id"`
+	CreatorName     string       `json:"creator_name,omitempty"`
+	MembersCount    int          `json:"members_count"`
+	UserRole        string       `json:"user_role,omitempty"` // "leader" or "member"
+	CreatedAt       time.Time    `json:"created_at"`
+	UpdatedAt       time.Time    `json:"updated_at"`
+	Members         []TeamMember `json:"members,omitempty"`
+}
+
+type TeamMember struct {
+	ID          string    `json:"id"`
+	TeamID      string    `json:"team_id"`
+	UserID      string    `json:"user_id"`
+	Name        string    `json:"name"`
+	Username    string    `json:"username"`
+	Email       string    `json:"email"`
+	AvatarColor string    `json:"avatar_color"`
+	Role        string    `json:"role"` // "leader" or "member"
+	JoinedAt    time.Time `json:"joined_at"`
+}
+
+type CreateTeamRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	AvatarColor string `json:"avatar_color"`
+}
+
+type AddTeamMemberRequest struct {
+	UserID    string `json:"user_id"`
+	UserEmail string `json:"user_email"`
+	Role      string `json:"role"` // "member" or "leader"
+}

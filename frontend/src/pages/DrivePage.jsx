@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   folderAPI,
   fileAPI,
@@ -9,10 +9,23 @@ import {
   FolderPlus,
   HardDrive,
   UploadCloud,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  LayoutGrid,
+  List,
+  Search,
+  X,
+  Folder,
+  FileText,
+  Clock,
+  Sparkles,
+  ChevronDown,
 } from 'lucide-react';
+import { formatBytes, formatDate } from '../utils/formatters';
 
 export default function DrivePage({
-  viewMode,
+  viewMode: propViewMode,
   currentFolderId,
   setCurrentFolderId,
   onOpenPreview,
@@ -33,8 +46,20 @@ export default function DrivePage({
   const [loading, setLoading] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
 
+  // Content listing system controls
+  const [viewMode, setViewMode] = useState(propViewMode || 'grid');
+  const [sortField, setSortField] = useState('name'); // 'name' | 'size' | 'updated_at' | 'type'
+  const [sortOrder, setSortOrder] = useState('asc'); // 'asc' | 'desc'
+  const [contentFilter, setContentFilter] = useState('');
+
+  // Synchronize viewMode from props if changed externally
+  useEffect(() => {
+    if (propViewMode) setViewMode(propViewMode);
+  }, [propViewMode]);
+
   useEffect(() => {
     loadFolder(currentFolderId);
+    setContentFilter('');
   }, [currentFolderId]);
 
   const loadFolder = async (folderId) => {
@@ -112,8 +137,59 @@ export default function DrivePage({
     }
   };
 
+  const handleHeaderSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
+
   const { folder, breadcrumbs, subfolders, files } = folderData;
-  const isEmpty = subfolders.length === 0 && files.length === 0;
+
+  // Filter and sort subfolders and files
+  const { filteredFolders, filteredFiles, totalBytes } = useMemo(() => {
+    let fList = [...(subfolders || [])];
+    let fileList = [...(files || [])];
+
+    // 1. Text filter
+    if (contentFilter.trim()) {
+      const q = contentFilter.toLowerCase();
+      fList = fList.filter((f) => f.name.toLowerCase().includes(q));
+      fileList = fileList.filter((fl) => fl.name.toLowerCase().includes(q));
+    }
+
+    // 2. Sort function
+    const sorter = (a, b) => {
+      let comparison = 0;
+      if (sortField === 'name') {
+        comparison = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+      } else if (sortField === 'size') {
+        const sizeA = a.size || 0;
+        const sizeB = b.size || 0;
+        comparison = sizeA - sizeB;
+      } else if (sortField === 'updated_at') {
+        comparison = new Date(a.updated_at || 0) - new Date(b.updated_at || 0);
+      } else if (sortField === 'type') {
+        const typeA = a.extension || (a.mime_type ? a.mime_type : 'folder');
+        const typeB = b.extension || (b.mime_type ? b.mime_type : 'folder');
+        comparison = typeA.localeCompare(typeB);
+      }
+
+      return sortOrder === 'asc' ? comparison : -comparison;
+    };
+
+    fList.sort(sorter);
+    fileList.sort(sorter);
+
+    const bytes = fileList.reduce((acc, f) => acc + (f.size || 0), 0);
+
+    return { filteredFolders: fList, filteredFiles: fileList, totalBytes: bytes };
+  }, [subfolders, files, contentFilter, sortField, sortOrder]);
+
+  const isEmpty = (subfolders?.length === 0 && files?.length === 0);
+  const isFilterEmpty = !isEmpty && filteredFolders.length === 0 && filteredFiles.length === 0;
 
   return (
     <div
@@ -122,7 +198,7 @@ export default function DrivePage({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Breadcrumb Path */}
+      {/* Breadcrumbs Path */}
       <Breadcrumbs
         breadcrumbs={breadcrumbs}
         currentFolder={folder}
@@ -130,12 +206,99 @@ export default function DrivePage({
         onShareFolder={() => onOpenShare(folder, 'folder')}
       />
 
+      {/* Modern Content Listing Toolbar */}
+      {!isEmpty && (
+        <div className="px-3.5 sm:px-6 py-2.5 border-b border-slate-800/80 bg-slate-900/40 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 flex-1 min-w-[200px] max-w-md">
+            {/* Live Filter Input */}
+            <div className="relative w-full">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Filter files in this folder..."
+                value={contentFilter}
+                onChange={(e) => setContentFilter(e.target.value)}
+                className="w-full pl-8 pr-8 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-hidden focus:border-blue-500 transition-colors"
+              />
+              {contentFilter && (
+                <button
+                  onClick={() => setContentFilter('')}
+                  className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Folder Metrics Pill */}
+            <span className="hidden md:inline-block text-[11px] text-slate-400 font-mono whitespace-nowrap">
+              {filteredFolders.length} {filteredFolders.length === 1 ? 'folder' : 'folders'}, {filteredFiles.length} {filteredFiles.length === 1 ? 'file' : 'files'}
+              {totalBytes > 0 && ` (${formatBytes(totalBytes)})`}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Sort Controls */}
+            <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-0.5">
+              <select
+                value={sortField}
+                onChange={(e) => setSortField(e.target.value)}
+                className="bg-transparent text-xs text-slate-300 px-2 py-1 outline-none cursor-pointer"
+              >
+                <option value="name" className="bg-slate-900">Name</option>
+                <option value="updated_at" className="bg-slate-900">Last Modified</option>
+                <option value="size" className="bg-slate-900">Size</option>
+                <option value="type" className="bg-slate-900">Type</option>
+              </select>
+
+              <button
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition-colors"
+                title={`Sort ${sortOrder === 'asc' ? 'Ascending' : 'Descending'}`}
+              >
+                {sortOrder === 'asc' ? (
+                  <ArrowUp className="w-3.5 h-3.5 text-blue-400" />
+                ) : (
+                  <ArrowDown className="w-3.5 h-3.5 text-blue-400" />
+                )}
+              </button>
+            </div>
+
+            {/* View Mode Toggle */}
+            <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-0.5">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  viewMode === 'grid'
+                    ? 'bg-slate-800 text-blue-400 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Grid View"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-slate-800 text-blue-400 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Table List View"
+              >
+                <List className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Drag & Drop Visual Overlay */}
       {isDragOver && (
         <div className="absolute inset-0 bg-blue-950/80 border-2 border-dashed border-blue-500 z-40 flex items-center justify-center pointer-events-none backdrop-blur-xs">
           <div className="bg-slate-900 border border-blue-500/50 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 text-blue-400 font-bold text-sm">
             <UploadCloud className="w-6 h-6 animate-bounce" />
-            <span>Drop files or projects here to upload</span>
+            <span>Drop files or project folders here to upload</span>
           </div>
         </div>
       )}
@@ -153,7 +316,7 @@ export default function DrivePage({
             </div>
             <h3 className="text-base font-bold text-slate-100 mb-1">This folder is empty</h3>
             <p className="text-xs text-slate-400 mb-6">
-              Drag & drop files or project folders here, or click below to create a new folder.
+              Drag & drop files or project folders here, or create a new folder to organize your work.
             </p>
             <div className="flex items-center gap-3">
               <button
@@ -165,14 +328,72 @@ export default function DrivePage({
               </button>
             </div>
           </div>
+        ) : isFilterEmpty ? (
+          <div className="h-64 flex flex-col items-center justify-center text-center max-w-sm mx-auto">
+            <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 text-slate-500 flex items-center justify-center mb-3">
+              <Search className="w-6 h-6" />
+            </div>
+            <h4 className="text-sm font-bold text-slate-200 mb-1">No matches found</h4>
+            <p className="text-xs text-slate-500 mb-3">
+              No items matching "{contentFilter}" in this folder.
+            </p>
+            <button
+              onClick={() => setContentFilter('')}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+            >
+              Clear Filter
+            </button>
+          </div>
         ) : (
           <div className="space-y-6">
+            {/* List Mode Table Header (Only rendered when in list view) */}
+            {viewMode === 'list' && (
+              <div className="hidden sm:flex items-center justify-between px-4 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-800/80 select-none">
+                <button
+                  onClick={() => handleHeaderSort('name')}
+                  className="flex items-center gap-1.5 hover:text-slate-200 transition-colors flex-1"
+                >
+                  <span>Name</span>
+                  {sortField === 'name' && (
+                    <span className="text-blue-400">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </button>
+
+                <div className="flex items-center gap-6 shrink-0">
+                  <button
+                    onClick={() => handleHeaderSort('size')}
+                    className="w-20 text-right hover:text-slate-200 transition-colors"
+                  >
+                    <span>Size</span>
+                    {sortField === 'size' && (
+                      <span className="text-blue-400 ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => handleHeaderSort('updated_at')}
+                    className="w-24 text-right hidden md:inline hover:text-slate-200 transition-colors"
+                  >
+                    <span>Modified</span>
+                    {sortField === 'updated_at' && (
+                      <span className="text-blue-400 ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </button>
+
+                  <span className="w-16 text-right">Actions</span>
+                </div>
+              </div>
+            )}
+
             {/* Folders Section */}
-            {subfolders.length > 0 && (
+            {filteredFolders.length > 0 && (
               <div>
-                <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
-                  Folders ({subfolders.length})
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                    <Folder className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Folders ({filteredFolders.length})</span>
+                  </h3>
+                </div>
                 <div
                   className={
                     viewMode === 'grid'
@@ -180,7 +401,7 @@ export default function DrivePage({
                       : 'space-y-1.5'
                   }
                 >
-                  {subfolders.map((sf) => (
+                  {filteredFolders.map((sf) => (
                     <FileCard
                       key={sf.id}
                       item={sf}
@@ -201,11 +422,14 @@ export default function DrivePage({
             )}
 
             {/* Files Section */}
-            {files.length > 0 && (
+            {filteredFiles.length > 0 && (
               <div>
-                <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
-                  Files ({files.length})
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Files ({filteredFiles.length})</span>
+                  </h3>
+                </div>
                 <div
                   className={
                     viewMode === 'grid'
@@ -213,7 +437,7 @@ export default function DrivePage({
                       : 'space-y-1.5'
                   }
                 >
-                  {files.map((fl) => (
+                  {filteredFiles.map((fl) => (
                     <FileCard
                       key={fl.id}
                       item={fl}
