@@ -108,6 +108,9 @@ func (s *StorageService) addFolderToZip(folderID string, currentPath string, zw 
 		_, _ = io.Copy(w, fileData)
 		fileData.Close()
 	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
 
 	// Fetch subfolders
 	subRows, err := db.DB.Query(`
@@ -125,12 +128,16 @@ func (s *StorageService) addFolderToZip(folderID string, currentPath string, zw 
 	}
 	for subRows.Next() {
 		var id, name string
-		if err := subRows.Scan(&id, &name); err == nil {
-			subfolders = append(subfolders, struct {
-				id   string
-				name string
-			}{id: id, name: name})
+		if err := subRows.Scan(&id, &name); err != nil {
+			return err
 		}
+		subfolders = append(subfolders, struct {
+			id   string
+			name string
+		}{id: id, name: name})
+	}
+	if err := subRows.Err(); err != nil {
+		return err
 	}
 
 	for _, sf := range subfolders {
