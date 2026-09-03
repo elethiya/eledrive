@@ -276,11 +276,11 @@ function AppContent() {
           {searchResults !== null ? (
             <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950 text-slate-100">
               {/* Search Results Header */}
-              <div className="h-14 px-4 sm:px-6 border-b border-slate-800 bg-slate-900/60 backdrop-blur-md flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-2.5 text-xs font-bold text-slate-100">
-                  <Search className="w-4 h-4 text-blue-400" />
-                  <span>Search results for: <span className="text-blue-400 font-mono">"{searchQuery}"</span></span>
-                  <span className="text-slate-500 font-normal">({searchResults.length} {searchResults.length === 1 ? 'file' : 'files'} found)</span>
+              <div className="h-14 px-3 sm:px-6 border-b border-slate-800 bg-slate-900/60 backdrop-blur-md flex items-center justify-between gap-2 shrink-0">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-100 truncate min-w-0">
+                  <Search className="w-4 h-4 text-blue-400 shrink-0" />
+                  <span className="truncate">Results: <span className="text-blue-400 font-mono">"{searchQuery}"</span></span>
+                  <span className="text-slate-500 font-normal shrink-0">({searchResults.length})</span>
                 </div>
 
                 <button
@@ -288,10 +288,11 @@ function AppContent() {
                     setSearchResults(null);
                     setSearchQuery('');
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-750 active:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition-colors shadow-xs"
+                  className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 bg-slate-800 hover:bg-slate-750 active:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition-colors shadow-xs shrink-0"
+                  title="Exit Search"
                 >
                   <X className="w-3.5 h-3.5" />
-                  <span>Exit Search</span>
+                  <span className="hidden sm:inline">Exit Search</span>
                 </button>
               </div>
 

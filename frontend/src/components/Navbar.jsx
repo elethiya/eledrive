@@ -33,7 +33,6 @@ export default function Navbar({
   const { isConnected } = useRealtime();
   const [profileOpen, setProfileOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const searchInputRef = useRef(null);
 
   // Global shortcut: '/' or 'Ctrl+K' focuses search input
@@ -45,7 +44,6 @@ export default function Navbar({
       ) {
         e.preventDefault();
         searchInputRef.current?.focus();
-        setMobileSearchOpen(true);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -61,36 +59,27 @@ export default function Navbar({
   ];
 
   return (
-    <header className="h-16 border-b border-slate-800 bg-slate-900 px-4 sm:px-6 flex items-center justify-between gap-2.5 sm:gap-4 select-none shrink-0 text-slate-100 relative">
-      {/* Left: Mobile hamburger menu & Search toggle */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={onToggleSidebar}
-          className="md:hidden p-2 -ml-1 text-slate-400 hover:text-slate-100 rounded-xl hover:bg-slate-800 transition-colors"
-          title="Open menu"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-
-        <button
-          onClick={() => setMobileSearchOpen(!mobileSearchOpen)}
-          className="sm:hidden p-2 text-slate-400 hover:text-slate-100 rounded-xl hover:bg-slate-800 transition-colors"
-          title="Search"
-        >
-          <Search className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Center Search Input (hidden on xs unless mobileSearchOpen is true) */}
-      <div
-        className={`flex-1 max-w-2xl flex items-center gap-2 ${
-          mobileSearchOpen
-            ? 'absolute inset-x-3 top-2.5 z-30 bg-slate-900 p-1.5 rounded-2xl border border-slate-700 shadow-2xl flex sm:static sm:p-0 sm:border-0 sm:shadow-none'
-            : 'hidden sm:flex'
-        }`}
+    <header className="h-16 border-b border-slate-800 bg-slate-900 px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 select-none shrink-0 text-slate-100 relative">
+      {/* Left: Mobile hamburger menu */}
+      <button
+        onClick={onToggleSidebar}
+        className="md:hidden p-2 -ml-1 text-slate-400 hover:text-slate-100 rounded-xl hover:bg-slate-800 transition-colors shrink-0"
+        title="Open menu"
       >
-        <div className="relative flex-1 group">
-          <Search className="w-4 h-4 text-slate-400 group-focus-within:text-blue-400 absolute left-3 top-1/2 -translate-y-1/2 transition-colors" />
+        <Menu className="w-5 h-5" />
+      </button>
+
+      {/* Center Search Input (Always visible & responsive on mobile and desktop) */}
+      <div className="flex-1 max-w-2xl min-w-0 flex items-center gap-1.5 sm:gap-2">
+        <div className="relative flex-1 group min-w-0">
+          <button
+            type="button"
+            onClick={() => onSearch && onSearch()}
+            className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-400 hover:text-blue-400 transition-colors"
+            title="Search"
+          >
+            <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          </button>
           <input
             ref={searchInputRef}
             type="text"
@@ -99,16 +88,16 @@ export default function Navbar({
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 if (onSearch) onSearch();
-                setMobileSearchOpen(false);
               }
             }}
-            placeholder="Search files, code, folders... (Press / to search)"
-            className="w-full bg-slate-950/80 hover:bg-slate-950 focus:bg-slate-950 text-xs text-slate-100 placeholder:text-slate-500 rounded-xl pl-9 pr-16 py-2.5 border border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-hidden transition-all shadow-inner"
+            placeholder="Search files..."
+            className="w-full bg-slate-950/80 hover:bg-slate-950 focus:bg-slate-950 text-xs text-slate-100 placeholder:text-slate-500 rounded-xl pl-8 sm:pl-9 pr-7 sm:pr-14 py-2 sm:py-2.5 border border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-hidden transition-all shadow-inner"
           />
 
-          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+          <div className="absolute right-2 sm:right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
             {searchQuery ? (
               <button
+                type="button"
                 onClick={() => {
                   setSearchQuery('');
                   if (onSearch) onSearch('');
@@ -129,28 +118,19 @@ export default function Navbar({
         {/* Filter dropdown */}
         <div className="relative shrink-0">
           <button
+            type="button"
             onClick={() => setFilterOpen(!filterOpen)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-colors ${
+            className={`flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-medium border transition-colors ${
               searchType !== 'all'
                 ? 'bg-blue-600/20 text-blue-400 border-blue-500/30'
                 : 'bg-slate-950/80 text-slate-300 border-slate-800 hover:bg-slate-800/80'
             }`}
+            title="Filter by file type"
           >
             <Filter className="w-3.5 h-3.5 text-slate-400" />
             <span className="capitalize hidden md:inline">{searchType === 'all' ? 'All Types' : searchType}</span>
-            <ChevronDown className="w-3 h-3 text-slate-400" />
+            <ChevronDown className="w-3 h-3 text-slate-400 hidden sm:inline" />
           </button>
-
-          {/* Close button for mobile search bar overlay */}
-          {mobileSearchOpen && (
-            <button
-              onClick={() => setMobileSearchOpen(false)}
-              className="sm:hidden p-2 text-slate-400 hover:text-slate-100 rounded-xl hover:bg-slate-800 transition-colors shrink-0 ml-1"
-              title="Close search"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
 
           {filterOpen && (
             <>
@@ -165,6 +145,7 @@ export default function Navbar({
                   return (
                     <button
                       key={f.id}
+                      type="button"
                       onClick={() => {
                         setSearchType(f.id);
                         setFilterOpen(false);
@@ -184,15 +165,6 @@ export default function Navbar({
             </>
           )}
         </div>
-
-        {mobileSearchOpen && (
-          <button
-            onClick={() => setMobileSearchOpen(false)}
-            className="sm:hidden p-2 text-slate-400 hover:text-slate-200"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
       </div>
 
       {/* Right Controls: Realtime Status + Profile */}

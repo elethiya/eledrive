@@ -356,29 +356,18 @@ export default function AdminPage({ onBackToDrive }) {
   return (
     <div className="flex-1 flex flex-col h-screen bg-slate-950 text-slate-100 overflow-y-auto">
       {/* Top Header Bar */}
-      <header className="h-16 px-6 border-b border-slate-800 bg-slate-900/60 backdrop-blur-md flex items-center justify-between shrink-0 sticky top-0 z-20">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onBackToDrive}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all"
+      <header className="min-h-16 px-4 sm:px-6 py-3 border-b border-slate-800 bg-slate-900/60 backdrop-blur-md flex items-center justify-between gap-3 shrink-0 sticky top-0 z-20">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div
+            className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-lg shrink-0 ${
+              isOwner
+                ? 'bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 shadow-amber-500/20'
+                : 'bg-gradient-to-tr from-purple-600 to-indigo-500 text-white shadow-purple-500/20'
+            }`}
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Drive</span>
-          </button>
-
-          <div className="h-4 w-px bg-slate-800" />
-
-          <div className="flex items-center gap-2.5">
-            <div
-              className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-lg ${
-                isOwner
-                  ? 'bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 shadow-amber-500/20'
-                  : 'bg-gradient-to-tr from-purple-600 to-indigo-500 text-white shadow-purple-500/20'
-              }`}
-            >
-              {isOwner ? <Crown className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
-            </div>
-            <div className="min-w-0">
+            {isOwner ? <Crown className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
+          </div>
+          <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h1 className="text-xs sm:text-sm font-bold text-slate-100 truncate">
                   {isOwner ? 'EleDrive Workspace Owner Console' : 'EleDrive Admin Console'}
@@ -398,7 +387,6 @@ export default function AdminPage({ onBackToDrive }) {
               </p>
             </div>
           </div>
-        </div>
 
         <div className="flex items-center gap-2 shrink-0">
           <button
@@ -572,17 +560,27 @@ export default function AdminPage({ onBackToDrive }) {
             {/* Search & Status Filters */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900 p-3 rounded-2xl border border-slate-800">
               <div className="relative w-full sm:w-80">
-                <Search className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
+                <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
                 <input
                   type="text"
                   placeholder="Search user name, email, or handle..."
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-hidden focus:border-blue-500"
+                  className="w-full pl-9 pr-8 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-hidden focus:border-blue-500"
                 />
+                {userSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setUserSearch('')}
+                    className="absolute right-2.5 top-2 text-slate-500 hover:text-slate-300 p-0.5"
+                    title="Clear search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
 
-              <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto">
+              <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto no-scrollbar py-0.5">
                 {['all', 'pending', 'approved', 'rejected'].map((st) => (
                   <button
                     key={st}
