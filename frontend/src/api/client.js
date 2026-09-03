@@ -115,6 +115,8 @@ export const statsAPI = {
 export const profileAPI = {
   updateProfile: (data) => api.put('/user/profile', data),
   changePassword: (data) => api.put('/user/password', data),
+  updateSelfStorageLimit: (storageLimitGB) =>
+    api.put('/user/storage-limit', { storage_limit_gb: storageLimitGB }),
 };
 
 export const adminAPI = {

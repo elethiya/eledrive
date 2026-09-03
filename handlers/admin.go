@@ -12,6 +12,7 @@ import (
 
 	"eledrive/config"
 	"eledrive/db"
+	"eledrive/events"
 	"eledrive/middleware"
 	"eledrive/models"
 	"eledrive/storage"
@@ -171,8 +172,8 @@ func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
 
 	// Fetch current target user
-	var currentTargetRole, currentTargetName string
-	err := db.DB.QueryRow("SELECT role, name FROM users WHERE id = ?", targetUserID).Scan(&currentTargetRole, &currentTargetName)
+	var currentTargetRole, currentTargetName, currentTargetEmail string
+	err := db.DB.QueryRow("SELECT role, name, email FROM users WHERE id = ?", targetUserID).Scan(&currentTargetRole, &currentTargetName, &currentTargetEmail)
 	if err != nil {
 		utils.RespondError(w, http.StatusNotFound, "User not found")
 		return
@@ -208,14 +209,23 @@ func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		targetRole = currentTargetRole
 	}
 
+	targetName := currentTargetName
+	if req.Name != "" {
+		targetName = req.Name
+	}
+	targetEmail := currentTargetEmail
+	if req.Email != "" {
+		targetEmail = req.Email
+	}
+
 	// Update base fields
 	_, err = db.DB.Exec(`
 		UPDATE users 
 		SET name = ?, email = ?, role = ?, updated_at = CURRENT_TIMESTAMP 
 		WHERE id = ?
-	`, req.Name, req.Email, targetRole, targetUserID)
+	`, targetName, targetEmail, targetRole, targetUserID)
 	if err != nil {
-		utils.RespondError(w, http.StatusInternalServerError, "Failed to update user profile")
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to update user profile: "+err.Error())
 		return
 	}
 
@@ -227,7 +237,13 @@ func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.StorageLimit != nil && *req.StorageLimit > 0 {
+		// Admin cannot change owner's storage limit; only owner can change self storage limit
+		if currentTargetRole == "owner" && claims.Role != "owner" {
+			utils.RespondError(w, http.StatusForbidden, "Admins cannot change the Owner's storage limit")
+			return
+		}
 		_, _ = db.DB.Exec("UPDATE users SET storage_limit = ? WHERE id = ?", *req.StorageLimit, targetUserID)
+		events.Broadcast("storage:update", "storage", "update", targetUserID, "", claims.UserID, map[string]interface{}{"storage_limit": *req.StorageLimit})
 	}
 
 	if req.Password != nil && len(*req.Password) >= 6 {
@@ -394,7 +410,7 @@ func (h *AdminHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pairs := map[string]string{
-		"site_name":                 req.SiteName,
+		"site_name":                 "EleDrive",
 		"default_quota_gb":          strconv.FormatInt(req.DefaultQuotaGB, 10),
 		"allow_public_registration": strconv.FormatBool(req.AllowPublicRegistration),
 		"allow_public_shares":       strconv.FormatBool(req.AllowPublicShares),

@@ -659,13 +659,22 @@ export default function AdminPage({ onBackToDrive }) {
                                     </button>
                                   </>
                                 )}
-                                <button
-                                  onClick={() => setEditUserModal(u)}
-                                  className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
-                                  title="Edit User"
-                                >
-                                  <Edit className="w-3.5 h-3.5" />
-                                </button>
+                                {u.role === 'owner' && user?.role !== 'owner' ? (
+                                  <span
+                                    className="p-1.5 rounded-lg bg-slate-900/60 text-slate-600 cursor-not-allowed inline-flex items-center justify-center"
+                                    title="Admins cannot edit or change the Owner's storage limit"
+                                  >
+                                    <Lock className="w-3.5 h-3.5" />
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => setEditUserModal(u)}
+                                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+                                    title={u.role === 'owner' ? 'Edit Self & Storage Limit' : 'Edit User'}
+                                  >
+                                    <Edit className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
                                 {u.role !== 'owner' && (
                                   <button
                                     onClick={() => handleDeleteUser(u.id)}
@@ -1260,18 +1269,6 @@ export default function AdminPage({ onBackToDrive }) {
             </div>
 
             <form onSubmit={handleSaveSettings} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Platform Name
-                </label>
-                <input
-                  type="text"
-                  value={settings.site_name}
-                  onChange={(e) => setSettings({ ...settings, site_name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-blue-500"
-                />
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1.5">
@@ -1454,22 +1451,32 @@ export default function AdminPage({ onBackToDrive }) {
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                  Storage Limit (GB)
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center justify-between">
+                  <span>Storage Limit (GB)</span>
+                  {editUserModal.role === 'owner' && (
+                    <span className="text-amber-400 font-bold text-[10px]">Owner Quota</span>
+                  )}
                 </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="10000"
-                  value={Math.round((editUserModal.storage_limit || 10737418240) / (1024 * 1024 * 1024))}
-                  onChange={(e) =>
-                    setEditUserModal({
-                      ...editUserModal,
-                      storage_limit: (parseInt(e.target.value) || 10) * 1024 * 1024 * 1024,
-                    })
-                  }
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100"
-                />
+                {editUserModal.role === 'owner' && user?.role !== 'owner' ? (
+                  <div className="p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-[11px] text-amber-400/90 flex items-center gap-2">
+                    <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span>Admins cannot change the Owner's storage limit</span>
+                  </div>
+                ) : (
+                  <input
+                    type="number"
+                    min="1"
+                    max="100000"
+                    value={Math.round((editUserModal.storage_limit || 10737418240) / (1024 * 1024 * 1024))}
+                    onChange={(e) =>
+                      setEditUserModal({
+                        ...editUserModal,
+                        storage_limit: (parseInt(e.target.value) || 10) * 1024 * 1024 * 1024,
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-blue-500"
+                  />
+                )}
               </div>
             </div>
 
@@ -1484,16 +1491,21 @@ export default function AdminPage({ onBackToDrive }) {
               <button
                 type="button"
                 onClick={async () => {
+                  if (editUserModal.role === 'owner' && user?.role !== 'owner') {
+                    toast.error("Admins cannot change the Owner's storage limit");
+                    return;
+                  }
                   try {
                     await adminAPI.updateUser(editUserModal.id, {
                       name: editUserModal.name,
+                      email: editUserModal.email,
                       role: editUserModal.role,
                       status: editUserModal.status,
                       storage_limit: editUserModal.storage_limit,
                     });
                     setEditUserModal(null);
                     loadUsers();
-                    toast.success('User updated successfully');
+                    toast.success(editUserModal.id === user?.id ? 'Self profile & storage limit updated!' : 'User updated successfully');
                   } catch (err) {
                     toast.error(err.response?.data?.error || 'Failed to update user');
                   }

@@ -136,6 +136,7 @@ func main() {
 			// Profile Settings (Per User)
 			auth.Put("/user/profile", profileHandler.UpdateProfile)
 			auth.Put("/user/password", profileHandler.ChangePassword)
+			auth.Put("/user/storage-limit", profileHandler.UpdateSelfStorageLimit)
 
 			// Folders
 			auth.Get("/folders", folderHandler.GetContents)

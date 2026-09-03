@@ -11,8 +11,10 @@ import {
   Mail,
   AtSign,
   Palette,
+  Crown,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { profileAPI, statsAPI } from '../api/client';
 import { formatBytes, formatDate } from '../utils/formatters';
 
@@ -29,6 +31,7 @@ const AVATAR_COLORS = [
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
+  const toast = useToast();
 
   // Profile Form state
   const [name, setName] = useState(user?.name || '');
@@ -45,6 +48,12 @@ export default function ProfilePage() {
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
+  // Owner Self Storage Limit state
+  const [selfLimitGB, setSelfLimitGB] = useState(
+    Math.round((user?.storage_limit || 10737418240) / (1024 * 1024 * 1024))
+  );
+  const [savingSelfLimit, setSavingSelfLimit] = useState(false);
+
   // Storage stats
   const [stats, setStats] = useState(null);
 
@@ -52,9 +61,29 @@ export default function ProfilePage() {
     if (user) {
       setName(user.name || '');
       setAvatarColor(user.avatar_color || '#3b82f6');
+      setSelfLimitGB(Math.round((user.storage_limit || 10737418240) / (1024 * 1024 * 1024)));
     }
     loadStats();
   }, [user]);
+
+  const handleUpdateSelfStorage = async (e) => {
+    e.preventDefault();
+    const gb = parseInt(selfLimitGB);
+    if (!gb || gb <= 0) {
+      toast.error('Please enter a valid storage quota in GB');
+      return;
+    }
+    setSavingSelfLimit(true);
+    try {
+      await profileAPI.updateSelfStorageLimit(gb);
+      toast.success(`Owner storage limit updated to ${gb} GB!`);
+      if (refreshUser) refreshUser();
+    } catch (err) {
+      toast.error(err.response?.data?.error || err.message || 'Failed to update storage limit');
+    } finally {
+      setSavingSelfLimit(false);
+    }
+  };
 
   const loadStats = async () => {
     try {
@@ -349,18 +378,64 @@ export default function ProfilePage() {
         </div>
 
         {/* Section 3: Storage Breakdown */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl">
-          <div className="flex items-center gap-3 pb-4 border-b border-slate-800">
-            <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
-              <HardDrive className="w-4 h-4" />
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-2">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                <HardDrive className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-100">Personal Storage Breakdown</h3>
+                <p className="text-[11px] text-slate-400">
+                  {formatBytes(used)} of {formatBytes(limit)} used ({percent}%)
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-100">Personal Storage Breakdown</h3>
-              <p className="text-[11px] text-slate-400">
-                {formatBytes(used)} of {formatBytes(limit)} used ({percent}%)
-              </p>
-            </div>
+            {user?.role === 'owner' && (
+              <span className="self-start sm:self-auto text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
+                <Crown className="w-3 h-3 text-amber-400" />
+                Owner Storage Controls Active
+              </span>
+            )}
           </div>
+
+          {/* Owner Self Storage Limit Controller */}
+          {user?.role === 'owner' && (
+            <div className="p-4 bg-slate-950/80 border border-amber-500/30 rounded-2xl shadow-inner">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                    <Crown className="w-3.5 h-3.5 text-amber-400" />
+                    Change Self Storage Limit
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    As Workspace Owner, you have exclusive authority to adjust your personal storage quota.
+                  </p>
+                </div>
+                <form onSubmit={handleUpdateSelfStorage} className="flex items-center gap-2">
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="1"
+                      max="100000"
+                      value={selfLimitGB}
+                      onChange={(e) => setSelfLimitGB(e.target.value)}
+                      className="w-28 px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-100 font-semibold focus:outline-hidden focus:border-amber-400 pr-9"
+                    />
+                    <span className="absolute right-2.5 top-1.5 text-[11px] text-slate-400 font-bold pointer-events-none">GB</span>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={savingSelfLimit}
+                    className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-all shadow-md disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{savingSelfLimit ? 'Saving...' : 'Update Limit'}</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
 
           <div className="mt-5 space-y-4">
             <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden p-0.5 border border-slate-800">

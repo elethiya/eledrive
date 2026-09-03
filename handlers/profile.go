@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"eledrive/db"
+	"eledrive/events"
 	"eledrive/middleware"
 	"eledrive/utils"
 	"golang.org/x/crypto/bcrypt"
@@ -112,4 +114,38 @@ func (h *ProfileHandler) ChangePassword(w http.ResponseWriter, r *http.Request) 
 	db.LogActivity(claims.UserID, claims.Username, "password_change", "user", claims.UserID, claims.Username, "Changed account password")
 
 	utils.RespondSuccess(w, http.StatusOK, "Password changed successfully", nil)
+}
+
+// UpdateSelfStorageLimit allows the Workspace Owner to change their own storage limit
+func (h *ProfileHandler) UpdateSelfStorageLimit(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+	if claims.Role != "owner" {
+		utils.RespondError(w, http.StatusForbidden, "Only the workspace Owner can change their self storage limit")
+		return
+	}
+
+	var req struct {
+		StorageLimitGB int64 `json:"storage_limit_gb"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.StorageLimitGB <= 0 {
+		utils.RespondError(w, http.StatusBadRequest, "Invalid storage limit")
+		return
+	}
+
+	limitBytes := req.StorageLimitGB * 1024 * 1024 * 1024
+	_, err := db.DB.Exec("UPDATE users SET storage_limit = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", limitBytes, claims.UserID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to update storage limit")
+		return
+	}
+
+	events.Broadcast("storage:update", "storage", "update", claims.UserID, "", claims.UserID, map[string]interface{}{
+		"storage_limit": limitBytes,
+	})
+
+	db.LogActivity(claims.UserID, claims.Username, "update_self_storage_limit", "user", claims.UserID, claims.Username, fmt.Sprintf("Owner updated self storage limit to %d GB", req.StorageLimitGB))
+
+	utils.RespondSuccess(w, http.StatusOK, "Self storage limit updated successfully", map[string]interface{}{
+		"storage_limit": limitBytes,
+	})
 }
