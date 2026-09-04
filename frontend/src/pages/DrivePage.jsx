@@ -28,10 +28,12 @@ import {
   Layers,
   RefreshCw,
   Search,
+  Lock,
 } from 'lucide-react';
 import { formatBytes, formatDate, getFileTypeCategory } from '../utils/formatters';
 
 export default function DrivePage({
+  isSharedView = false,
   currentFolderId,
   setCurrentFolderId,
   searchQuery = '',
@@ -50,6 +52,7 @@ export default function DrivePage({
     breadcrumbs: [],
     subfolders: [],
     files: [],
+    permission: 'owner',
   });
   const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
@@ -82,6 +85,7 @@ export default function DrivePage({
           breadcrumbs: res.data.breadcrumbs || [],
           subfolders: res.data.subfolders || [],
           files: res.data.files || [],
+          permission: res.data.permission || 'owner',
         });
       }
     } catch (err) {
@@ -177,10 +181,14 @@ export default function DrivePage({
     }
   };
 
+  const isReadOnly = isSharedView && folderData.permission === 'viewer';
+
   // Drag & drop upload handler
   const handleDragOver = (e) => {
     e.preventDefault();
-    setIsDragOver(true);
+    if (!isReadOnly) {
+      setIsDragOver(true);
+    }
   };
 
   const handleDragLeave = (e) => {
@@ -191,6 +199,7 @@ export default function DrivePage({
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragOver(false);
+    if (isReadOnly) return;
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       onUploadFiles(Array.from(e.dataTransfer.files));
     }
@@ -294,7 +303,7 @@ export default function DrivePage({
         breadcrumbs={breadcrumbs}
         currentFolder={folder}
         onNavigate={(id) => {
-          if (id === 'shared') {
+          if (id === 'shared' || (!id && isSharedView)) {
             if (onNavigateView) {
               onNavigateView('shared');
             }
@@ -333,18 +342,28 @@ export default function DrivePage({
 
           {/* Right: New Folder, Share Drive, Name (Sort) & Animated Refresh in the SAME ROW */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* New Folder quick button */}
-            <button
-              onClick={onOpenNewFolder}
-              className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 bg-slate-900 hover:bg-slate-850 active:bg-slate-800 text-slate-200 border border-slate-800 rounded-xl text-xs font-semibold transition-colors shadow-xs shrink-0"
-              title="Create a new folder"
-            >
-              <FolderPlus className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden sm:inline">New Folder</span>
-            </button>
+            {/* New Folder quick button or Read-only indicator */}
+            {!isReadOnly ? (
+              <button
+                onClick={onOpenNewFolder}
+                className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 bg-slate-900 hover:bg-slate-850 active:bg-slate-800 text-slate-200 border border-slate-800 rounded-xl text-xs font-semibold transition-colors shadow-xs shrink-0"
+                title="Create a new folder"
+              >
+                <FolderPlus className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">New Folder</span>
+              </button>
+            ) : (
+              <div
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-900/90 border border-slate-800 text-slate-400 rounded-xl text-xs font-medium shrink-0"
+                title="You have view-only access to this shared folder"
+              >
+                <Lock className="w-3 h-3 text-slate-500" />
+                <span className="hidden sm:inline text-[11px]">Read-only</span>
+              </div>
+            )}
 
             {/* Share Drive with Team button (when in root My Drive) or Share Folder */}
-            {!currentFolderId ? (
+            {!isSharedView && (!currentFolderId ? (
               <button
                 onClick={() => onOpenShare({ id: 'root', name: 'My Drive' }, 'drive')}
                 className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded-xl text-xs font-semibold transition-colors shadow-xs shrink-0"
@@ -362,7 +381,7 @@ export default function DrivePage({
                 <Users className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Share Folder</span>
               </button>
-            )}
+            ))}
 
             {/* Refresh button with Animation */}
             <button

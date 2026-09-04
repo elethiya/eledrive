@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight, Download, Folder, HardDrive } from 'lucide-react';
+import { ChevronRight, Download, Folder, HardDrive, Users } from 'lucide-react';
 import { folderAPI } from '../api/client';
 
 export default function Breadcrumbs({
@@ -32,7 +32,11 @@ export default function Breadcrumbs({
                 }`}
               >
                 {isRoot ? (
-                  <HardDrive className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  crumb.id === 'shared' ? (
+                    <Users className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  ) : (
+                    <HardDrive className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  )
                 ) : (
                   <Folder className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                 )}

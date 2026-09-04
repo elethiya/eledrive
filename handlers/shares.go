@@ -181,7 +181,15 @@ func (h *ShareHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.TargetType == "drive" {
-		// Share all root folders and files with target user
+		// Record drive-level share entry
+		driveShareID := uuid.New().String()
+		_, _ = db.DB.Exec(`
+			INSERT INTO drive.shares (id, target_type, target_id, shared_by_user_id, shared_with_user_id, permission, created_at)
+			VALUES (?, 'drive', ?, ?, ?, ?, ?)
+			ON CONFLICT(target_type, target_id, shared_with_user_id) DO UPDATE SET permission = excluded.permission
+		`, driveShareID, claims.UserID, claims.UserID, targetUser.ID, req.Permission, nowStr)
+
+		// Share all current root folders and files with target user
 		_, _ = db.DB.Exec(`
 			INSERT INTO drive.shares (id, target_type, target_id, shared_by_user_id, shared_with_user_id, permission, created_at)
 			SELECT LOWER(HEX(RANDOMBLOB(16))), 'folder', id, ?, ?, ?, ?
@@ -243,7 +251,10 @@ func (h *ShareHandler) GetSharedWithMe(w http.ResponseWriter, r *http.Request) {
 		       (SELECT COUNT(*) FROM folders WHERE parent_id = f.id AND is_trashed = 0) AS item_count
 		FROM folders f
 		JOIN users u ON f.owner_id = u.id
-		LEFT JOIN shares s ON s.target_type = 'folder' AND s.target_id = f.id AND s.shared_with_user_id = ?
+		LEFT JOIN shares s ON (
+			(s.target_type = 'folder' AND s.target_id = f.id) OR
+			(s.target_type = 'drive' AND s.shared_by_user_id = f.owner_id AND f.parent_id IS NULL)
+		) AND s.shared_with_user_id = ?
 		LEFT JOIN team_shares ts ON (
 			(ts.target_type = 'folder' AND ts.target_id = f.id) OR
 			(ts.target_type = 'drive' AND ts.shared_by_user_id = f.owner_id AND f.parent_id IS NULL)
@@ -286,7 +297,10 @@ func (h *ShareHandler) GetSharedWithMe(w http.ResponseWriter, r *http.Request) {
 		       COALESCE(s.permission, ts.permission, 'viewer') AS permission
 		FROM files f
 		JOIN users u ON f.owner_id = u.id
-		LEFT JOIN shares s ON s.target_type = 'file' AND s.target_id = f.id AND s.shared_with_user_id = ?
+		LEFT JOIN shares s ON (
+			(s.target_type = 'file' AND s.target_id = f.id) OR
+			(s.target_type = 'drive' AND s.shared_by_user_id = f.owner_id AND f.folder_id IS NULL)
+		) AND s.shared_with_user_id = ?
 		LEFT JOIN team_shares ts ON (
 			(ts.target_type = 'file' AND ts.target_id = f.id) OR
 			(ts.target_type = 'drive' AND ts.shared_by_user_id = f.owner_id AND f.folder_id IS NULL)

@@ -78,12 +78,13 @@ func CheckFileAccess(userID string, fileID string) (*models.File, string, error)
 		return &f, "owner", nil
 	}
 
-	// Check direct file share
+	// Check direct file or drive share
 	var directPerm string
 	err = db.DB.QueryRow(`
 		SELECT permission FROM shares 
-		WHERE target_type = 'file' AND target_id = ? AND shared_with_user_id = ?
-	`, fileID, userID).Scan(&directPerm)
+		WHERE ((target_type = 'file' AND target_id = ?) OR (target_type = 'drive' AND target_id = ?))
+		  AND shared_with_user_id = ?
+	`, fileID, f.OwnerID, userID).Scan(&directPerm)
 	if err == nil {
 		return &f, directPerm, nil
 	}

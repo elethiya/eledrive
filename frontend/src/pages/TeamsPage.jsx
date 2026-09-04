@@ -71,6 +71,17 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
   const [selectedInitialMembers, setSelectedInitialMembers] = useState([]);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [createMemberSearch, setCreateMemberSearch] = useState('');
+
+  const handleOpenCreateModal = () => {
+    setNewTeamName('');
+    setNewTeamDesc('');
+    setNewTeamColor(TEAM_COLORS[0]);
+    setSelectedInitialMembers([]);
+    setCreateError('');
+    setCreateMemberSearch('');
+    setCreateModalOpen(true);
+  };
 
   // Manage / Details Modal
   const [activeTeam, setActiveTeam] = useState(null);
@@ -477,6 +488,17 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
         ((t.description || '').toLowerCase().includes(searchQuery.toLowerCase())))
   );
 
+  const filteredCreateUsers = useMemo(() => {
+    if (!createMemberSearch.trim()) return availableUsers;
+    const q = createMemberSearch.toLowerCase();
+    return availableUsers.filter(
+      (u) =>
+        (u.name || '').toLowerCase().includes(q) ||
+        (u.username || '').toLowerCase().includes(q) ||
+        (u.email || '').toLowerCase().includes(q)
+    );
+  }, [availableUsers, createMemberSearch]);
+
   const sortedTeams = useMemo(() => {
     const list = [...filteredTeams];
     list.sort((a, b) => {
@@ -566,7 +588,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
           </button>
 
           <button
-            onClick={() => setCreateModalOpen(true)}
+            onClick={handleOpenCreateModal}
             className="flex items-center justify-center gap-1.5 px-2.5 py-2 sm:px-3 sm:py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/20 transition-all transform hover:-translate-y-0.5"
             title={isAdminOrOwner ? 'Create New Team' : 'Request New Team'}
           >
@@ -645,7 +667,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
               Create a team to easily organize teammates and share folders with everyone at once.
             </p>
             <button
-              onClick={() => setCreateModalOpen(true)}
+              onClick={handleOpenCreateModal}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-md"
             >
               <Plus className="w-4 h-4" />
@@ -910,163 +932,250 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
 
       {/* Create Team Modal */}
       {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
-          <div className="relative bg-slate-900 rounded-2xl sm:rounded-3xl max-w-md w-full border border-slate-800 p-4 sm:p-6 shadow-2xl shadow-black/80 space-y-4 overflow-hidden max-h-[90vh] flex flex-col">
+        <div
+          onClick={() => setCreateModalOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative bg-slate-900 rounded-2xl sm:rounded-3xl max-w-lg w-full border border-slate-800 p-4 sm:p-6 shadow-2xl shadow-black/80 flex flex-col max-h-[90vh] sm:max-h-[85vh] overflow-hidden"
+          >
             {/* Ambient Top Glow */}
-            <div className="absolute -top-16 -left-16 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div
+              className="absolute -top-16 -left-16 w-48 h-48 rounded-full blur-3xl pointer-events-none opacity-30 transition-colors duration-500"
+              style={{ backgroundColor: newTeamColor }}
+            />
 
-            <div className="flex items-center justify-between relative z-10 shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold shadow-md shadow-blue-500/10">
-                  <Users className="w-4 h-4" />
+            {/* Modal Header */}
+            <div className="flex items-center justify-between relative z-10 shrink-0 pb-3 border-b border-slate-800/80">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-lg transition-all duration-300"
+                  style={{ backgroundColor: newTeamColor }}
+                >
+                  <Users className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-100">
-                  {isAdminOrOwner ? 'Create New Team' : 'Request New Team Workspace'}
-                </h3>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-100">
+                    {isAdminOrOwner ? 'Create New Team' : 'Request New Team Workspace'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    {isAdminOrOwner
+                      ? 'Set up a shared workspace for collaboration'
+                      : 'Submit a proposal for administrator review'}
+                  </p>
+                </div>
               </div>
               <button
+                type="button"
                 onClick={() => setCreateModalOpen(false)}
                 className="p-1.5 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-800 transition-colors"
+                title="Close"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
+            {/* Non-Admin Informative Banner */}
             {!isAdminOrOwner && (
-              <div className="p-2.5 rounded-xl bg-blue-950/40 border border-blue-500/20 text-blue-300 text-[11px] flex items-start gap-2 shrink-0">
-                <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-blue-400" />
-                <span>
-                  Team creation requires administrator approval. Your proposal will be submitted for review, and upon approval, you will be appointed team leader.
+              <div className="mt-3 p-3 rounded-xl bg-blue-950/40 border border-blue-500/25 text-blue-300 text-xs flex items-start gap-2.5 shrink-0">
+                <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-400" />
+                <span className="leading-relaxed">
+                  Team creation requires administrator approval. Your proposal will be submitted for review, and upon approval, you will be automatically appointed team leader.
                 </span>
               </div>
             )}
 
-            <form onSubmit={handleCreateTeam} className="space-y-4 overflow-y-auto flex-1 pr-0.5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Team Name *
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Frontend Engineers, Design Team, Project Alpha"
-                  value={newTeamName}
-                  onChange={(e) => setNewTeamName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-600 focus:outline-hidden focus:border-blue-500"
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Description (Optional)
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Brief description of the team's role or purpose..."
-                  value={newTeamDesc}
-                  onChange={(e) => setNewTeamDesc(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-600 focus:outline-hidden focus:border-blue-500 resize-none"
-                />
-              </div>
-
-              {/* Color Theme */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-2">
-                  Team Color Theme
-                </label>
-                <div className="flex items-center gap-2.5">
-                  {TEAM_COLORS.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setNewTeamColor(c)}
-                      className={`w-8 h-8 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-transform ${
-                        newTeamColor === c ? 'scale-125 ring-2 ring-white ring-offset-2 ring-offset-slate-900' : 'hover:scale-110'
-                      }`}
-                      style={{ backgroundColor: c }}
-                    >
-                      {newTeamColor === c && <Check className="w-3.5 h-3.5 text-white" />}
-                    </button>
-                  ))}
+            {/* Modal Body & Pinned Footer Form */}
+            <form onSubmit={handleCreateTeam} className="flex flex-col flex-1 overflow-hidden min-h-0 mt-3">
+              <div className="space-y-4 overflow-y-auto flex-1 pr-1 pb-1">
+                {/* Team Name */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Team Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Frontend Engineers, Design Team, Project Alpha"
+                    value={newTeamName}
+                    onChange={(e) => {
+                      setNewTeamName(e.target.value);
+                      if (createError) setCreateError('');
+                    }}
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    autoFocus
+                  />
                 </div>
-              </div>
 
-              {/* Add Teammates Checklist */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Requested Teammates ({selectedInitialMembers.length} selected)
-                </label>
-                <div className="max-h-32 sm:max-h-36 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-2 divide-y divide-slate-900">
-                  {availableUsers.length === 0 ? (
-                    <div className="p-3 text-center text-slate-500 text-xs">
-                      No other approved users in workspace yet.
-                    </div>
-                  ) : (
-                    availableUsers.map((u) => {
-                      const isSelected = selectedInitialMembers.includes(u.id);
-                      return (
-                        <div
-                          key={u.id}
-                          onClick={() => {
-                            if (isSelected) {
-                              setSelectedInitialMembers(selectedInitialMembers.filter((id) => id !== u.id));
-                            } else {
-                              setSelectedInitialMembers([...selectedInitialMembers, u.id]);
-                            }
-                          }}
-                          className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer transition-colors"
+                {/* Description */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Description <span className="text-slate-500 font-normal">(Optional)</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Brief description of the team's role, objectives, or members..."
+                    value={newTeamDesc}
+                    onChange={(e) => setNewTeamDesc(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none transition-all"
+                  />
+                </div>
+
+                {/* Color Theme */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-semibold text-slate-300">
+                      Team Color Theme
+                    </label>
+                    <span className="text-[10px] font-mono text-slate-400 uppercase">{newTeamColor}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                    {TEAM_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setNewTeamColor(c)}
+                        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all ${
+                          newTeamColor === c
+                            ? 'scale-110 ring-2 ring-white ring-offset-2 ring-offset-slate-900 shadow-md'
+                            : 'hover:scale-110 opacity-80 hover:opacity-100'
+                        }`}
+                        style={{ backgroundColor: c }}
+                        title={c}
+                      >
+                        {newTeamColor === c && <Check className="w-3.5 h-3.5 text-white stroke-[2.5]" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Teammates Checklist */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-300">
+                      {isAdminOrOwner ? 'Initial Teammates' : 'Requested Teammates'}
+                    </label>
+                    <span className="text-[11px] font-medium text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
+                      {selectedInitialMembers.length} selected
+                    </span>
+                  </div>
+
+                  {availableUsers.length > 3 && (
+                    <div className="relative mb-2">
+                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="text"
+                        placeholder="Search members by name, @username, or email..."
+                        value={createMemberSearch}
+                        onChange={(e) => setCreateMemberSearch(e.target.value)}
+                        className="w-full pl-8 pr-7 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                      />
+                      {createMemberSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setCreateMemberSearch('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
                         >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div
-                              className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-                              style={{ backgroundColor: u.avatar_color || '#3b82f6' }}
-                            >
-                              {u.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-xs font-medium text-slate-200 truncate">{u.name}</div>
-                              <div className="text-[10px] text-slate-400 font-mono truncate">@{u.username} • {u.email}</div>
-                            </div>
-                          </div>
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  )}
 
+                  <div className="max-h-36 sm:max-h-44 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-1.5 divide-y divide-slate-900/80">
+                    {availableUsers.length === 0 ? (
+                      <div className="p-3 text-center text-slate-500 text-xs">
+                        No other approved users in workspace yet.
+                      </div>
+                    ) : filteredCreateUsers.length === 0 ? (
+                      <div className="p-3 text-center text-slate-500 text-xs">
+                        No teammates found matching "{createMemberSearch}".
+                      </div>
+                    ) : (
+                      filteredCreateUsers.map((u) => {
+                        const isSelected = selectedInitialMembers.includes(u.id);
+                        const isOwner = u.role === 'owner';
+                        return (
                           <div
-                            className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ml-2 ${
-                              isSelected ? 'bg-blue-600 border-blue-500 text-white' : 'border-slate-700'
+                            key={u.id}
+                            onClick={() => {
+                              if (isSelected) {
+                                setSelectedInitialMembers(selectedInitialMembers.filter((id) => id !== u.id));
+                              } else {
+                                setSelectedInitialMembers([...selectedInitialMembers, u.id]);
+                              }
+                            }}
+                            className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
+                              isSelected ? 'bg-blue-600/10 hover:bg-blue-600/15' : 'hover:bg-slate-900'
                             }`}
                           >
-                            {isSelected && <Check className="w-3.5 h-3.5" />}
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div
+                                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0 shadow-xs"
+                                style={{ backgroundColor: u.avatar_color || '#3b82f6' }}
+                              >
+                                {u.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-xs font-medium text-slate-200 flex items-center gap-1.5 truncate">
+                                  <span className="truncate">{u.name}</span>
+                                  {isOwner && (
+                                    <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30 flex items-center gap-0.5 shrink-0">
+                                      <Crown className="w-2.5 h-2.5 text-amber-400" />
+                                      Owner
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-mono truncate">
+                                  @{u.username} • {u.email}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div
+                              className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ml-2 transition-colors ${
+                                isSelected ? 'bg-blue-600 border-blue-500 text-white' : 'border-slate-700 bg-slate-900/60'
+                              }`}
+                            >
+                              {isSelected && <Check className="w-3 h-3 stroke-[2.5]" />}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })
-                  )}
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
+
+                {createError && (
+                  <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+                    <XCircle className="w-4 h-4 shrink-0" />
+                    <span>{createError}</span>
+                  </div>
+                )}
               </div>
 
-              {createError && (
-                <p className="text-xs text-red-400 font-medium">{createError}</p>
-              )}
-
-              <div className="flex justify-end gap-2.5 pt-2 shrink-0">
+              {/* Pinned Action Footer */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 mt-3 border-t border-slate-800/80 shrink-0">
                 <button
                   type="button"
                   onClick={() => setCreateModalOpen(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={creating}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 disabled:opacity-50"
+                  disabled={creating || !newTeamName.trim()}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 disabled:opacity-50 transition-all flex items-center gap-2"
                 >
-                  {creating
-                    ? isAdminOrOwner
-                      ? 'Creating...'
-                      : 'Submitting Proposal...'
-                    : isAdminOrOwner
-                    ? 'Create Team'
-                    : 'Submit Team Proposal'}
+                  {creating ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>{isAdminOrOwner ? 'Creating...' : 'Submitting...'}</span>
+                    </>
+                  ) : (
+                    <span>{isAdminOrOwner ? 'Create Team' : 'Submit Team Proposal'}</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -1722,10 +1831,10 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                                           type="button"
                                           onClick={() => {
                                             setActiveTeam(null);
-                                            onOpenFolder(isDrive ? '' : s.target_id);
+                                            onOpenFolder(isDrive ? '' : s.target_id, true);
                                           }}
                                           className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600/15 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-[11px] font-semibold transition-colors"
-                                          title={isDrive ? 'Open Drive' : 'Open folder in Drive'}
+                                          title={isDrive ? 'Open Shared Drive' : 'Open folder in Shared View'}
                                         >
                                           <ExternalLink className="w-3 h-3" />
                                           <span>Open</span>

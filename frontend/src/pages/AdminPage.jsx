@@ -12,6 +12,7 @@ import {
   RefreshCw,
   CheckCircle,
   AlertCircle,
+  Activity,
   ArrowLeft,
   X,
   Shield,
@@ -684,7 +685,7 @@ export default function AdminPage({ onBackToDrive }) {
       <div className="p-3.5 sm:p-6 max-w-7xl w-full mx-auto space-y-4 sm:space-y-6">
         {/* Top Executive Stats Cards (2-col on mobile, 4-col on desktop) */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
-          <div className="p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-all">
+          <div className="p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-all flex flex-col justify-between min-h-[104px] sm:min-h-[116px]">
             <div className="flex items-center justify-between mb-1.5 sm:mb-2">
               <span className="text-[11px] sm:text-xs font-semibold text-slate-400 truncate">Total Users</span>
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0">
@@ -707,7 +708,7 @@ export default function AdminPage({ onBackToDrive }) {
             </div>
           </div>
 
-          <div className="p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-all">
+          <div className="p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-all flex flex-col justify-between min-h-[104px] sm:min-h-[116px]">
             <div className="flex items-center justify-between mb-1.5 sm:mb-2">
               <span className="text-[11px] sm:text-xs font-semibold text-slate-400 truncate">Forensic Assets</span>
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
@@ -722,7 +723,7 @@ export default function AdminPage({ onBackToDrive }) {
             </div>
           </div>
 
-          <div className="p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-all">
+          <div className="p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-all flex flex-col justify-between min-h-[104px] sm:min-h-[116px]">
             <div className="flex items-center justify-between mb-1.5 sm:mb-2">
               <span className="text-[11px] sm:text-xs font-semibold text-slate-400 truncate">Storage Usage</span>
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center shrink-0">
@@ -737,19 +738,23 @@ export default function AdminPage({ onBackToDrive }) {
             </div>
           </div>
 
-          <div className="p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-all">
-            <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+          <div className="p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-all flex flex-col justify-between min-h-[104px] sm:min-h-[116px]">
+            <div className="absolute -top-6 -right-6 w-16 h-16 bg-emerald-500/10 rounded-full blur-xl pointer-events-none group-hover:bg-emerald-500/20 transition-all" />
+            <div className="flex items-center justify-between mb-1.5 sm:mb-2 relative z-10">
               <span className="text-[11px] sm:text-xs font-semibold text-slate-400 truncate">Engine Status</span>
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
-                <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
-            <div className="text-xs sm:text-sm font-bold text-slate-100 mt-1 truncate">
-              Crypto Security
+            <div className="text-xl sm:text-2xl font-black text-emerald-400 truncate flex items-center gap-1.5 relative z-10">
+              <span>Operational</span>
             </div>
-            <div className="mt-1.5 sm:mt-2 text-[10px] sm:text-[11px] text-emerald-400 flex items-center gap-1 font-mono truncate">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block shrink-0" />
-              ACTIVE SHA-256
+            <div className="mt-1.5 sm:mt-2 text-[10px] sm:text-[11px] text-slate-400 flex items-center gap-1.5 font-mono truncate relative z-10">
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span className="text-emerald-400 font-semibold truncate">SHA-256 Active</span>
             </div>
           </div>
         </div>

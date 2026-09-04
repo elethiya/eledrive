@@ -88,12 +88,13 @@ func CheckFolderAccess(userID string, folderID string) (*models.Folder, string, 
 		return &f, "owner", nil
 	}
 
-	// Check direct share
+	// Check direct share (direct folder or shared drive)
 	var permission string
 	err = db.DB.QueryRow(`
 		SELECT permission FROM shares 
-		WHERE target_type = 'folder' AND target_id = ? AND shared_with_user_id = ?
-	`, folderID, userID).Scan(&permission)
+		WHERE ((target_type = 'folder' AND target_id = ?) OR (target_type = 'drive' AND target_id = ?))
+		  AND shared_with_user_id = ?
+	`, folderID, f.OwnerID, userID).Scan(&permission)
 	if err == nil {
 		return &f, permission, nil
 	}
@@ -109,17 +110,24 @@ func CheckFolderAccess(userID string, folderID string) (*models.Folder, string, 
 		return &f, permission, nil
 	}
 
-	// Check recursive parent share
+	// Check recursive parent share (direct or team share on ancestor)
 	currParent := f.ParentID
 	for currParent != nil {
 		var pPerm string
 		var pParent sql.NullString
 		err := db.DB.QueryRow(`
-			SELECT s.permission, f.parent_id
+			SELECT COALESCE(s.permission, ts.permission, ''), f.parent_id
 			FROM folders f
-			LEFT JOIN shares s ON s.target_type = 'folder' AND s.target_id = f.id AND s.shared_with_user_id = ?
+			LEFT JOIN shares s ON (
+				(s.target_type = 'folder' AND s.target_id = f.id) OR
+				(s.target_type = 'drive' AND s.shared_by_user_id = f.owner_id)
+			) AND s.shared_with_user_id = ?
+			LEFT JOIN team_shares ts ON (
+				(ts.target_type = 'folder' AND ts.target_id = f.id) OR
+				(ts.target_type = 'drive' AND ts.shared_by_user_id = f.owner_id)
+			) AND ts.team_id IN (SELECT team_id FROM main.team_members WHERE user_id = ?)
 			WHERE f.id = ?
-		`, userID, *currParent).Scan(&pPerm, &pParent)
+		`, userID, userID, *currParent).Scan(&pPerm, &pParent)
 		if err == nil && pPerm != "" {
 			return &f, pPerm, nil
 		}
@@ -157,7 +165,10 @@ func (h *FolderHandler) GetContents(w http.ResponseWriter, r *http.Request) {
 			       COALESCE(s.permission, ts.permission, 'viewer') AS permission
 			FROM folders f
 			JOIN users u ON f.owner_id = u.id
-			LEFT JOIN shares s ON s.target_type = 'folder' AND s.target_id = f.id AND s.shared_with_user_id = ?
+			LEFT JOIN shares s ON (
+				(s.target_type = 'folder' AND s.target_id = f.id) OR
+				(s.target_type = 'drive' AND s.shared_by_user_id = f.owner_id AND f.parent_id IS NULL)
+			) AND s.shared_with_user_id = ?
 			LEFT JOIN team_shares ts ON (
 				(ts.target_type = 'folder' AND ts.target_id = f.id) OR
 				(ts.target_type = 'drive' AND ts.shared_by_user_id = f.owner_id AND f.parent_id IS NULL)
@@ -200,7 +211,10 @@ func (h *FolderHandler) GetContents(w http.ResponseWriter, r *http.Request) {
 			       COALESCE(s.permission, ts.permission, 'viewer') AS permission
 			FROM files f
 			JOIN users u ON f.owner_id = u.id
-			LEFT JOIN shares s ON s.target_type = 'file' AND s.target_id = f.id AND s.shared_with_user_id = ?
+			LEFT JOIN shares s ON (
+				(s.target_type = 'file' AND s.target_id = f.id) OR
+				(s.target_type = 'drive' AND s.shared_by_user_id = f.owner_id AND f.folder_id IS NULL)
+			) AND s.shared_with_user_id = ?
 			LEFT JOIN team_shares ts ON (
 				(ts.target_type = 'file' AND ts.target_id = f.id) OR
 				(ts.target_type = 'drive' AND ts.shared_by_user_id = f.owner_id AND f.folder_id IS NULL)
@@ -271,7 +285,7 @@ func (h *FolderHandler) GetContents(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if perm == "owner" {
+		if f.OwnerID == claims.UserID {
 			breadcrumbs = append(breadcrumbs, chain...)
 		} else {
 			// In shared view

@@ -43,6 +43,10 @@ function parseNavigationFromLocation() {
   // Check URL paths
   if (path === '/admin' || path.startsWith('/admin/')) return { view: 'admin', folderId: '' };
   if (path === '/teams' || path.startsWith('/teams/')) return { view: 'teams', folderId: '' };
+  if (path.startsWith('/shared/folder/')) {
+    const folderId = path.split('/shared/folder/')[1]?.split('/')[0] || '';
+    return { view: 'shared', folderId };
+  }
   if (path === '/shared' || path.startsWith('/shared/')) return { view: 'shared', folderId: '' };
   if (path === '/recent' || path.startsWith('/recent/')) return { view: 'recent', folderId: '' };
   if (path === '/starred' || path.startsWith('/starred/')) return { view: 'starred', folderId: '' };
@@ -70,7 +74,7 @@ function parseNavigationFromLocation() {
     if (savedView && VALID_VIEWS.includes(savedView)) {
       return {
         view: savedView,
-        folderId: savedView === 'drive' && savedFolder ? savedFolder : '',
+        folderId: (savedView === 'drive' || savedView === 'shared') && savedFolder ? savedFolder : '',
       };
     }
   } catch (e) {}
@@ -114,7 +118,7 @@ function AppContent() {
 
     try {
       localStorage.setItem('eledrive_current_view', currentView);
-      if (currentView === 'drive' && currentFolderId) {
+      if ((currentView === 'drive' || currentView === 'shared') && currentFolderId) {
         localStorage.setItem('eledrive_current_folder', currentFolderId);
       } else {
         localStorage.removeItem('eledrive_current_folder');
@@ -124,7 +128,9 @@ function AppContent() {
     let targetPath = '/';
     if (currentView === 'admin') targetPath = '/admin';
     else if (currentView === 'teams') targetPath = '/teams';
-    else if (currentView === 'shared') targetPath = '/shared';
+    else if (currentView === 'shared') {
+      targetPath = currentFolderId ? `/shared/folder/${currentFolderId}` : '/shared';
+    }
     else if (currentView === 'recent') targetPath = '/recent';
     else if (currentView === 'starred') targetPath = '/starred';
     else if (currentView === 'trash') targetPath = '/trash';
@@ -480,38 +486,77 @@ function AppContent() {
 
               {currentView === 'teams' && (
                 <TeamsPage
-                  onOpenFolder={(folderId) => {
-                    setCurrentView('drive');
-                    setCurrentFolderId(folderId);
+                  onOpenFolder={(folderId, isShared = true) => {
+                    setCurrentView(isShared ? 'shared' : 'drive');
+                    setCurrentFolderId(folderId || '');
                   }}
                   onOpenPreview={(file) => setPreviewModalFile(file)}
                 />
               )}
 
               {currentView === 'shared' && (
-                <SharedWithMePage
-                  onOpenFolder={(folderId) => {
-                    setCurrentView('drive');
-                    setCurrentFolderId(folderId);
-                  }}
-                  onOpenPreview={(file) => setPreviewModalFile(file)}
-                  onOpenShare={(item, type) => {
-                    setShareModalItem(item);
-                    setShareModalType(type);
-                  }}
-                  onOpenRename={(item, isFolder) => {
-                    setRenameModalItem(item);
-                    setIsRenameFolder(isFolder);
-                  }}
-                  onOpenMove={(item, isFolder) => {
-                    setMoveModalItem(item);
-                    setIsMoveFolder(isFolder);
-                  }}
-                  onOpenDetails={(item, isFolder) => {
-                    setDetailsModalItem(item);
-                    setIsDetailsFolder(isFolder);
-                  }}
-                />
+                !currentFolderId ? (
+                  <SharedWithMePage
+                    onOpenFolder={(folderId) => {
+                      setCurrentFolderId(folderId);
+                    }}
+                    onOpenPreview={(file) => setPreviewModalFile(file)}
+                    onOpenShare={(item, type) => {
+                      setShareModalItem(item);
+                      setShareModalType(type);
+                    }}
+                    onOpenRename={(item, isFolder) => {
+                      setRenameModalItem(item);
+                      setIsRenameFolder(isFolder);
+                    }}
+                    onOpenMove={(item, isFolder) => {
+                      setMoveModalItem(item);
+                      setIsMoveFolder(isFolder);
+                    }}
+                    onOpenDetails={(item, isFolder) => {
+                      setDetailsModalItem(item);
+                      setIsDetailsFolder(isFolder);
+                    }}
+                  />
+                ) : (
+                  <DrivePage
+                    isSharedView={true}
+                    searchQuery={searchQuery}
+                    onClearSearch={() => {
+                      setSearchQuery('');
+                      setSearchResults(null);
+                    }}
+                    currentFolderId={currentFolderId === '__temp' ? '' : currentFolderId}
+                    setCurrentFolderId={setCurrentFolderId}
+                    onOpenPreview={(file) => setPreviewModalFile(file)}
+                    onOpenShare={(item, type) => {
+                      setShareModalItem(item);
+                      setShareModalType(type);
+                    }}
+                    onOpenRename={(item, isFolder) => {
+                      setRenameModalItem(item);
+                      setIsRenameFolder(isFolder);
+                    }}
+                    onOpenMove={(item, isFolder) => {
+                      setMoveModalItem(item);
+                      setIsMoveFolder(isFolder);
+                    }}
+                    onOpenDetails={(item, isFolder) => {
+                      setDetailsModalItem(item);
+                      setIsDetailsFolder(isFolder);
+                    }}
+                    onUploadFiles={handleUploadFiles}
+                    onOpenNewFolder={() => setNewFolderOpen(true)}
+                    onNavigateView={(view) => {
+                      if (view === 'shared') {
+                        setCurrentFolderId('');
+                      } else {
+                        setCurrentView(view);
+                        setCurrentFolderId('');
+                      }
+                    }}
+                  />
+                )
               )}
 
               {currentView === 'recent' && (
