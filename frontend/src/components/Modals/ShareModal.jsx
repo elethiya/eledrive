@@ -15,10 +15,12 @@ import {
 import { shareAPI, publicShareAPI, authAPI, teamAPI } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmContext';
 
 export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' }) {
   const { user } = useAuth();
   const toast = useToast();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState('team');
 
   // Team Share state
@@ -111,6 +113,26 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
   };
 
   const handleShareWithTeam = async (t) => {
+    const itemName = itemType === 'drive' ? 'Entire Drive' : (item?.name || 'this item');
+    const permLabel = memberPermission === 'editor' ? 'Can Edit & Upload' : 'Can View Only';
+
+    const ok = await confirm({
+      title: 'Share Content with Team',
+      message: `Are you sure you want to share ${itemType === 'drive' ? 'your' : ''} ${itemName} with team "${t.name}"?`,
+      confirmText: `Share with ${t.name}`,
+      cancelText: 'Cancel',
+      variant: 'info',
+      icon: <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />,
+      itemHighlight: {
+        teamName: t.name,
+        membersCount: t.members_count,
+        permission: permLabel,
+        avatarColor: t.avatar_color,
+      },
+      subMessage: `All ${t.members_count} member(s) of "${t.name}" will receive "${permLabel}" permissions immediately.`,
+    });
+    if (!ok) return;
+
     setTeamLoading(true);
     try {
       await shareAPI.createShare({
@@ -129,6 +151,15 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
   };
 
   const handleRemoveShare = async (shareId) => {
+    const ok = await confirm({
+      title: 'Revoke Share Access',
+      message: 'Are you sure you want to remove access for this collaborator? They will no longer be able to access this content.',
+      confirmText: 'Revoke Access',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
     try {
       await shareAPI.deleteShare(shareId);
       await loadTeamShares();
@@ -161,6 +192,15 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
 
   const handleDeleteLink = async () => {
     if (!linkInfo?.link?.id) return;
+    const ok = await confirm({
+      title: 'Deactivate Share Link',
+      message: 'Are you sure you want to disable this public share link? Anyone with this URL will immediately lose access.',
+      confirmText: 'Deactivate Link',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
     setLinkLoading(true);
     try {
       await publicShareAPI.deleteLink(linkInfo.link.id);

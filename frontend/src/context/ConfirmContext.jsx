@@ -7,7 +7,7 @@ export function ConfirmProvider({ children }) {
   const [config, setConfig] = useState(null);
   const resolverRef = useRef(null);
 
-  const confirm = useCallback((options) => {
+  const confirm = useCallback((options = {}) => {
     return new Promise((resolve) => {
       resolverRef.current = resolve;
       setConfig({
@@ -17,6 +17,9 @@ export function ConfirmProvider({ children }) {
         confirmText: options.confirmText || 'Confirm',
         cancelText: options.cancelText || 'Cancel',
         variant: options.variant || 'danger',
+        icon: options.icon,
+        itemHighlight: options.itemHighlight,
+        subMessage: options.subMessage,
       });
     });
   }, []);
@@ -48,6 +51,9 @@ export function ConfirmProvider({ children }) {
           confirmText={config.confirmText}
           cancelText={config.cancelText}
           variant={config.variant}
+          icon={config.icon}
+          itemHighlight={config.itemHighlight}
+          subMessage={config.subMessage}
           onConfirm={handleConfirm}
           onClose={handleCancel}
         />
