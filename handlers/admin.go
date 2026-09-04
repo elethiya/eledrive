@@ -686,9 +686,9 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 	var forensicMeta sql.NullString
 
 	err := db.DB.QueryRow(`
-		SELECT f.id, f.name, f.owner_id, u.name, u.email, u.username, f.size, f.mime_type, f.created_at, f.forensic_meta
+		SELECT f.id, f.name, f.owner_id, COALESCE(u.name, 'Workspace User'), COALESCE(u.email, 'unknown@eledrive.local'), COALESCE(u.username, 'user'), f.size, f.mime_type, f.created_at, f.forensic_meta
 		FROM files f
-		JOIN users u ON f.owner_id = u.id
+		LEFT JOIN users u ON f.owner_id = u.id
 		WHERE f.secret_uuid = ? OR f.id = ? OR LOWER(f.name) = LOWER(?)
 		LIMIT 1
 	`, foundSecretUUID, foundSecretUUID, foundSecretUUID).Scan(
@@ -738,20 +738,23 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 	var fUploadedAt time.Time
 
 	err = db.DB.QueryRow(`
-		SELECT f.id, f.name, f.owner_id, u.name, u.email, u.username, f.created_at
+		SELECT f.id, f.name, f.owner_id, COALESCE(u.name, 'Workspace User'), COALESCE(u.email, 'unknown@eledrive.local'), COALESCE(u.username, 'user'), f.created_at
 		FROM folders f
-		JOIN users u ON f.owner_id = u.id
-		WHERE f.secret_uuid = ? OR f.id = ? OR LOWER(f.name) = LOWER(?)
+		LEFT JOIN users u ON f.owner_id = u.id
+		WHERE f.secret_uuid = ? OR f.id = ? OR LOWER(f.name) = LOWER(?) OR LOWER(f.name || '.zip') = LOWER(?)
 		LIMIT 1
-	`, foundSecretUUID, foundSecretUUID, foundSecretUUID).Scan(
+	`, foundSecretUUID, foundSecretUUID, foundSecretUUID, foundSecretUUID).Scan(
 		&folderID, &folderName, &fOwnerID, &fUploaderName, &fUploaderEmail, &fUploaderUsername, &fUploadedAt,
 	)
 
 	if err == nil {
 		result.Matched = true
 		result.SecretUUID = foundSecretUUID
-		result.OriginalFilename = folderName
-		result.FileType = "Folder / Archive"
+		result.OriginalFilename = folderName + ".zip"
+		result.FileType = "application/zip (Folder Archive)"
+		if len(suspectBytes) > 0 {
+			result.FileSize = int64(len(suspectBytes))
+		}
 		result.UploaderID = fOwnerID
 		result.UploaderName = fUploaderName
 		result.UploaderEmail = fUploaderEmail
@@ -764,7 +767,7 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 		if result.SHA256Checksum == "" && checksum != "" {
 			result.SHA256Checksum = checksum
 		}
-		result.MetadataSummary = fmt.Sprintf("Folder archive leaked. Originally created by %s (%s).", fUploaderName, fUploaderEmail)
+		result.MetadataSummary = fmt.Sprintf("Folder archive cryptographically verified. Originally created by %s (%s).", fUploaderName, fUploaderEmail)
 
 		result.DownloadHistory = h.getDownloadHistory(folderID, foundSecretUUID)
 
@@ -787,6 +790,9 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 	if result.UploaderEmail != "" {
 		result.Matched = true
 		result.RiskAssessment = "LEAK_IDENTIFIED"
+		if len(suspectBytes) > 0 && result.FileSize == 0 {
+			result.FileSize = int64(len(suspectBytes))
+		}
 		if result.SHA256Checksum == "" && checksum != "" {
 			result.SHA256Checksum = checksum
 		}

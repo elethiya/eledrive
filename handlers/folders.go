@@ -532,6 +532,11 @@ func (h *FolderHandler) DownloadZip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if f.SecretUUID == "" {
+		f.SecretUUID = utils.GenerateSecretUUID()
+		_, _ = db.DB.Exec("UPDATE folders SET secret_uuid = ? WHERE id = ?", f.SecretUUID, folderID)
+	}
+
 	zipFilename := fmt.Sprintf("%s.zip", f.Name)
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", zipFilename))

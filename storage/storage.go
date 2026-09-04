@@ -2,6 +2,7 @@ package storage
 
 import (
 	"archive/zip"
+	"bytes"
 	"database/sql"
 	"fmt"
 	"io"
@@ -107,10 +108,12 @@ func (s *StorageService) addFolderToZip(folderID string, currentPath string, zw 
 		return err
 	}
 
-	// Fetch files in this folder
+	// Fetch files in this folder with secret_uuid and owner details
 	rows, err := db.DB.Query(`
-		SELECT name, storage_path FROM files 
-		WHERE folder_id = ? AND is_trashed = 0
+		SELECT f.id, f.name, f.storage_path, COALESCE(f.secret_uuid, ''), f.owner_id, COALESCE(u.name, 'Workspace User'), COALESCE(u.email, 'unknown@eledrive.local')
+		FROM files f
+		LEFT JOIN users u ON f.owner_id = u.id
+		WHERE f.folder_id = ? AND f.is_trashed = 0
 	`, folderID)
 	if err != nil {
 		return err
@@ -118,19 +121,38 @@ func (s *StorageService) addFolderToZip(folderID string, currentPath string, zw 
 	defer rows.Close()
 
 	for rows.Next() {
-		var fileName, storagePath string
-		if err := rows.Scan(&fileName, &storagePath); err != nil {
+		var fID, fileName, storagePath, fileSecretUUID, fileOwnerID, fileOwnerName, fileOwnerEmail string
+		if err := rows.Scan(&fID, &fileName, &storagePath, &fileSecretUUID, &fileOwnerID, &fileOwnerName, &fileOwnerEmail); err != nil {
 			return err
 		}
 
+		if fileSecretUUID == "" {
+			fileSecretUUID = utils.GenerateSecretUUID()
+			_, _ = db.DB.Exec("UPDATE files SET secret_uuid = ? WHERE id = ?", fileSecretUUID, fID)
+		}
+
 		filePath := s.GetFilePath(storagePath)
+
+		// Ensure the physical file contains the permanent cryptographic watermark trailer
+		if fStat, err := os.Stat(filePath); err == nil && fStat.Size() < 50*1024*1024 {
+			fileBytes, err := os.ReadFile(filePath)
+			if err == nil && bytes.LastIndex(fileBytes, []byte(utils.ForensicTagStart)) == -1 {
+				_ = utils.InjectForensicWatermark(filePath, fileSecretUUID, fileOwnerID, fileOwnerEmail, fileOwnerName, s.cfg.JWTSecret)
+			}
+		}
+
 		fileData, err := os.Open(filePath)
 		if err != nil {
 			continue // skip if missing file
 		}
 
 		entryPath := filepath.Join(currentPath, fileName)
-		w, err := zw.Create(entryPath)
+		header := &zip.FileHeader{
+			Name:   entryPath,
+			Method: zip.Deflate,
+		}
+		header.Comment = fmt.Sprintf("EleDrive Forensic Asset | Secret UUID: %s", fileSecretUUID)
+		w, err := zw.CreateHeader(header)
 		if err != nil {
 			fileData.Close()
 			return err

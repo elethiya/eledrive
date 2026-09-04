@@ -401,6 +401,11 @@ func (h *PublicShareHandler) DownloadPublic(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if secretUUID == "" {
+		secretUUID = utils.GenerateSecretUUID()
+		_, _ = db.DB.Exec("UPDATE folders SET secret_uuid = ? WHERE id = ?", secretUUID, link.TargetID)
+	}
+
 	utils.LogDownloadEvent(db.DB, "folder", link.TargetID, secretUUID, "public_guest", "Public Link Visitor", link.Token, r.RemoteAddr, r.UserAgent())
 
 	w.Header().Set("Content-Type", "application/zip")
