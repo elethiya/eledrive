@@ -107,25 +107,32 @@ export default function LoginPage({ onNavigateRegister }) {
         ) : isResetMode ? (
           <div className="animate-in fade-in zoom-in-95 duration-200">
             {resetSuccess ? (
-              <div className="text-center py-2 space-y-4">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
-                  <CheckCircle2 className="w-7 h-7" />
+              <div className="py-2 animate-in fade-in zoom-in-95 duration-200">
+                {/* Header with check icon box in front of title and message */}
+                <div className="flex items-start gap-3.5 mb-5">
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-b from-emerald-500/20 to-emerald-500/5 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5 shadow-sm shadow-emerald-500/10">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-100 leading-tight">
+                      Request Dispatched
+                    </h2>
+                    <p className="text-xs text-slate-300 leading-relaxed mt-1">
+                      {resetSuccess}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-lg font-bold text-slate-100">Request Dispatched</h2>
-                  <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-                    {resetSuccess}
-                  </p>
-                </div>
-                <div className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-2xl text-left text-xs text-slate-400 space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-blue-400 font-semibold text-[11px] uppercase tracking-wider">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                    <span>Next Steps</span>
+
+                <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl text-left mb-6 space-y-2">
+                  <div className="flex items-center gap-2 text-emerald-400 font-semibold text-[11px] uppercase tracking-wider">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Administrator Review Pending</span>
                   </div>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
                     Your workspace administrators have received your request. Once verified and reset, your administrator will supply you with your updated password.
                   </p>
                 </div>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -133,7 +140,7 @@ export default function LoginPage({ onNavigateRegister }) {
                     setResetSuccess(null);
                     if (resetIdentifier) setEmailOrUser(resetIdentifier);
                   }}
-                  className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/25 transition-all flex items-center justify-center gap-2"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span>Return to Sign In</span>
@@ -298,17 +305,6 @@ export default function LoginPage({ onNavigateRegister }) {
                 className="text-blue-400 font-bold hover:underline"
               >
                 Create Team Account
-              </button>
-            </div>
-
-            <div className="mt-2.5 text-center text-xs text-slate-500">
-              Lost credentials?{' '}
-              <button
-                type="button"
-                onClick={handleOpenReset}
-                className="text-slate-400 font-semibold hover:text-blue-400 hover:underline transition-colors"
-              >
-                Request Password Reset
               </button>
             </div>
           </>
