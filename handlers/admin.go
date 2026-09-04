@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -585,12 +587,14 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 
 	var suspectBytes []byte
 	var queryStr string
+	var suspectFileName string
 
 	// Check if file was uploaded in multipart form
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
 		err := r.ParseMultipartForm(50 * 1024 * 1024) // up to 50MB for inspection
 		if err == nil && r.MultipartForm != nil {
 			if files := r.MultipartForm.File["file"]; len(files) > 0 {
+				suspectFileName = files[0].Filename
 				f, err := files[0].Open()
 				if err == nil {
 					suspectBytes, _ = io.ReadAll(f)
@@ -608,9 +612,19 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var checksum string
+	if len(suspectBytes) > 0 {
+		hSum := sha256.New()
+		hSum.Write(suspectBytes)
+		checksum = hex.EncodeToString(hSum.Sum(nil))
+	}
+
 	result := &models.ForensicInspectionResult{
-		Matched:        false,
-		RiskAssessment: "NOT_FOUND",
+		Matched:          false,
+		RiskAssessment:   "NOT_FOUND",
+		OriginalFilename: suspectFileName,
+		SHA256Checksum:   checksum,
+		DownloadHistory:  []models.DownloadRecord{},
 	}
 
 	var foundSecretUUID string
@@ -621,6 +635,12 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 		if err == nil && extracted != nil && extracted.SecretUUID != "" {
 			result = extracted
 			foundSecretUUID = extracted.SecretUUID
+			if result.OriginalFilename == "" && suspectFileName != "" {
+				result.OriginalFilename = suspectFileName
+			}
+			if result.SHA256Checksum == "" && checksum != "" {
+				result.SHA256Checksum = checksum
+			}
 		}
 	}
 
@@ -629,8 +649,33 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 		foundSecretUUID = queryStr
 	}
 
+	// If neither watermark nor secret UUID could be found, log failed/untracked scan and return
 	if foundSecretUUID == "" {
-		utils.RespondError(w, http.StatusBadRequest, "No forensic watermark found in uploaded file and no Secret UUID provided")
+		targetName := suspectFileName
+		if targetName == "" {
+			targetName = queryStr
+		}
+		if targetName == "" {
+			targetName = "Unidentified Asset"
+		}
+
+		db.LogActivity(
+			actorID,
+			actorName,
+			"forensic_inspect",
+			"failed_scan",
+			"untracked",
+			targetName,
+			fmt.Sprintf("Forensic analysis run by @%s on '%s': INVALID / UNTRACKED (No forensic watermark signature detected)", actorName, targetName),
+		)
+
+		result.Matched = false
+		result.OriginalFilename = targetName
+		result.RiskAssessment = "INVALID_OR_UNTRACKED"
+		result.MetadataSummary = "No valid cryptographic forensic watermark or Secret UUID detected in suspect asset."
+		result.DownloadHistory = []models.DownloadRecord{}
+
+		utils.RespondJSON(w, http.StatusOK, result)
 		return
 	}
 
@@ -665,6 +710,9 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 		result.IsFolder = false
 		result.RiskAssessment = "LEAK_IDENTIFIED"
 		result.SignatureValid = true
+		if result.SHA256Checksum == "" && checksum != "" {
+			result.SHA256Checksum = checksum
+		}
 		result.MetadataSummary = fmt.Sprintf("Asset leaked from workspace. Originally uploaded by %s (%s).", uploaderName, uploaderEmail)
 
 		// Fetch download history for this file
@@ -713,6 +761,9 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 		result.IsFolder = true
 		result.RiskAssessment = "LEAK_IDENTIFIED"
 		result.SignatureValid = true
+		if result.SHA256Checksum == "" && checksum != "" {
+			result.SHA256Checksum = checksum
+		}
 		result.MetadataSummary = fmt.Sprintf("Folder archive leaked. Originally created by %s (%s).", fUploaderName, fUploaderEmail)
 
 		result.DownloadHistory = h.getDownloadHistory(folderID, foundSecretUUID)
@@ -732,9 +783,13 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If metadata was extracted from file trailer itself even if deleted from DB
+	// 5. If metadata was extracted from file trailer itself even if deleted from DB
 	if result.UploaderEmail != "" {
 		result.Matched = true
+		result.RiskAssessment = "LEAK_IDENTIFIED"
+		if result.SHA256Checksum == "" && checksum != "" {
+			result.SHA256Checksum = checksum
+		}
 		result.MetadataSummary = fmt.Sprintf("Forensic metadata embedded inside file confirms uploader was %s (%s). (Asset was subsequently removed from workspace database).", result.UploaderName, result.UploaderEmail)
 
 		// Record in audit log
@@ -752,18 +807,36 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Log unmatched forensic scan to activity audit logs
+	// 6. Log unmatched forensic scan to activity audit logs
+	targetName := suspectFileName
+	if targetName == "" {
+		targetName = queryStr
+	}
+	if targetName == "" {
+		targetName = foundSecretUUID
+	}
+
 	db.LogActivity(
 		actorID,
 		actorName,
 		"forensic_inspect",
-		"query",
+		"unmatched_asset",
 		foundSecretUUID,
-		queryStr,
-		fmt.Sprintf("Forensic analysis run by @%s for query '%s' [No matching asset found]", actorName, foundSecretUUID),
+		targetName,
+		fmt.Sprintf("Forensic analysis run by @%s for '%s' [Secret UUID: %s - No matching workspace asset found in database]", actorName, targetName, foundSecretUUID),
 	)
 
-	utils.RespondError(w, http.StatusNotFound, fmt.Sprintf("No workspace asset matched the Secret UUID or forensic fingerprint: %s", foundSecretUUID))
+	result.Matched = false
+	result.SecretUUID = foundSecretUUID
+	result.OriginalFilename = targetName
+	if result.SHA256Checksum == "" && checksum != "" {
+		result.SHA256Checksum = checksum
+	}
+	result.RiskAssessment = "UNMATCHED_ASSET"
+	result.MetadataSummary = fmt.Sprintf("Secret UUID '%s' detected, but no matching active asset was found in workspace database.", foundSecretUUID)
+	result.DownloadHistory = []models.DownloadRecord{}
+
+	utils.RespondJSON(w, http.StatusOK, result)
 }
 
 func (h *AdminHandler) getDownloadHistory(targetID, secretUUID string) []models.DownloadRecord {

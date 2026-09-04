@@ -1116,10 +1116,10 @@ export default function AdminPage({ onBackToDrive }) {
 
                 <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
                   <div className="text-[11px] font-bold text-purple-400 flex items-center gap-1.5 mb-1">
-                    <Archive className="w-3.5 h-3.5" /> ZIP Archive Manifest
+                    <Archive className="w-3.5 h-3.5" /> Steganographic ZIP Archives
                   </div>
                   <p className="text-[10px] text-slate-400">
-                    Folder ZIP downloads automatically embed hidden forensic manifests & metadata comments.
+                    Folder ZIP downloads automatically embed cryptographic forensic trailers and comment signatures.
                   </p>
                 </div>
 
@@ -1288,169 +1288,299 @@ export default function AdminPage({ onBackToDrive }) {
 
               {/* Inspection Result Dossier */}
               {inspectionResult && (
-                <div className="mt-4 sm:mt-6 p-3.5 sm:p-6 rounded-2xl bg-slate-950 border border-emerald-500/30 shadow-2xl space-y-4 sm:space-y-5 animate-in fade-in zoom-in-95 duration-200">
+                <div className={`mt-4 sm:mt-6 p-3.5 sm:p-6 rounded-2xl bg-slate-950 border ${
+                  inspectionResult.matched 
+                    ? 'border-emerald-500/30' 
+                    : inspectionResult.risk_assessment === 'UNMATCHED_ASSET'
+                      ? 'border-amber-500/30'
+                      : 'border-rose-500/30'
+                } shadow-2xl space-y-4 sm:space-y-5 animate-in fade-in zoom-in-95 duration-200`}>
                   {/* Banner */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                  <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-xl ${
+                    inspectionResult.matched 
+                      ? 'bg-emerald-500/10 border border-emerald-500/20' 
+                      : inspectionResult.risk_assessment === 'UNMATCHED_ASSET'
+                        ? 'bg-amber-500/10 border border-amber-500/20'
+                        : 'bg-rose-500/10 border border-rose-500/20'
+                  }`}>
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold shrink-0">
-                        <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shrink-0 ${
+                        inspectionResult.matched 
+                          ? 'bg-emerald-500/20 text-emerald-400' 
+                          : inspectionResult.risk_assessment === 'UNMATCHED_ASSET'
+                            ? 'bg-amber-500/20 text-amber-400'
+                            : 'bg-rose-500/20 text-rose-400'
+                      }`}>
+                        {inspectionResult.matched ? (
+                          <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+                        ) : inspectionResult.risk_assessment === 'UNMATCHED_ASSET' ? (
+                          <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6" />
+                        ) : (
+                          <XCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+                        )}
                       </div>
                       <div className="min-w-0">
-                        <div className="text-[11px] sm:text-xs font-bold text-emerald-300 uppercase tracking-wider">
-                          Cryptographic Match Verified
+                        <div className={`text-[11px] sm:text-xs font-bold uppercase tracking-wider ${
+                          inspectionResult.matched 
+                            ? 'text-emerald-300' 
+                            : inspectionResult.risk_assessment === 'UNMATCHED_ASSET'
+                              ? 'text-amber-300'
+                              : 'text-rose-300'
+                        }`}>
+                          {inspectionResult.matched 
+                            ? 'Cryptographic Match Verified' 
+                            : inspectionResult.risk_assessment === 'UNMATCHED_ASSET'
+                              ? 'Forensic Signature Found — Unmatched Workspace Asset'
+                              : 'No Forensic Watermark Detected'}
                         </div>
                         <div className="text-xs sm:text-sm font-black text-slate-100 truncate">
-                          Origin Asset Identified: {inspectionResult.original_filename}
+                          {inspectionResult.matched 
+                            ? `Origin Asset Identified: ${inspectionResult.original_filename}` 
+                            : `Scanned Target: ${inspectionResult.original_filename || 'Suspect Asset'}`}
                         </div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[10px] font-mono px-2 py-1 rounded bg-slate-900 border border-emerald-500/30 text-emerald-400">
-                        HMAC-SHA256: VALID
+                      <span className={`text-[10px] font-mono px-2 py-1 rounded bg-slate-900 border ${
+                        inspectionResult.matched 
+                          ? 'border-emerald-500/30 text-emerald-400' 
+                          : inspectionResult.risk_assessment === 'UNMATCHED_ASSET'
+                            ? 'border-amber-500/30 text-amber-400'
+                            : 'border-rose-500/30 text-rose-400'
+                      }`}>
+                        {inspectionResult.matched 
+                          ? 'HMAC-SHA256: VALID' 
+                          : inspectionResult.risk_assessment === 'UNMATCHED_ASSET'
+                            ? 'STATUS: UNMATCHED'
+                            : 'STATUS: INVALID / UNTRACKED'}
                       </span>
                     </div>
                   </div>
 
-                  {/* Attributed Leaker Information Card */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
-                      <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                        <UserCheck className="w-4 h-4 text-emerald-400" />
-                        Attributed Original Uploader
-                      </h4>
+                  {inspectionResult.matched ? (
+                    <>
+                      {/* Attributed Leaker Information Card */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+                          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <UserCheck className="w-4 h-4 text-emerald-400" />
+                            Attributed Original Uploader
+                          </h4>
 
-                      <div className="flex items-center gap-3 pt-1">
-                        <div className="w-11 h-11 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-base shadow-md">
-                          {inspectionResult.uploader_name?.charAt(0).toUpperCase() || 'U'}
+                          <div className="flex items-center gap-3 pt-1">
+                            <div className="w-11 h-11 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-base shadow-md">
+                              {inspectionResult.uploader_name?.charAt(0).toUpperCase() || 'U'}
+                            </div>
+                            <div>
+                              <div className="text-sm font-bold text-slate-100">
+                                {inspectionResult.uploader_name}
+                              </div>
+                              <div className="text-xs text-slate-400">
+                                @{inspectionResult.uploader_username} • {inspectionResult.uploader_email}
+                              </div>
+                              <div className="text-[10px] font-mono text-slate-500 mt-0.5">
+                                User ID: {inspectionResult.uploader_id}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-800/80 grid grid-cols-2 gap-2 text-[11px]">
+                            <div>
+                              <span className="text-slate-500 block">Uploaded Date:</span>
+                              <span className="text-slate-300 font-medium">
+                                {inspectionResult.uploaded_at ? formatDate(inspectionResult.uploaded_at) : 'N/A'}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 block">File Size:</span>
+                              <span className="text-slate-300 font-medium">
+                                {formatBytes(inspectionResult.file_size)}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="text-sm font-bold text-slate-100">
-                            {inspectionResult.uploader_name}
-                          </div>
-                          <div className="text-xs text-slate-400">
-                            @{inspectionResult.uploader_username} • {inspectionResult.uploader_email}
-                          </div>
-                          <div className="text-[10px] font-mono text-slate-500 mt-0.5">
-                            User ID: {inspectionResult.uploader_id}
+
+                        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+                          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <Shield className="w-4 h-4 text-blue-400" />
+                            Forensic Signature Details
+                          </h4>
+
+                          <div className="space-y-2 text-xs">
+                            <div>
+                              <span className="text-[10px] text-slate-500 uppercase font-semibold block">
+                                Secret Tracking UUID:
+                              </span>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="font-mono text-xs text-blue-300 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 select-all truncate">
+                                  {inspectionResult.secret_uuid}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyUUID(inspectionResult.secret_uuid)}
+                                  className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+                                  title="Copy Secret UUID"
+                                >
+                                  {copiedUUID === inspectionResult.secret_uuid ? (
+                                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {inspectionResult.sha256_checksum && (
+                              <div>
+                                <span className="text-[10px] text-slate-500 uppercase font-semibold block">
+                                  SHA256 File Checksum:
+                                </span>
+                                <span className="font-mono text-[11px] text-slate-400 break-all select-all">
+                                  {inspectionResult.sha256_checksum}
+                                </span>
+                              </div>
+                            )}
+
+                            <div className="pt-2">
+                              <span className="text-[10px] text-slate-500 uppercase font-semibold block mb-0.5">
+                                Forensic Verdict:
+                              </span>
+                              <p className="text-xs text-emerald-300 font-medium">
+                                {inspectionResult.metadata_summary}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
 
-                      <div className="pt-2 border-t border-slate-800/80 grid grid-cols-2 gap-2 text-[11px]">
-                        <div>
-                          <span className="text-slate-500 block">Uploaded Date:</span>
-                          <span className="text-slate-300 font-medium">
-                            {inspectionResult.uploaded_at ? formatDate(inspectionResult.uploaded_at) : 'N/A'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-slate-500 block">File Size:</span>
-                          <span className="text-slate-300 font-medium">
-                            {formatBytes(inspectionResult.file_size)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                      {/* Exfiltration & Download History Table */}
+                      <div className="space-y-3 pt-2">
+                        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                          <Download className="w-4 h-4 text-indigo-400" />
+                          Chain of Custody & Download Trail ({inspectionResult.download_history?.length || 0} events)
+                        </h4>
 
-                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
-                      <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                        <Shield className="w-4 h-4 text-blue-400" />
-                        Forensic Signature Details
-                      </h4>
-
-                      <div className="space-y-2 text-xs">
-                        <div>
-                          <span className="text-[10px] text-slate-500 uppercase font-semibold block">
-                            Secret Tracking UUID:
-                          </span>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="font-mono text-xs text-blue-300 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 select-all truncate">
-                              {inspectionResult.secret_uuid}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleCopyUUID(inspectionResult.secret_uuid)}
-                              className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200"
-                              title="Copy Secret UUID"
-                            >
-                              {copiedUUID === inspectionResult.secret_uuid ? (
-                                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                              ) : (
-                                <Copy className="w-3.5 h-3.5" />
-                              )}
-                            </button>
+                        {(!inspectionResult.download_history || inspectionResult.download_history.length === 0) ? (
+                          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center text-xs text-slate-500">
+                            No external download records found for this asset. The file was likely exfiltrated directly by the uploader.
                           </div>
-                        </div>
-
-                        {inspectionResult.sha256_checksum && (
-                          <div>
-                            <span className="text-[10px] text-slate-500 uppercase font-semibold block">
-                              SHA256 File Checksum:
-                            </span>
-                            <span className="font-mono text-[11px] text-slate-400 break-all select-all">
-                              {inspectionResult.sha256_checksum}
-                            </span>
+                        ) : (
+                          <div className="overflow-x-auto rounded-xl border border-slate-800">
+                            <table className="w-full text-left text-xs text-slate-300">
+                              <thead className="bg-slate-900 text-slate-400 font-semibold border-b border-slate-800">
+                                <tr>
+                                  <th className="py-2.5 px-3">Downloader</th>
+                                  <th className="py-2.5 px-3">IP Address</th>
+                                  <th className="py-2.5 px-3">Client / Browser</th>
+                                  <th className="py-2.5 px-3">Downloaded At</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-800/60 bg-slate-950/60">
+                                {inspectionResult.download_history.map((dl) => (
+                                  <tr key={dl.id} className="hover:bg-slate-900/60">
+                                    <td className="py-2.5 px-3">
+                                      <div className="font-semibold text-slate-200">{dl.user_name}</div>
+                                      <div className="text-[10px] text-slate-500">{dl.user_email}</div>
+                                    </td>
+                                    <td className="py-2.5 px-3 font-mono text-blue-400 text-[11px]">
+                                      {dl.ip_address}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-[11px] text-slate-400 truncate max-w-[200px]" title={dl.user_agent}>
+                                      {dl.user_agent || 'Standard HTTP Client'}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-[11px] text-slate-400">
+                                      {formatDate(dl.downloaded_at)}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
                           </div>
                         )}
+                      </div>
+                    </>
+                  ) : (
+                    /* Unmatched / Invalid Investigation Dossier */
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                      <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+                        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                          <FileSearch className="w-4 h-4 text-amber-400" />
+                          Inspection Verdict & Status
+                        </h4>
 
-                        <div className="pt-2">
-                          <span className="text-[10px] text-slate-500 uppercase font-semibold block mb-0.5">
-                            Forensic Verdict:
-                          </span>
-                          <p className="text-xs text-emerald-300 font-medium">
-                            {inspectionResult.metadata_summary}
-                          </p>
+                        <div className="space-y-2.5 text-xs pt-1">
+                          <div>
+                            <span className="text-[10px] text-slate-500 uppercase font-semibold block">
+                              Scanned Target:
+                            </span>
+                            <span className="text-sm font-bold text-slate-200 block truncate">
+                              {inspectionResult.original_filename || 'Uploaded File / Query'}
+                            </span>
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] text-slate-500 uppercase font-semibold block mb-1">
+                              Analysis Details:
+                            </span>
+                            <p className="text-xs text-slate-300 leading-relaxed bg-slate-950 p-3 rounded-lg border border-slate-800/80">
+                              {inspectionResult.metadata_summary}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+                        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                          <Shield className="w-4 h-4 text-blue-400" />
+                          Cryptographic & Audit Signature
+                        </h4>
+
+                        <div className="space-y-2.5 text-xs">
+                          {inspectionResult.secret_uuid && (
+                            <div>
+                              <span className="text-[10px] text-slate-500 uppercase font-semibold block">
+                                Detected Secret UUID:
+                              </span>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="font-mono text-xs text-amber-300 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 select-all truncate">
+                                  {inspectionResult.secret_uuid}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyUUID(inspectionResult.secret_uuid)}
+                                  className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+                                  title="Copy Secret UUID"
+                                >
+                                  {copiedUUID === inspectionResult.secret_uuid ? (
+                                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {inspectionResult.sha256_checksum && (
+                            <div>
+                              <span className="text-[10px] text-slate-500 uppercase font-semibold block">
+                                SHA256 Checksum:
+                              </span>
+                              <span className="font-mono text-[11px] text-slate-400 break-all select-all block bg-slate-950 p-2 rounded-lg border border-slate-800 mt-0.5">
+                                {inspectionResult.sha256_checksum}
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="pt-2 border-t border-slate-800 flex items-center gap-2 text-[11px] text-emerald-400">
+                            <Check className="w-3.5 h-3.5 shrink-0" />
+                            <span>This scan has been permanently recorded in the Security Audit Logs.</span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Exfiltration & Download History Table */}
-                  <div className="space-y-3 pt-2">
-                    <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                      <Download className="w-4 h-4 text-indigo-400" />
-                      Chain of Custody & Download Trail ({inspectionResult.download_history?.length || 0} events)
-                    </h4>
-
-                    {(!inspectionResult.download_history || inspectionResult.download_history.length === 0) ? (
-                      <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center text-xs text-slate-500">
-                        No external download records found for this asset. The file was likely exfiltrated directly by the uploader.
-                      </div>
-                    ) : (
-                      <div className="overflow-x-auto rounded-xl border border-slate-800">
-                        <table className="w-full text-left text-xs text-slate-300">
-                          <thead className="bg-slate-900 text-slate-400 font-semibold border-b border-slate-800">
-                            <tr>
-                              <th className="py-2.5 px-3">Downloader</th>
-                              <th className="py-2.5 px-3">IP Address</th>
-                              <th className="py-2.5 px-3">Client / Browser</th>
-                              <th className="py-2.5 px-3">Downloaded At</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-800/60 bg-slate-950/60">
-                            {inspectionResult.download_history.map((dl) => (
-                              <tr key={dl.id} className="hover:bg-slate-900/60">
-                                <td className="py-2.5 px-3">
-                                  <div className="font-semibold text-slate-200">{dl.user_name}</div>
-                                  <div className="text-[10px] text-slate-500">{dl.user_email}</div>
-                                </td>
-                                <td className="py-2.5 px-3 font-mono text-blue-400 text-[11px]">
-                                  {dl.ip_address}
-                                </td>
-                                <td className="py-2.5 px-3 text-[11px] text-slate-400 truncate max-w-[200px]" title={dl.user_agent}>
-                                  {dl.user_agent || 'Standard HTTP Client'}
-                                </td>
-                                <td className="py-2.5 px-3 text-[11px] text-slate-400">
-                                  {formatDate(dl.downloaded_at)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1656,10 +1786,17 @@ export default function AdminPage({ onBackToDrive }) {
                                 <span>Password Reset</span>
                               </span>
                             ) : l.action === 'forensic_inspect' ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 font-mono text-[10px] uppercase font-bold text-emerald-400 shadow-xs">
-                                <Fingerprint className="w-3 h-3 text-emerald-400" />
-                                <span>Forensic Scan</span>
-                              </span>
+                              l.item_type === 'failed_scan' || l.item_type === 'unmatched_asset' || l.details?.includes('INVALID') || l.details?.includes('No matching') ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/30 font-mono text-[10px] uppercase font-bold text-amber-400 shadow-xs">
+                                  <Fingerprint className="w-3 h-3 text-amber-400" />
+                                  <span>Forensic Scan (Failed)</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 font-mono text-[10px] uppercase font-bold text-emerald-400 shadow-xs">
+                                  <Fingerprint className="w-3 h-3 text-emerald-400" />
+                                  <span>Forensic Scan</span>
+                                </span>
+                              )
                             ) : l.action === 'download' && l.details?.includes('Secret UUID') ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-500/15 border border-blue-500/30 font-mono text-[10px] uppercase font-bold text-blue-400">
                                 <Download className="w-3 h-3 text-blue-400" />
