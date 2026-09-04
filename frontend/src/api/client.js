@@ -63,8 +63,9 @@ export const folderAPI = {
 };
 
 export const fileAPI = {
-  uploadFiles: (formData, onProgress) =>
+  uploadFiles: (formData, onProgress, signal) =>
     api.post('/upload', formData, {
+      signal,
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: (e) => {
         if (onProgress) {
@@ -106,8 +107,9 @@ export const publicShareAPI = {
       headers: password ? { 'X-Share-Password': password } : {},
     }),
   getDownloadUrl: (token) => `/api/public/share/${token}/download`,
-  uploadPublic: (token, formData, onProgress) =>
+  uploadPublic: (token, formData, onProgress, signal) =>
     api.post(`/public/share/${token}/upload`, formData, {
+      signal,
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: (e) => {
         if (onProgress && e.total) {
@@ -182,9 +184,9 @@ export const webhookAPI = {
 };
 
 /**
- * Downloads a file from a URL with full real-time progress and speed tracking.
+ * Downloads a file from a URL with full real-time progress, speed tracking, and abort support.
  */
-export async function downloadWithProgress({ url, filename, expectedSize, onProgress }) {
+export async function downloadWithProgress({ url, filename, expectedSize, onProgress, signal }) {
   let lastTime = Date.now();
   let lastLoaded = 0;
   let currentSpeed = 0;
@@ -195,7 +197,7 @@ export async function downloadWithProgress({ url, filename, expectedSize, onProg
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, { headers });
+  const response = await fetch(url, { headers, signal });
   if (!response.ok) {
     throw new Error(`Download failed with status ${response.status}`);
   }
@@ -207,30 +209,48 @@ export async function downloadWithProgress({ url, filename, expectedSize, onProg
   const chunks = [];
   let loadedBytes = 0;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      if (signal?.aborted) {
+        try {
+          await reader.cancel();
+        } catch (_) {}
+        throw new DOMException('Download cancelled by user', 'AbortError');
+      }
 
-    chunks.push(value);
-    loadedBytes += value.length;
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    const now = Date.now();
-    const timeDelta = (now - lastTime) / 1000;
-    if (timeDelta >= 0.2) {
-      currentSpeed = (loadedBytes - lastLoaded) / timeDelta;
-      lastLoaded = loadedBytes;
-      lastTime = now;
+      chunks.push(value);
+      loadedBytes += value.length;
+
+      const now = Date.now();
+      const timeDelta = (now - lastTime) / 1000;
+      if (timeDelta >= 0.2) {
+        currentSpeed = (loadedBytes - lastLoaded) / timeDelta;
+        lastLoaded = loadedBytes;
+        lastTime = now;
+      }
+
+      const percent = totalBytes > 0 ? Math.min(100, Math.round((loadedBytes * 100) / totalBytes)) : 0;
+      if (onProgress) {
+        onProgress({
+          loadedBytes,
+          totalBytes,
+          percent,
+          speed: currentSpeed,
+        });
+      }
     }
+  } catch (err) {
+    try {
+      await reader.cancel();
+    } catch (_) {}
+    throw err;
+  }
 
-    const percent = totalBytes > 0 ? Math.min(100, Math.round((loadedBytes * 100) / totalBytes)) : 0;
-    if (onProgress) {
-      onProgress({
-        loadedBytes,
-        totalBytes,
-        percent,
-        speed: currentSpeed,
-      });
-    }
+  if (signal?.aborted) {
+    throw new DOMException('Download cancelled by user', 'AbortError');
   }
 
   // Construct blob and trigger browser save

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ConfirmProvider } from './context/ConfirmContext';
 import { RealtimeProvider, useRealtimeEvent } from './context/RealtimeContext';
@@ -163,9 +163,11 @@ function AppContent() {
   const [detailsModalItem, setDetailsModalItem] = useState(null);
   const [isDetailsFolder, setIsDetailsFolder] = useState(false);
 
-  // Upload and Download transfer status trackers
+  // Upload and Download transfer status trackers & abort controllers
   const [uploadStatus, setUploadStatus] = useState(null);
   const [downloadStatus, setDownloadStatus] = useState(null);
+  const uploadAbortControllerRef = useRef(null);
+  const downloadAbortControllerRef = useRef(null);
 
   // Sync browser URL & localStorage whenever currentView or currentFolderId changes
   useEffect(() => {
@@ -220,6 +222,34 @@ function AppContent() {
     }
   }, [user, currentView]);
 
+  // Warn and require confirmation if user attempts to reload, leave, or close tab/browser during active transfers
+  useEffect(() => {
+    const isUploading = !!uploadStatus?.isUploading;
+    const isDownloading = !!downloadStatus?.isDownloading;
+
+    window.__eledriveTransferActive = isUploading || isDownloading;
+
+    if (!isUploading && !isDownloading) return;
+
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      const message =
+        isUploading && isDownloading
+          ? 'Upload and download are still in progress. If you leave or reload this page, your transfers will be cancelled.'
+          : isUploading
+          ? 'An upload is still in progress. If you leave or reload this page, your upload will be cancelled.'
+          : 'A download is still in progress. If you leave or reload this page, your download will be cancelled.';
+      e.returnValue = message;
+      return message;
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.__eledriveTransferActive = false;
+    };
+  }, [uploadStatus?.isUploading, downloadStatus?.isDownloading]);
+
   // Handle Search
   const handleSearch = async (overrideQuery) => {
     const q = overrideQuery !== undefined ? overrideQuery : searchQuery;
@@ -240,9 +270,18 @@ function AppContent() {
     }
   };
 
-  // Upload Files or Folders/Projects with real-time network speed and file size tracking
+  // Upload Files or Folders/Projects with real-time network speed, file size tracking, and cancel support
   const handleUploadFiles = async (filesList) => {
     if (!filesList || filesList.length === 0) return;
+
+    if (uploadAbortControllerRef.current) {
+      try {
+        uploadAbortControllerRef.current.abort();
+      } catch (_) {}
+    }
+
+    const controller = new AbortController();
+    uploadAbortControllerRef.current = controller;
 
     let totalUploadBytes = 0;
     for (let i = 0; i < filesList.length; i++) {
@@ -257,6 +296,7 @@ function AppContent() {
       totalBytes: totalUploadBytes,
       speed: 0,
       success: false,
+      cancelled: false,
       error: null,
     });
 
@@ -277,30 +317,36 @@ function AppContent() {
     let currentSpeed = 0;
 
     try {
-      await fileAPI.uploadFiles(formData, (percent, stats) => {
-        const now = Date.now();
-        const timeDelta = (now - lastTime) / 1000;
-        const loaded = stats?.loaded ?? Math.round((totalUploadBytes * percent) / 100);
-        const total = stats?.total ?? totalUploadBytes;
+      await fileAPI.uploadFiles(
+        formData,
+        (percent, stats) => {
+          const now = Date.now();
+          const timeDelta = (now - lastTime) / 1000;
+          const loaded = stats?.loaded ?? Math.round((totalUploadBytes * percent) / 100);
+          const total = stats?.total ?? totalUploadBytes;
 
-        if (timeDelta >= 0.25) {
-          currentSpeed = (loaded - lastLoaded) / timeDelta;
-          lastLoaded = loaded;
-          lastTime = now;
-        }
+          if (timeDelta >= 0.25) {
+            currentSpeed = (loaded - lastLoaded) / timeDelta;
+            lastLoaded = loaded;
+            lastTime = now;
+          }
 
-        setUploadStatus((prev) =>
-          prev
-            ? {
-                ...prev,
-                progress: percent,
-                loadedBytes: loaded,
-                totalBytes: total,
-                speed: currentSpeed,
-              }
-            : null
-        );
-      });
+          setUploadStatus((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  progress: percent,
+                  loadedBytes: loaded,
+                  totalBytes: total,
+                  speed: currentSpeed,
+                }
+              : null
+          );
+        },
+        controller.signal
+      );
+
+      uploadAbortControllerRef.current = null;
 
       setUploadStatus((prev) =>
         prev
@@ -325,6 +371,30 @@ function AppContent() {
         setUploadStatus(null);
       }, 4000);
     } catch (err) {
+      uploadAbortControllerRef.current = null;
+      if (
+        controller.signal.aborted ||
+        err?.name === 'CanceledError' ||
+        err?.name === 'AbortError' ||
+        err?.code === 'ERR_CANCELED'
+      ) {
+        setUploadStatus((prev) =>
+          prev
+            ? {
+                ...prev,
+                isUploading: false,
+                cancelled: true,
+                progress: 0,
+                error: 'Upload cancelled by user',
+              }
+            : null
+        );
+        setTimeout(() => {
+          setUploadStatus(null);
+        }, 2500);
+        return;
+      }
+
       setUploadStatus((prev) =>
         prev
           ? {
@@ -337,9 +407,39 @@ function AppContent() {
     }
   };
 
-  // Tracked Download with real-time network speed & file size progress
+  const handleCancelUpload = () => {
+    if (uploadAbortControllerRef.current) {
+      uploadAbortControllerRef.current.abort();
+      uploadAbortControllerRef.current = null;
+    }
+    setUploadStatus((prev) =>
+      prev
+        ? {
+            ...prev,
+            isUploading: false,
+            cancelled: true,
+            progress: 0,
+            error: 'Upload cancelled by user',
+          }
+        : null
+    );
+    setTimeout(() => {
+      setUploadStatus(null);
+    }, 2500);
+  };
+
+  // Tracked Download with real-time network speed, file size progress, and cancel support
   const handleDownload = async (item, isFolder = false) => {
     if (!item) return;
+
+    if (downloadAbortControllerRef.current) {
+      try {
+        downloadAbortControllerRef.current.abort();
+      } catch (_) {}
+    }
+
+    const controller = new AbortController();
+    downloadAbortControllerRef.current = controller;
 
     const itemName = isFolder ? `${item.name || 'folder'}.zip` : item.name;
     const url = isFolder
@@ -355,6 +455,7 @@ function AppContent() {
       totalBytes: expectedSize,
       speed: 0,
       success: false,
+      cancelled: false,
       error: null,
     });
 
@@ -363,6 +464,7 @@ function AppContent() {
         url,
         filename: itemName,
         expectedSize,
+        signal: controller.signal,
         onProgress: ({ loadedBytes, totalBytes, percent, speed }) => {
           setDownloadStatus((prev) =>
             prev
@@ -377,6 +479,8 @@ function AppContent() {
           );
         },
       });
+
+      downloadAbortControllerRef.current = null;
 
       setDownloadStatus((prev) =>
         prev
@@ -395,10 +499,56 @@ function AppContent() {
         setDownloadStatus(null);
       }, 3500);
     } catch (err) {
+      downloadAbortControllerRef.current = null;
+      if (
+        controller.signal.aborted ||
+        err?.name === 'AbortError' ||
+        err?.name === 'CanceledError' ||
+        err?.code === 'ERR_CANCELED'
+      ) {
+        setDownloadStatus((prev) =>
+          prev
+            ? {
+                ...prev,
+                isDownloading: false,
+                name: itemName,
+                cancelled: true,
+                progress: 0,
+                error: 'Download cancelled by user',
+              }
+            : null
+        );
+        setTimeout(() => {
+          setDownloadStatus(null);
+        }, 2500);
+        return;
+      }
+
       console.warn('Tracked download fallback to direct download:', err);
       window.location.href = url;
       setDownloadStatus(null);
     }
+  };
+
+  const handleCancelDownload = () => {
+    if (downloadAbortControllerRef.current) {
+      downloadAbortControllerRef.current.abort();
+      downloadAbortControllerRef.current = null;
+    }
+    setDownloadStatus((prev) =>
+      prev
+        ? {
+            ...prev,
+            isDownloading: false,
+            cancelled: true,
+            progress: 0,
+            error: 'Download cancelled by user',
+          }
+        : null
+    );
+    setTimeout(() => {
+      setDownloadStatus(null);
+    }, 2500);
   };
 
   // Listen for download events dispatched across components
@@ -951,6 +1101,8 @@ function AppContent() {
         }}
         onCloseUpload={() => setUploadStatus(null)}
         onCloseDownload={() => setDownloadStatus(null)}
+        onCancelUpload={handleCancelUpload}
+        onCancelDownload={handleCancelDownload}
       />
     </div>
   );

@@ -15,6 +15,7 @@ import {
   Film,
   Music,
   Archive,
+  X,
 } from 'lucide-react';
 import { publicShareAPI } from '../api/client';
 import { useToast } from '../context/ToastContext';
@@ -34,6 +35,20 @@ export default function PublicSharePage({ token, onBackToDrive }) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const fileInputRef = useRef(null);
+  const uploadAbortControllerRef = useRef(null);
+
+  // Prevent reload, leave, or tab close during active upload
+  useEffect(() => {
+    if (!isUploading) return;
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      const msg = 'File upload is currently in progress. If you leave or reload, your upload will be cancelled.';
+      e.returnValue = msg;
+      return msg;
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isUploading]);
 
   useEffect(() => {
     loadShareInfo();
@@ -76,6 +91,16 @@ export default function PublicSharePage({ token, onBackToDrive }) {
 
   const handleUploadFiles = async (files) => {
     if (!files || files.length === 0) return;
+
+    if (uploadAbortControllerRef.current) {
+      try {
+        uploadAbortControllerRef.current.abort();
+      } catch (_) {}
+    }
+
+    const controller = new AbortController();
+    uploadAbortControllerRef.current = controller;
+
     setIsUploading(true);
     setUploadProgress(0);
     setUploadSuccess(false);
@@ -86,18 +111,44 @@ export default function PublicSharePage({ token, onBackToDrive }) {
     }
 
     try {
-      await publicShareAPI.uploadPublic(token, formData, (prog) => {
-        setUploadProgress(prog);
-      });
+      await publicShareAPI.uploadPublic(
+        token,
+        formData,
+        (prog) => {
+          setUploadProgress(prog);
+        },
+        controller.signal
+      );
+      uploadAbortControllerRef.current = null;
       setUploadSuccess(true);
       setTimeout(() => setUploadSuccess(false), 3000);
       loadShareInfo(password);
       toast.success('Files uploaded successfully!');
     } catch (err) {
+      uploadAbortControllerRef.current = null;
+      if (
+        controller.signal.aborted ||
+        err.name === 'CanceledError' ||
+        err.name === 'AbortError' ||
+        err.code === 'ERR_CANCELED'
+      ) {
+        toast.info('Upload cancelled');
+        return;
+      }
       toast.error('Upload failed: ' + err.message);
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleCancelUpload = () => {
+    if (uploadAbortControllerRef.current) {
+      uploadAbortControllerRef.current.abort();
+      uploadAbortControllerRef.current = null;
+    }
+    setIsUploading(false);
+    setUploadProgress(0);
+    toast.info('Upload cancelled');
   };
 
   const renderFileIcon = (mime, ext, name = '') => {
@@ -263,9 +314,20 @@ export default function PublicSharePage({ token, onBackToDrive }) {
             {/* Upload Progress feedback */}
             {isUploading && (
               <div className="bg-slate-900 rounded-2xl p-4 border border-blue-500/40 shadow-sm space-y-2">
-                <div className="flex justify-between text-xs font-bold text-blue-300">
+                <div className="flex justify-between items-center text-xs font-bold text-blue-300">
                   <span>Uploading files to shared drive...</span>
-                  <span>{uploadProgress}%</span>
+                  <div className="flex items-center gap-3">
+                    <span>{uploadProgress}%</span>
+                    <button
+                      type="button"
+                      onClick={handleCancelUpload}
+                      className="px-2 py-0.5 text-[11px] font-semibold text-rose-300 hover:text-white bg-rose-500/20 hover:bg-rose-600 rounded-lg transition-colors flex items-center gap-1"
+                      title="Cancel upload"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Cancel</span>
+                    </button>
+                  </div>
                 </div>
                 <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
                   <div

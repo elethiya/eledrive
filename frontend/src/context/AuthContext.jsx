@@ -53,6 +53,12 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    if (window.__eledriveTransferActive) {
+      const confirmLeave = window.confirm(
+        'Upload or download is currently in progress. If you sign out now, active transfers will be cancelled. Do you want to continue?'
+      );
+      if (!confirmLeave) return;
+    }
     localStorage.removeItem('eledrive_token');
     localStorage.removeItem('eledrive_user');
     setToken(null);
