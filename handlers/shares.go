@@ -10,6 +10,7 @@ import (
 
 	"eledrive/config"
 	"eledrive/db"
+	"eledrive/events"
 	"eledrive/middleware"
 	"eledrive/models"
 	"eledrive/storage"
@@ -143,6 +144,8 @@ func (h *ShareHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 
 		db.LogActivity(claims.UserID, claims.Username, "share_team", req.TargetType, req.TargetID, team.Name, fmt.Sprintf("Shared %s with team %s", req.TargetType, team.Name))
+		events.Broadcast("team:share", "team", "share", req.TargetID, "", claims.UserID, nil)
+		events.Broadcast("share:create", "share", "create", req.TargetID, "", claims.UserID, nil)
 
 		utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
 			"id":          teamShareID,
@@ -204,6 +207,7 @@ func (h *ShareHandler) Create(w http.ResponseWriter, r *http.Request) {
 		`, claims.UserID, targetUser.ID, req.Permission, nowStr, claims.UserID)
 
 		db.LogActivity(claims.UserID, claims.Username, "share_drive", "drive", claims.UserID, targetUser.Name, fmt.Sprintf("Shared entire Drive with %s", targetUser.Name))
+		events.Broadcast("share:create", "share", "create", claims.UserID, "", claims.UserID, nil)
 
 		utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
 			"target_type": "drive",
@@ -229,6 +233,7 @@ func (h *ShareHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db.LogActivity(claims.UserID, claims.Username, "share", req.TargetType, req.TargetID, targetUser.Name, fmt.Sprintf("Shared %s with %s", req.TargetType, targetUser.Name))
+	events.Broadcast("share:create", "share", "create", req.TargetID, "", claims.UserID, nil)
 
 	utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"id":          shareID,
@@ -248,7 +253,9 @@ func (h *ShareHandler) GetSharedWithMe(w http.ResponseWriter, r *http.Request) {
 		SELECT DISTINCT f.id, f.name, f.parent_id, f.owner_id, u.name, u.email, f.is_starred, f.is_trashed, f.color, f.created_at, f.updated_at,
 		       COALESCE(s.permission, ts.permission, 'viewer') AS permission,
 		       (SELECT COUNT(*) FROM files WHERE folder_id = f.id AND is_trashed = 0) +
-		       (SELECT COUNT(*) FROM folders WHERE parent_id = f.id AND is_trashed = 0) AS item_count
+		       (SELECT COUNT(*) FROM folders WHERE parent_id = f.id AND is_trashed = 0) AS item_count,
+		       (ts.id IS NOT NULL OR (SELECT 1 FROM drive.team_shares WHERE target_type = 'folder' AND target_id = f.id LIMIT 1) IS NOT NULL) AS is_team_shared,
+		       ((SELECT 1 FROM drive.share_links WHERE target_type = 'folder' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL) AS has_share_link
 		FROM folders f
 		JOIN users u ON f.owner_id = u.id
 		LEFT JOIN shares s ON (
@@ -273,7 +280,7 @@ func (h *ShareHandler) GetSharedWithMe(w http.ResponseWriter, r *http.Request) {
 			if err := folderRows.Scan(
 				&f.ID, &f.Name, &pID, &f.OwnerID, &f.OwnerName, &f.OwnerEmail,
 				&f.IsStarred, &f.IsTrashed, &col, &f.CreatedAt, &f.UpdatedAt,
-				&perm, &f.ItemCount,
+				&perm, &f.ItemCount, &f.IsTeamShared, &f.HasShareLink,
 			); err == nil {
 				if pID.Valid {
 					f.ParentID = &pID.String
@@ -294,7 +301,9 @@ func (h *ShareHandler) GetSharedWithMe(w http.ResponseWriter, r *http.Request) {
 	fileRows, err := db.DB.Query(`
 		SELECT DISTINCT f.id, f.name, f.original_name, f.folder_id, f.owner_id, u.name, u.email,
 		       f.size, f.mime_type, f.extension, f.is_starred, f.is_trashed, f.created_at, f.updated_at,
-		       COALESCE(s.permission, ts.permission, 'viewer') AS permission
+		       COALESCE(s.permission, ts.permission, 'viewer') AS permission,
+		       (ts.id IS NOT NULL OR (SELECT 1 FROM drive.team_shares WHERE target_type = 'file' AND target_id = f.id LIMIT 1) IS NOT NULL) AS is_team_shared,
+		       ((SELECT 1 FROM drive.share_links WHERE target_type = 'file' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL) AS has_share_link
 		FROM files f
 		JOIN users u ON f.owner_id = u.id
 		LEFT JOIN shares s ON (
@@ -319,7 +328,7 @@ func (h *ShareHandler) GetSharedWithMe(w http.ResponseWriter, r *http.Request) {
 			if err := fileRows.Scan(
 				&f.ID, &f.Name, &f.OriginalName, &pID, &f.OwnerID, &f.OwnerName, &f.OwnerEmail,
 				&f.Size, &f.MimeType, &f.Extension, &f.IsStarred, &f.IsTrashed, &f.CreatedAt, &f.UpdatedAt,
-				&perm,
+				&perm, &f.IsTeamShared, &f.HasShareLink,
 			); err == nil {
 				if pID.Valid {
 					f.FolderID = &pID.String
@@ -426,5 +435,6 @@ func (h *ShareHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db.LogActivity(claims.UserID, claims.Username, "revoke_share", "share", shareID, "", "Revoked share access")
+	events.Broadcast("share:delete", "share", "delete", shareID, "", claims.UserID, nil)
 	utils.RespondSuccess(w, http.StatusOK, "Share access revoked", nil)
 }

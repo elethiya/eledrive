@@ -39,6 +39,9 @@ export default function FileCard({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const isTeamShared = Boolean(item?.is_team_shared);
+  const hasShareLink = Boolean(item?.has_share_link);
+
   const category = !isFolder ? detectFileCategory(item) : 'folder';
 
   const renderIcon = (sizeClass = 'w-5 h-5') => {
@@ -126,10 +129,21 @@ export default function FileCard({
                 setMenuOpen(false);
                 onShare(item);
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-800 hover:text-indigo-400 rounded-xl font-medium transition-colors"
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-medium transition-colors ${
+                hasShareLink
+                  ? 'bg-sky-500/15 text-sky-300 hover:bg-sky-500/25 border border-sky-500/30'
+                  : 'hover:bg-slate-800 hover:text-indigo-400 text-slate-200'
+              }`}
             >
-              <Share2 className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Share</span>
+              <div className="flex items-center gap-2.5">
+                <Share2 className={`w-3.5 h-3.5 ${hasShareLink ? 'text-sky-400' : 'text-indigo-400'}`} />
+                <span>Share</span>
+              </div>
+              {hasShareLink && (
+                <span className="text-[9px] font-bold text-sky-300 bg-sky-500/25 border border-sky-500/40 px-1.5 py-0.5 rounded">
+                  Link Active
+                </span>
+              )}
             </button>
           )}
 
@@ -200,14 +214,24 @@ export default function FileCard({
   return (
     <div
       onClick={handleCardClick}
-      className="group flex items-center justify-between px-3.5 sm:px-4 py-2.5 bg-slate-900/60 hover:bg-slate-850 active:bg-slate-800 rounded-xl border border-slate-800/80 hover:border-slate-700 transition-all select-none cursor-pointer text-xs text-slate-200"
+      className={`group flex items-center justify-between px-3.5 sm:px-4 py-2.5 rounded-xl transition-all select-none cursor-pointer text-xs text-slate-200 ${
+        isTeamShared
+          ? 'bg-gradient-to-r from-indigo-950/70 via-slate-900/90 to-indigo-950/40 border border-indigo-500/50 hover:border-indigo-400/80 hover:bg-indigo-950/80 border-l-4 border-l-indigo-500 shadow-sm shadow-indigo-950/50'
+          : 'bg-slate-900/60 hover:bg-slate-850 active:bg-slate-800 border border-slate-800/80 hover:border-slate-700'
+      }`}
     >
       {/* Column 1: Icon & Name & Mobile Details */}
       <div className="flex items-center gap-3 flex-1 min-w-0 pr-2">
         <div
-          className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border border-slate-800/80 shadow-inner"
+          className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border shadow-inner ${
+            isTeamShared ? 'border-indigo-500/40' : 'border-slate-800/80'
+          }`}
           style={{
-            backgroundColor: isFolder ? `${item.color || '#f59e0b'}18` : 'rgba(15, 23, 42, 0.8)',
+            backgroundColor: isFolder
+              ? `${item.color || '#f59e0b'}18`
+              : isTeamShared
+              ? 'rgba(49, 46, 129, 0.4)'
+              : 'rgba(15, 23, 42, 0.8)',
           }}
         >
           {renderIcon('w-4 h-4')}
@@ -219,7 +243,14 @@ export default function FileCard({
               {item.name}
             </span>
 
-            {item.shared_permission && (
+            {isTeamShared && (
+              <span className="inline-flex items-center gap-1 text-[9px] font-bold text-indigo-300 bg-indigo-500/25 border border-indigo-400/40 px-1.5 py-0.5 rounded-md shrink-0 shadow-xs">
+                <Users className="w-2.5 h-2.5 text-indigo-400" />
+                <span>Team</span>
+              </span>
+            )}
+
+            {item.shared_permission && !isTeamShared && (
               <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded-md shrink-0">
                 <Users className="w-2.5 h-2.5" />
                 <span className="hidden xs:inline">Shared</span>
@@ -284,10 +315,24 @@ export default function FileCard({
                 e.stopPropagation();
                 onShare(item);
               }}
-              className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors opacity-0 group-hover:opacity-100 hidden sm:inline-flex"
-              title="Share"
+              className={`p-1.5 rounded-lg transition-all ${
+                hasShareLink
+                  ? 'text-sky-300 bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/50 shadow-sm shadow-sky-500/30 ring-1 ring-sky-400/30 opacity-100 inline-flex'
+                  : 'text-slate-500 hover:text-indigo-400 hover:bg-slate-800 opacity-0 group-hover:opacity-100 hidden sm:inline-flex'
+              }`}
+              title={hasShareLink ? 'Public Share Link Active (Click to manage)' : 'Share'}
             >
-              <Share2 className="w-3.5 h-3.5" />
+              {hasShareLink ? (
+                <div className="relative inline-flex items-center justify-center">
+                  <Share2 className="w-3.5 h-3.5 text-sky-300" />
+                  <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-400"></span>
+                  </span>
+                </div>
+              ) : (
+                <Share2 className="w-3.5 h-3.5" />
+              )}
             </button>
           )}
 

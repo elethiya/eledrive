@@ -14,6 +14,7 @@ import (
 
 	"eledrive/config"
 	"eledrive/db"
+	"eledrive/events"
 	"eledrive/middleware"
 	"eledrive/models"
 	"eledrive/storage"
@@ -111,6 +112,7 @@ func (h *PublicShareHandler) CreateLink(w http.ResponseWriter, r *http.Request) 
 	}
 
 	shareURL := fmt.Sprintf("%s/share/%s", h.cfg.BaseURL, token)
+	events.Broadcast("link:create", "link", "create", linkID, req.TargetID, claims.UserID, nil)
 
 	utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"id":           linkID,
@@ -156,14 +158,16 @@ func (h *PublicShareHandler) GetTargetLink(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	link.HasPassword = pwHash.Valid
+	link.HasPassword = pwHash.Valid && pwHash.String != ""
 	if expAt.Valid {
 		link.ExpiresAt = &expAt.Time
 	}
 
+	shareURL := fmt.Sprintf("%s/share/%s", h.cfg.BaseURL, link.Token)
+
 	utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"link": link,
-		"url":  fmt.Sprintf("%s/share/%s", h.cfg.BaseURL, link.Token),
+		"url":  shareURL,
 	})
 }
 
@@ -179,6 +183,7 @@ func (h *PublicShareHandler) DeleteLink(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	events.Broadcast("link:delete", "link", "delete", linkID, "", claims.UserID, nil)
 	utils.RespondSuccess(w, http.StatusOK, "Share link deleted", nil)
 }
 

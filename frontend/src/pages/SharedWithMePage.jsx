@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { shareAPI, folderAPI, fileAPI } from '../api/client';
+import { useRealtimeEvent } from '../context/RealtimeContext';
 import FileCard from '../components/FileCard';
 import { Users, RefreshCw } from 'lucide-react';
 
@@ -18,6 +19,16 @@ export default function SharedWithMePage({
 
   useEffect(() => {
     loadShared();
+  }, []);
+
+  useRealtimeEvent(['file', 'folder', 'sync', 'share', 'link', 'team'], () => {
+    loadShared();
+  });
+
+  useEffect(() => {
+    const handleRefreshEvent = () => loadShared();
+    window.addEventListener('eledrive:refresh_content', handleRefreshEvent);
+    return () => window.removeEventListener('eledrive:refresh_content', handleRefreshEvent);
   }, []);
 
   const loadShared = async () => {

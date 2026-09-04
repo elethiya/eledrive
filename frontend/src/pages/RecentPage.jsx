@@ -21,9 +21,15 @@ export default function RecentPage({
   }, []);
 
   // Real-time Event Subscription for Recent files
-  useRealtimeEvent(['file', 'sync'], () => {
+  useRealtimeEvent(['file', 'sync', 'share', 'link', 'team'], () => {
     loadRecent();
   });
+
+  useEffect(() => {
+    const handleRefreshEvent = () => loadRecent();
+    window.addEventListener('eledrive:refresh_content', handleRefreshEvent);
+    return () => window.removeEventListener('eledrive:refresh_content', handleRefreshEvent);
+  }, []);
 
   const loadRecent = async () => {
     setLoading(true);

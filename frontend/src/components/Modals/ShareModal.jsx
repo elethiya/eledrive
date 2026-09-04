@@ -105,6 +105,7 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
       setSelectedUser(null);
       setSearchQuery('');
       await loadTeamShares();
+      window.dispatchEvent(new CustomEvent('eledrive:refresh_content'));
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -142,6 +143,7 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
         permission: memberPermission,
       });
       await loadTeamShares();
+      window.dispatchEvent(new CustomEvent('eledrive:refresh_content'));
       toast.success(`Successfully shared ${itemType === 'drive' ? 'My Drive' : item.name} with team "${t.name}"!`);
     } catch (err) {
       toast.error(err.response?.data?.error || err.message || 'Failed to share with team');
@@ -163,6 +165,7 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
     try {
       await shareAPI.deleteShare(shareId);
       await loadTeamShares();
+      window.dispatchEvent(new CustomEvent('eledrive:refresh_content'));
       toast.success('Share access removed');
     } catch (err) {
       toast.error(err.message);
@@ -181,6 +184,7 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
       });
       if (res.data) {
         setLinkInfo({ link: res.data, url: res.data.url });
+        window.dispatchEvent(new CustomEvent('eledrive:refresh_content'));
         toast.success('Public share link created!');
       }
     } catch (err) {
@@ -205,6 +209,7 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
     try {
       await publicShareAPI.deleteLink(linkInfo.link.id);
       setLinkInfo(null);
+      window.dispatchEvent(new CustomEvent('eledrive:refresh_content'));
       toast.success('Public share link deactivated');
     } catch (err) {
       toast.error(err.message);

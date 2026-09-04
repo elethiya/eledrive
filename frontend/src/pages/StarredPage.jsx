@@ -22,9 +22,15 @@ export default function StarredPage({
   }, []);
 
   // Real-time Event Subscription for Starred items
-  useRealtimeEvent(['file', 'folder', 'sync'], () => {
+  useRealtimeEvent(['file', 'folder', 'sync', 'share', 'link', 'team'], () => {
     loadStarred();
   });
+
+  useEffect(() => {
+    const handleRefreshEvent = () => loadStarred();
+    window.addEventListener('eledrive:refresh_content', handleRefreshEvent);
+    return () => window.removeEventListener('eledrive:refresh_content', handleRefreshEvent);
+  }, []);
 
   const loadStarred = async () => {
     setLoading(true);

@@ -39,6 +39,8 @@ type Folder struct {
 	Color            *string   `json:"color,omitempty"`
 	SharedPermission *string   `json:"shared_permission,omitempty"` // viewer or editor
 	ItemCount        int       `json:"item_count,omitempty"`
+	IsTeamShared     bool      `json:"is_team_shared"`
+	HasShareLink     bool      `json:"has_share_link"`
 	SecretUUID       string    `json:"secret_uuid,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
@@ -60,6 +62,8 @@ type File struct {
 	IsTrashed        bool      `json:"is_trashed"`
 	TrashedAt        *time.Time`json:"trashed_at,omitempty"`
 	SharedPermission *string   `json:"shared_permission,omitempty"` // viewer or editor
+	IsTeamShared     bool      `json:"is_team_shared"`
+	HasShareLink     bool      `json:"has_share_link"`
 	SecretUUID       string    `json:"secret_uuid,omitempty"`
 	ForensicMeta     string    `json:"forensic_meta,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`

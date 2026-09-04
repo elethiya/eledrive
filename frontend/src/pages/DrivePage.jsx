@@ -105,9 +105,15 @@ export default function DrivePage({
   }, [loadContent]);
 
   // Real-time Event Subscription: load everything in real time without refreshing
-  useRealtimeEvent(['file', 'folder', 'trash', 'sync', 'item'], () => {
+  useRealtimeEvent(['file', 'folder', 'trash', 'sync', 'item', 'share', 'link', 'team'], () => {
     loadContent(false);
   });
+
+  useEffect(() => {
+    const handleRefreshEvent = () => loadContent(false);
+    window.addEventListener('eledrive:refresh_content', handleRefreshEvent);
+    return () => window.removeEventListener('eledrive:refresh_content', handleRefreshEvent);
+  }, [loadContent]);
 
   // Navigation handlers
   const handleOpenItem = (item) => {

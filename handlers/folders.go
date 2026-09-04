@@ -162,7 +162,9 @@ func (h *FolderHandler) GetContents(w http.ResponseWriter, r *http.Request) {
 			SELECT DISTINCT f.id, f.name, f.parent_id, f.owner_id, u.name, u.email, f.is_starred, f.is_trashed, f.color, f.created_at, f.updated_at,
 			       (SELECT COUNT(*) FROM files WHERE folder_id = f.id AND is_trashed = 0) +
 			       (SELECT COUNT(*) FROM folders WHERE parent_id = f.id AND is_trashed = 0) AS item_count,
-			       COALESCE(s.permission, ts.permission, 'viewer') AS permission
+			       COALESCE(s.permission, ts.permission, 'viewer') AS permission,
+			       (ts.id IS NOT NULL OR (SELECT 1 FROM drive.team_shares WHERE target_type = 'folder' AND target_id = f.id LIMIT 1) IS NOT NULL) AS is_team_shared,
+			       ((SELECT 1 FROM drive.share_links WHERE target_type = 'folder' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL) AS has_share_link
 			FROM folders f
 			JOIN users u ON f.owner_id = u.id
 			LEFT JOIN shares s ON (
@@ -187,7 +189,7 @@ func (h *FolderHandler) GetContents(w http.ResponseWriter, r *http.Request) {
 				if err := folderRows.Scan(
 					&f.ID, &f.Name, &pID, &f.OwnerID, &f.OwnerName, &f.OwnerEmail,
 					&f.IsStarred, &f.IsTrashed, &col, &f.CreatedAt, &f.UpdatedAt,
-					&f.ItemCount, &perm,
+					&f.ItemCount, &perm, &f.IsTeamShared, &f.HasShareLink,
 				); err == nil {
 					if pID.Valid {
 						f.ParentID = &pID.String
@@ -208,7 +210,9 @@ func (h *FolderHandler) GetContents(w http.ResponseWriter, r *http.Request) {
 		fileRows, err := db.DB.Query(`
 			SELECT DISTINCT f.id, f.name, f.original_name, f.folder_id, f.owner_id, u.name, u.email,
 			       f.size, f.mime_type, f.extension, f.is_starred, f.is_trashed, f.created_at, f.updated_at,
-			       COALESCE(s.permission, ts.permission, 'viewer') AS permission
+			       COALESCE(s.permission, ts.permission, 'viewer') AS permission,
+			       (ts.id IS NOT NULL OR (SELECT 1 FROM drive.team_shares WHERE target_type = 'file' AND target_id = f.id LIMIT 1) IS NOT NULL) AS is_team_shared,
+			       ((SELECT 1 FROM drive.share_links WHERE target_type = 'file' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL) AS has_share_link
 			FROM files f
 			JOIN users u ON f.owner_id = u.id
 			LEFT JOIN shares s ON (
@@ -233,7 +237,7 @@ func (h *FolderHandler) GetContents(w http.ResponseWriter, r *http.Request) {
 				if err := fileRows.Scan(
 					&f.ID, &f.Name, &f.OriginalName, &pID, &f.OwnerID, &f.OwnerName, &f.OwnerEmail,
 					&f.Size, &f.MimeType, &f.Extension, &f.IsStarred, &f.IsTrashed, &f.CreatedAt, &f.UpdatedAt,
-					&perm,
+					&perm, &f.IsTeamShared, &f.HasShareLink,
 				); err == nil {
 					if pID.Valid {
 						f.FolderID = &pID.String
@@ -303,7 +307,9 @@ func (h *FolderHandler) GetContents(w http.ResponseWriter, r *http.Request) {
 		folderRows, err = db.DB.Query(`
 			SELECT f.id, f.name, f.parent_id, f.owner_id, u.name, u.email, f.is_starred, f.is_trashed, f.color, f.created_at, f.updated_at,
 			       (SELECT COUNT(*) FROM files WHERE folder_id = f.id AND is_trashed = 0) +
-			       (SELECT COUNT(*) FROM folders WHERE parent_id = f.id AND is_trashed = 0) AS item_count
+			       (SELECT COUNT(*) FROM folders WHERE parent_id = f.id AND is_trashed = 0) AS item_count,
+			       ((SELECT 1 FROM drive.team_shares WHERE (target_type = 'folder' AND target_id = f.id) OR (target_type = 'drive' AND shared_by_user_id = f.owner_id) LIMIT 1) IS NOT NULL) AS is_team_shared,
+			       ((SELECT 1 FROM drive.share_links WHERE target_type = 'folder' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL) AS has_share_link
 			FROM folders f
 			JOIN users u ON f.owner_id = u.id
 			WHERE f.owner_id = ? AND f.parent_id IS NULL AND f.is_trashed = 0
@@ -313,7 +319,9 @@ func (h *FolderHandler) GetContents(w http.ResponseWriter, r *http.Request) {
 		folderRows, err = db.DB.Query(`
 			SELECT f.id, f.name, f.parent_id, f.owner_id, u.name, u.email, f.is_starred, f.is_trashed, f.color, f.created_at, f.updated_at,
 			       (SELECT COUNT(*) FROM files WHERE folder_id = f.id AND is_trashed = 0) +
-			       (SELECT COUNT(*) FROM folders WHERE parent_id = f.id AND is_trashed = 0) AS item_count
+			       (SELECT COUNT(*) FROM folders WHERE parent_id = f.id AND is_trashed = 0) AS item_count,
+			       ((SELECT 1 FROM drive.team_shares WHERE (target_type = 'folder' AND target_id = f.id) OR (target_type = 'drive' AND shared_by_user_id = f.owner_id) LIMIT 1) IS NOT NULL) AS is_team_shared,
+			       ((SELECT 1 FROM drive.share_links WHERE target_type = 'folder' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL) AS has_share_link
 			FROM folders f
 			JOIN users u ON f.owner_id = u.id
 			WHERE f.parent_id = ? AND f.is_trashed = 0
@@ -333,6 +341,7 @@ func (h *FolderHandler) GetContents(w http.ResponseWriter, r *http.Request) {
 		if err := folderRows.Scan(
 			&f.ID, &f.Name, &pID, &f.OwnerID, &f.OwnerName, &f.OwnerEmail,
 			&f.IsStarred, &f.IsTrashed, &col, &f.CreatedAt, &f.UpdatedAt, &f.ItemCount,
+			&f.IsTeamShared, &f.HasShareLink,
 		); err == nil {
 			if pID.Valid {
 				f.ParentID = &pID.String
@@ -351,7 +360,9 @@ func (h *FolderHandler) GetContents(w http.ResponseWriter, r *http.Request) {
 	if folderID == "" {
 		fileRows, err = db.DB.Query(`
 			SELECT f.id, f.name, f.original_name, f.folder_id, f.owner_id, u.name, u.email,
-			       f.size, f.mime_type, f.extension, f.is_starred, f.is_trashed, f.created_at, f.updated_at
+			       f.size, f.mime_type, f.extension, f.is_starred, f.is_trashed, f.created_at, f.updated_at,
+			       ((SELECT 1 FROM drive.team_shares WHERE (target_type = 'file' AND target_id = f.id) OR (target_type = 'drive' AND shared_by_user_id = f.owner_id) LIMIT 1) IS NOT NULL) AS is_team_shared,
+			       ((SELECT 1 FROM drive.share_links WHERE target_type = 'file' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL) AS has_share_link
 			FROM files f
 			JOIN users u ON f.owner_id = u.id
 			WHERE f.owner_id = ? AND f.folder_id IS NULL AND f.is_trashed = 0
@@ -360,7 +371,9 @@ func (h *FolderHandler) GetContents(w http.ResponseWriter, r *http.Request) {
 	} else {
 		fileRows, err = db.DB.Query(`
 			SELECT f.id, f.name, f.original_name, f.folder_id, f.owner_id, u.name, u.email,
-			       f.size, f.mime_type, f.extension, f.is_starred, f.is_trashed, f.created_at, f.updated_at
+			       f.size, f.mime_type, f.extension, f.is_starred, f.is_trashed, f.created_at, f.updated_at,
+			       ((SELECT 1 FROM drive.team_shares WHERE (target_type = 'file' AND target_id = f.id) OR (target_type = 'drive' AND shared_by_user_id = f.owner_id) LIMIT 1) IS NOT NULL) AS is_team_shared,
+			       ((SELECT 1 FROM drive.share_links WHERE target_type = 'file' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL) AS has_share_link
 			FROM files f
 			JOIN users u ON f.owner_id = u.id
 			WHERE f.folder_id = ? AND f.is_trashed = 0
@@ -380,6 +393,7 @@ func (h *FolderHandler) GetContents(w http.ResponseWriter, r *http.Request) {
 		if err := fileRows.Scan(
 			&f.ID, &f.Name, &f.OriginalName, &fID, &f.OwnerID, &f.OwnerName, &f.OwnerEmail,
 			&f.Size, &f.MimeType, &f.Extension, &f.IsStarred, &f.IsTrashed, &f.CreatedAt, &f.UpdatedAt,
+			&f.IsTeamShared, &f.HasShareLink,
 		); err == nil {
 			if fID.Valid {
 				f.FolderID = &fID.String
