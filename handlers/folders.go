@@ -163,8 +163,8 @@ func (h *FolderHandler) GetContents(w http.ResponseWriter, r *http.Request) {
 			       (SELECT COUNT(*) FROM files WHERE folder_id = f.id AND is_trashed = 0) +
 			       (SELECT COUNT(*) FROM folders WHERE parent_id = f.id AND is_trashed = 0) AS item_count,
 			       COALESCE(s.permission, ts.permission, 'viewer') AS permission,
-			       (ts.id IS NOT NULL OR (SELECT 1 FROM drive.team_shares WHERE target_type = 'folder' AND target_id = f.id LIMIT 1) IS NOT NULL) AS is_team_shared,
-			       ((SELECT 1 FROM drive.share_links WHERE target_type = 'folder' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL) AS has_share_link
+			       0 AS is_team_shared,
+			       0 AS has_share_link
 			FROM folders f
 			JOIN users u ON f.owner_id = u.id
 			LEFT JOIN shares s ON (
@@ -211,8 +211,8 @@ func (h *FolderHandler) GetContents(w http.ResponseWriter, r *http.Request) {
 			SELECT DISTINCT f.id, f.name, f.original_name, f.folder_id, f.owner_id, u.name, u.email,
 			       f.size, f.mime_type, f.extension, f.is_starred, f.is_trashed, f.created_at, f.updated_at,
 			       COALESCE(s.permission, ts.permission, 'viewer') AS permission,
-			       (ts.id IS NOT NULL OR (SELECT 1 FROM drive.team_shares WHERE target_type = 'file' AND target_id = f.id LIMIT 1) IS NOT NULL) AS is_team_shared,
-			       ((SELECT 1 FROM drive.share_links WHERE target_type = 'file' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL) AS has_share_link
+			       0 AS is_team_shared,
+			       0 AS has_share_link
 			FROM files f
 			JOIN users u ON f.owner_id = u.id
 			LEFT JOIN shares s ON (
@@ -320,13 +320,13 @@ func (h *FolderHandler) GetContents(w http.ResponseWriter, r *http.Request) {
 			SELECT f.id, f.name, f.parent_id, f.owner_id, u.name, u.email, f.is_starred, f.is_trashed, f.color, f.created_at, f.updated_at,
 			       (SELECT COUNT(*) FROM files WHERE folder_id = f.id AND is_trashed = 0) +
 			       (SELECT COUNT(*) FROM folders WHERE parent_id = f.id AND is_trashed = 0) AS item_count,
-			       ((SELECT 1 FROM drive.team_shares WHERE (target_type = 'folder' AND target_id = f.id) OR (target_type = 'drive' AND shared_by_user_id = f.owner_id) LIMIT 1) IS NOT NULL) AS is_team_shared,
-			       ((SELECT 1 FROM drive.share_links WHERE target_type = 'folder' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL) AS has_share_link
+			       ((f.owner_id = ? AND (SELECT 1 FROM drive.team_shares WHERE (target_type = 'folder' AND target_id = f.id) OR (target_type = 'drive' AND shared_by_user_id = f.owner_id) LIMIT 1) IS NOT NULL)) AS is_team_shared,
+			       ((f.owner_id = ? AND (SELECT 1 FROM drive.share_links WHERE target_type = 'folder' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL)) AS has_share_link
 			FROM folders f
 			JOIN users u ON f.owner_id = u.id
 			WHERE f.parent_id = ? AND f.is_trashed = 0
 			ORDER BY f.name COLLATE NOCASE ASC
-		`, folderID)
+		`, claims.UserID, claims.UserID, folderID)
 	}
 
 	if err != nil {
@@ -372,13 +372,13 @@ func (h *FolderHandler) GetContents(w http.ResponseWriter, r *http.Request) {
 		fileRows, err = db.DB.Query(`
 			SELECT f.id, f.name, f.original_name, f.folder_id, f.owner_id, u.name, u.email,
 			       f.size, f.mime_type, f.extension, f.is_starred, f.is_trashed, f.created_at, f.updated_at,
-			       ((SELECT 1 FROM drive.team_shares WHERE (target_type = 'file' AND target_id = f.id) OR (target_type = 'folder' AND target_id = f.folder_id) OR (target_type = 'drive' AND shared_by_user_id = f.owner_id) LIMIT 1) IS NOT NULL) AS is_team_shared,
-			       ((SELECT 1 FROM drive.share_links WHERE target_type = 'file' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL) AS has_share_link
+			       ((f.owner_id = ? AND (SELECT 1 FROM drive.team_shares WHERE (target_type = 'file' AND target_id = f.id) OR (target_type = 'folder' AND target_id = f.folder_id) OR (target_type = 'drive' AND shared_by_user_id = f.owner_id) LIMIT 1) IS NOT NULL)) AS is_team_shared,
+			       ((f.owner_id = ? AND (SELECT 1 FROM drive.share_links WHERE target_type = 'file' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL)) AS has_share_link
 			FROM files f
 			JOIN users u ON f.owner_id = u.id
 			WHERE f.folder_id = ? AND f.is_trashed = 0
 			ORDER BY f.name COLLATE NOCASE ASC
-		`, folderID)
+		`, claims.UserID, claims.UserID, folderID)
 	}
 
 	if err != nil {

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { formatBytes, formatDate, getFileTypeCategory, detectFileCategory } from '../utils/formatters';
 import { fileAPI } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 export default function FileCard({
   item,
@@ -37,10 +38,13 @@ export default function FileCard({
   onTrash,
   onShowDetails,
 }) {
+  const { user } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const isTeamShared = Boolean(item?.is_team_shared);
-  const hasShareLink = Boolean(item?.has_share_link);
+  // Only highlight user's own files and folders from their side
+  const isOwner = Boolean(user && item?.owner_id && user.id === item.owner_id);
+  const isTeamShared = Boolean(item?.is_team_shared && isOwner);
+  const hasShareLink = Boolean(item?.has_share_link && isOwner);
 
   const category = !isFolder ? detectFileCategory(item) : 'folder';
 

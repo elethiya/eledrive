@@ -95,15 +95,15 @@ func (h *StatsHandler) GetRecent(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.DB.Query(`
 		SELECT f.id, f.name, f.original_name, f.folder_id, f.owner_id, u.name, u.email,
 		       f.size, f.mime_type, f.extension, f.is_starred, f.is_trashed, f.created_at, f.updated_at,
-		       ((SELECT 1 FROM drive.team_shares WHERE (target_type = 'file' AND target_id = f.id) OR (f.folder_id IS NOT NULL AND target_type = 'folder' AND target_id = f.folder_id) OR (target_type = 'drive' AND shared_by_user_id = f.owner_id) LIMIT 1) IS NOT NULL) AS is_team_shared,
-		       ((SELECT 1 FROM drive.share_links WHERE target_type = 'file' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL) AS has_share_link
+		       ((f.owner_id = ? AND (SELECT 1 FROM drive.team_shares WHERE (target_type = 'file' AND target_id = f.id) OR (f.folder_id IS NOT NULL AND target_type = 'folder' AND target_id = f.folder_id) OR (target_type = 'drive' AND shared_by_user_id = f.owner_id) LIMIT 1) IS NOT NULL)) AS is_team_shared,
+		       ((f.owner_id = ? AND (SELECT 1 FROM drive.share_links WHERE target_type = 'file' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL)) AS has_share_link
 		FROM files f
 		JOIN users u ON f.owner_id = u.id
 		WHERE (f.owner_id = ? OR f.id IN (SELECT target_id FROM shares WHERE target_type = 'file' AND shared_with_user_id = ?))
 		  AND f.is_trashed = 0
 		ORDER BY f.updated_at DESC
 		LIMIT 40
-	`, claims.UserID, claims.UserID)
+	`, claims.UserID, claims.UserID, claims.UserID, claims.UserID)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, "Database error")
 		return

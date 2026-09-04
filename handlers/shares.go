@@ -205,8 +205,8 @@ func (h *ShareHandler) GetSharedWithMe(w http.ResponseWriter, r *http.Request) {
 		       COALESCE(s.permission, ts.permission, 'viewer') AS permission,
 		       (SELECT COUNT(*) FROM files WHERE folder_id = f.id AND is_trashed = 0) +
 		       (SELECT COUNT(*) FROM folders WHERE parent_id = f.id AND is_trashed = 0) AS item_count,
-		       (ts.id IS NOT NULL OR (SELECT 1 FROM drive.team_shares WHERE target_type = 'folder' AND target_id = f.id LIMIT 1) IS NOT NULL) AS is_team_shared,
-		       ((SELECT 1 FROM drive.share_links WHERE target_type = 'folder' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL) AS has_share_link
+		       0 AS is_team_shared,
+		       0 AS has_share_link
 		FROM folders f
 		JOIN users u ON f.owner_id = u.id
 		LEFT JOIN shares s ON (
@@ -253,8 +253,8 @@ func (h *ShareHandler) GetSharedWithMe(w http.ResponseWriter, r *http.Request) {
 		SELECT DISTINCT f.id, f.name, f.original_name, f.folder_id, f.owner_id, u.name, u.email,
 		       f.size, f.mime_type, f.extension, f.is_starred, f.is_trashed, f.created_at, f.updated_at,
 		       COALESCE(s.permission, ts.permission, 'viewer') AS permission,
-		       (ts.id IS NOT NULL OR (SELECT 1 FROM drive.team_shares WHERE target_type = 'file' AND target_id = f.id LIMIT 1) IS NOT NULL) AS is_team_shared,
-		       ((SELECT 1 FROM drive.share_links WHERE target_type = 'file' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL) AS has_share_link
+		       0 AS is_team_shared,
+		       0 AS has_share_link
 		FROM files f
 		JOIN users u ON f.owner_id = u.id
 		LEFT JOIN shares s ON (
