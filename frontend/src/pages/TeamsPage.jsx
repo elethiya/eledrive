@@ -432,14 +432,17 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950 text-slate-100">
       {/* Header */}
-      <div className="px-4 sm:px-6 py-3.5 border-b border-slate-800 bg-slate-900/60 backdrop-blur-md flex items-center justify-between gap-3 shrink-0">
+      <div className="px-3.5 sm:px-6 py-3 border-b border-slate-800 bg-slate-900/60 backdrop-blur-md flex items-center justify-between gap-2.5 sm:gap-3 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold shadow-md shadow-blue-600/20 shrink-0">
             <Users className="w-4 h-4" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="text-sm sm:text-base font-bold text-slate-100 truncate">Teams & Workspaces</h1>
+              <h1 className="text-sm sm:text-base font-bold text-slate-100 truncate">
+                <span className="sm:hidden">Teams</span>
+                <span className="hidden sm:inline">Teams & Workspaces</span>
+              </h1>
               <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 shrink-0">
                 {teams.length} {teams.length === 1 ? 'Team' : 'Teams'}
               </span>
@@ -450,7 +453,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={async () => {
               setIsRefreshing(true);
@@ -474,7 +477,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
 
           <button
             onClick={() => setCreateModalOpen(true)}
-            className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/20 transition-all transform hover:-translate-y-0.5"
+            className="flex items-center justify-center gap-1.5 px-2.5 py-2 sm:px-3 sm:py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/20 transition-all transform hover:-translate-y-0.5"
             title="Create New Team"
           >
             <Plus className="w-4 h-4" />
@@ -484,9 +487,9 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 space-y-4 sm:space-y-6">
         {/* Search Bar */}
-        <div className="max-w-md relative">
+        <div className="w-full max-w-md relative">
           <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
           <input
             type="text"
@@ -511,14 +514,14 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
             Loading team workspaces...
           </div>
         ) : filteredTeams.length === 0 ? (
-          <div className="h-80 flex flex-col items-center justify-center text-center max-w-sm mx-auto">
-            <div className="w-16 h-16 rounded-3xl bg-slate-900 border border-slate-800 text-blue-400 flex items-center justify-center mb-4 shadow-xl">
-              <Users className="w-8 h-8" />
+          <div className="h-80 flex flex-col items-center justify-center text-center max-w-sm mx-auto p-4">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-slate-900 border border-slate-800 text-blue-400 flex items-center justify-center mb-4 shadow-xl">
+              <Users className="w-7 h-7 sm:w-8 sm:h-8" />
             </div>
-            <h3 className="text-base font-bold text-slate-100 mb-1">
+            <h3 className="text-sm sm:text-base font-bold text-slate-100 mb-1">
               {searchQuery ? 'No teams match your search' : 'No teams created yet'}
             </h3>
-            <p className="text-xs text-slate-400 mb-6">
+            <p className="text-xs text-slate-400 mb-5">
               Create a team to easily organize teammates and share folders with everyone at once.
             </p>
             <button
@@ -531,8 +534,8 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
           </div>
         ) : (
           <div className="space-y-3">
-            {/* Table Header (Unified single Team Name & Sort header on desktop and mobile) */}
-            <div className="flex items-center justify-between px-4 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800/80 select-none bg-slate-900/30 rounded-xl">
+            {/* Table Header (Visible on sm: and up) */}
+            <div className="hidden sm:flex items-center justify-between px-4 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800/80 select-none bg-slate-900/30 rounded-xl">
               <button
                 onClick={() => handleHeaderSort('name')}
                 className="flex items-center gap-1.5 hover:text-slate-200 transition-colors flex-1 text-left font-bold"
@@ -547,7 +550,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
               </button>
 
               <div className="flex items-center gap-3 sm:gap-6 shrink-0">
-                <span className="w-24 text-center hidden sm:inline">Role</span>
+                <span className="w-24 text-center">Role</span>
 
                 <button
                   onClick={() => handleHeaderSort('members')}
@@ -571,115 +574,193 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                   )}
                 </button>
 
-                <span className="w-28 sm:w-44 text-right pr-2 hidden sm:inline">Actions</span>
+                <span className="w-28 sm:w-44 text-right pr-2">Actions</span>
               </div>
             </div>
 
             {/* List Rows */}
-            <div className="space-y-1.5">
+            <div className="space-y-2 sm:space-y-1.5">
               {sortedTeams.map((t) => {
                 const isLeader = t.user_role === 'leader' || t.created_by_user_id === user?.id;
                 return (
-                  <div
-                    key={t.id}
-                    onClick={() => handleOpenTeam(t.id, 'members')}
-                    className="group flex items-center justify-between px-4 py-3 bg-slate-900/70 hover:bg-slate-850 active:bg-slate-800 rounded-xl border border-slate-800/80 hover:border-slate-700 hover:shadow-xs transition-all select-none cursor-pointer text-xs text-slate-200"
-                  >
-                    {/* Team info: Avatar + Name + Description */}
-                    <div className="flex items-center gap-3.5 flex-1 min-w-0 pr-4">
-                      <div
-                        className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-sm shadow-md shrink-0 ring-1 ring-white/10"
-                        style={{ backgroundColor: t.avatar_color || '#3b82f6' }}
-                      >
-                        {t.name.charAt(0).toUpperCase()}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-slate-100 group-hover:text-blue-400 transition-colors truncate">
-                            {t.name}
-                          </span>
-                          {(t.creator_name || t.creator_username) && (
-                            <span className="text-[10px] text-slate-400 font-mono hidden lg:inline">
-                              by {t.creator_name} {t.creator_username && `(@${t.creator_username})`}
-                            </span>
-                          )}
+                  <React.Fragment key={t.id}>
+                    {/* Mobile-Optimized Card View (< sm) */}
+                    <div
+                      onClick={() => handleOpenTeam(t.id, 'members')}
+                      className="sm:hidden p-3.5 bg-slate-900/80 hover:bg-slate-850 active:bg-slate-800 rounded-2xl border border-slate-800/80 shadow-xs transition-all cursor-pointer space-y-2.5 select-none"
+                    >
+                      <div className="flex items-start justify-between gap-2.5">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div
+                            className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-base shadow-md shrink-0 ring-1 ring-white/10"
+                            style={{ backgroundColor: t.avatar_color || '#3b82f6' }}
+                          >
+                            {t.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-slate-100 truncate text-xs">{t.name}</span>
+                              <span
+                                className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0 ${
+                                  isLeader
+                                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                                }`}
+                              >
+                                {isLeader ? 'Leader' : 'Member'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
+                              {t.description || 'No description provided.'}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-[11px] text-slate-400 truncate mt-0.5 max-w-xl">
-                          {t.description || 'No description provided.'}
-                        </p>
-                      </div>
-                    </div>
 
-                    {/* Meta and actions */}
-                    <div className="flex items-center gap-4 sm:gap-6 shrink-0 text-slate-400">
-                      {/* Role Pill */}
-                      <div className="w-24 justify-center hidden sm:flex">
-                        <span
-                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-                            isLeader
-                              ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                              : 'bg-slate-800 text-slate-400 border-slate-700'
-                          }`}
-                        >
-                          {isLeader ? 'Leader' : 'Member'}
-                        </span>
+                        <div className="flex items-center gap-1 text-[11px] text-slate-300 shrink-0 font-mono bg-slate-950 px-2 py-1 rounded-lg border border-slate-800/80">
+                          <Users className="w-3 h-3 text-slate-500" />
+                          <span>{t.members_count || 0}</span>
+                        </div>
                       </div>
 
-                      {/* Members Count */}
-                      <div className="w-24 flex items-center justify-center gap-1.5 text-xs text-slate-300">
-                        <Users className="w-3.5 h-3.5 text-slate-500" />
-                        <span>{t.members_count || 0}</span>
-                      </div>
-
-                      {/* Created Date */}
-                      <span className="w-28 text-right hidden md:inline text-[11px] text-slate-500 font-mono">
-                        {formatDate(t.created_at)}
-                      </span>
-
-                      {/* Action Buttons */}
-                      <div className="w-28 sm:w-44 flex items-center justify-end gap-1.5">
+                      {/* Mobile Quick Action Buttons Full-Width Bar */}
+                      <div className="grid grid-cols-3 gap-1.5 pt-1.5 border-t border-slate-800/80">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleOpenTeam(t.id, 'members');
                           }}
-                          className="flex items-center justify-center gap-1 p-1.5 sm:px-2 sm:py-1 rounded-lg bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-300 text-[11px] font-medium transition-colors"
-                          title="View & manage members"
+                          className="flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg bg-slate-800/90 active:bg-blue-600 text-slate-200 active:text-white text-[11px] font-semibold transition-colors"
                         >
-                          <Users className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Members</span>
+                          <Users className="w-3 h-3 text-blue-400" />
+                          <span>Members</span>
                         </button>
-
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleOpenTeam(t.id, 'shares');
                           }}
-                          className="flex items-center justify-center gap-1 p-1.5 sm:px-2 sm:py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-300 text-[11px] font-medium transition-colors"
-                          title="View shared folders & files"
+                          className="flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg bg-slate-800/90 active:bg-emerald-600 text-slate-200 active:text-white text-[11px] font-semibold transition-colors"
                         >
-                          <FolderOpen className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Shares</span>
+                          <FolderOpen className="w-3 h-3 text-emerald-400" />
+                          <span>Shares</span>
                         </button>
-
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleOpenTeam(t.id, 'settings');
                           }}
-                          className="flex items-center justify-center gap-1 p-1.5 sm:px-2 sm:py-1 rounded-lg bg-slate-800 hover:bg-purple-600 hover:text-white text-slate-300 text-[11px] font-medium transition-colors"
-                          title="Team settings & danger zone"
+                          className="flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg bg-slate-800/90 active:bg-purple-600 text-slate-200 active:text-white text-[11px] font-semibold transition-colors"
                         >
-                          <Settings className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Settings</span>
+                          <Settings className="w-3 h-3 text-purple-400" />
+                          <span>Settings</span>
                         </button>
                       </div>
                     </div>
-                  </div>
+
+                    {/* Desktop/Tablet Row View (>= sm) */}
+                    <div
+                      onClick={() => handleOpenTeam(t.id, 'members')}
+                      className="hidden sm:flex items-center justify-between px-4 py-3 bg-slate-900/70 hover:bg-slate-850 active:bg-slate-800 rounded-xl border border-slate-800/80 hover:border-slate-700 hover:shadow-xs transition-all select-none cursor-pointer text-xs text-slate-200"
+                    >
+                      {/* Team info: Avatar + Name + Description */}
+                      <div className="flex items-center gap-3.5 flex-1 min-w-0 pr-4">
+                        <div
+                          className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-sm shadow-md shrink-0 ring-1 ring-white/10"
+                          style={{ backgroundColor: t.avatar_color || '#3b82f6' }}
+                        >
+                          {t.name.charAt(0).toUpperCase()}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-slate-100 group-hover:text-blue-400 transition-colors truncate">
+                              {t.name}
+                            </span>
+                            {(t.creator_name || t.creator_username) && (
+                              <span className="text-[10px] text-slate-400 font-mono hidden lg:inline">
+                                by {t.creator_name} {t.creator_username && `(@${t.creator_username})`}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 truncate mt-0.5 max-w-xl">
+                            {t.description || 'No description provided.'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Meta and actions */}
+                      <div className="flex items-center gap-4 sm:gap-6 shrink-0 text-slate-400">
+                        {/* Role Pill */}
+                        <div className="w-24 justify-center flex">
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                              isLeader
+                                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                : 'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}
+                          >
+                            {isLeader ? 'Leader' : 'Member'}
+                          </span>
+                        </div>
+
+                        {/* Members Count */}
+                        <div className="w-16 sm:w-24 flex items-center justify-center gap-1.5 text-xs text-slate-300">
+                          <Users className="w-3.5 h-3.5 text-slate-500" />
+                          <span>{t.members_count || 0}</span>
+                        </div>
+
+                        {/* Created Date */}
+                        <span className="w-28 text-right hidden md:inline text-[11px] text-slate-500 font-mono">
+                          {formatDate(t.created_at)}
+                        </span>
+
+                        {/* Action Buttons */}
+                        <div className="w-28 sm:w-44 flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenTeam(t.id, 'members');
+                            }}
+                            className="flex items-center justify-center gap-1 p-1.5 sm:px-2 sm:py-1 rounded-lg bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-300 text-[11px] font-medium transition-colors"
+                            title="View & manage members"
+                          >
+                            <Users className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Members</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenTeam(t.id, 'shares');
+                            }}
+                            className="flex items-center justify-center gap-1 p-1.5 sm:px-2 sm:py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-300 text-[11px] font-medium transition-colors"
+                            title="View shared folders & files"
+                          >
+                            <FolderOpen className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Shares</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenTeam(t.id, 'settings');
+                            }}
+                            className="flex items-center justify-center gap-1 p-1.5 sm:px-2 sm:py-1 rounded-lg bg-slate-800 hover:bg-purple-600 hover:text-white text-slate-300 text-[11px] font-medium transition-colors"
+                            title="Team settings & danger zone"
+                          >
+                            <Settings className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Settings</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </React.Fragment>
                 );
               })}
             </div>
@@ -689,12 +770,12 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
 
       {/* Create Team Modal */}
       {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
-          <div className="relative bg-slate-900 rounded-3xl max-w-md w-full border border-slate-800 p-5 sm:p-6 shadow-2xl shadow-black/80 space-y-4 overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
+          <div className="relative bg-slate-900 rounded-2xl sm:rounded-3xl max-w-md w-full border border-slate-800 p-4 sm:p-6 shadow-2xl shadow-black/80 space-y-4 overflow-hidden max-h-[90vh] flex flex-col">
             {/* Ambient Top Glow */}
             <div className="absolute -top-16 -left-16 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
-            <div className="flex items-center justify-between relative z-10">
+            <div className="flex items-center justify-between relative z-10 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold shadow-md shadow-blue-500/10">
                   <Users className="w-4 h-4" />
@@ -709,7 +790,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
               </button>
             </div>
 
-            <form onSubmit={handleCreateTeam} className="space-y-4">
+            <form onSubmit={handleCreateTeam} className="space-y-4 overflow-y-auto flex-1 pr-0.5">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                   Team Name *
@@ -748,7 +829,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                       key={c}
                       type="button"
                       onClick={() => setNewTeamColor(c)}
-                      className={`w-7 h-7 rounded-full flex items-center justify-center transition-transform ${
+                      className={`w-8 h-8 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-transform ${
                         newTeamColor === c ? 'scale-125 ring-2 ring-white ring-offset-2 ring-offset-slate-900' : 'hover:scale-110'
                       }`}
                       style={{ backgroundColor: c }}
@@ -764,7 +845,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                   Add Teammates Now ({selectedInitialMembers.length} selected)
                 </label>
-                <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-2 divide-y divide-slate-900">
+                <div className="max-h-32 sm:max-h-36 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-2 divide-y divide-slate-900">
                   {availableUsers.length === 0 ? (
                     <div className="p-3 text-center text-slate-500 text-xs">
                       No other approved users in workspace yet.
@@ -784,21 +865,21 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                           }}
                           className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer transition-colors"
                         >
-                          <div className="flex items-center gap-2.5">
+                          <div className="flex items-center gap-2.5 min-w-0">
                             <div
-                              className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
+                              className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
                               style={{ backgroundColor: u.avatar_color || '#3b82f6' }}
                             >
                               {u.name.charAt(0).toUpperCase()}
                             </div>
-                            <div>
-                              <div className="text-xs font-medium text-slate-200">{u.name}</div>
-                              <div className="text-[10px] text-slate-400 font-mono">@{u.username} • {u.email}</div>
+                            <div className="min-w-0">
+                              <div className="text-xs font-medium text-slate-200 truncate">{u.name}</div>
+                              <div className="text-[10px] text-slate-400 font-mono truncate">@{u.username} • {u.email}</div>
                             </div>
                           </div>
 
                           <div
-                            className={`w-4 h-4 rounded border flex items-center justify-center ${
+                            className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ml-2 ${
                               isSelected ? 'bg-blue-600 border-blue-500 text-white' : 'border-slate-700'
                             }`}
                           >
@@ -815,7 +896,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                 <p className="text-xs text-red-400 font-medium">{createError}</p>
               )}
 
-              <div className="flex justify-end gap-2.5 pt-2">
+              <div className="flex justify-end gap-2.5 pt-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setCreateModalOpen(false)}
@@ -861,25 +942,25 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
-            <div className="relative bg-slate-900 rounded-3xl max-w-2xl w-full border border-slate-800 shadow-2xl shadow-black/80 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="relative bg-slate-900 rounded-2xl sm:rounded-3xl max-w-2xl w-full border border-slate-800 shadow-2xl shadow-black/80 overflow-hidden flex flex-col max-h-[90vh]">
               {/* Ambient Top Glow */}
               <div className="absolute -top-16 -left-16 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
               {/* Modal Header */}
-              <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-950/60 relative z-10 shrink-0">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-3.5">
+              <div className="p-3.5 sm:p-5 border-b border-slate-800 bg-slate-950/60 relative z-10 shrink-0">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
                     <div
-                      className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-white text-lg sm:text-xl shadow-lg shrink-0 ring-1 ring-white/10"
+                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center font-bold text-white text-base sm:text-xl shadow-lg shrink-0 ring-1 ring-white/10"
                       style={{ backgroundColor: activeTeam.avatar_color || '#3b82f6' }}
                     >
                       {activeTeam.name.charAt(0).toUpperCase()}
                     </div>
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h2 className="text-base sm:text-lg font-bold text-slate-100">{activeTeam.name}</h2>
+                        <h2 className="text-sm sm:text-lg font-bold text-slate-100 truncate">{activeTeam.name}</h2>
                         <span
-                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                          className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded border shrink-0 ${
                             isOwner
                               ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
                               : isLeader
@@ -890,7 +971,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                           {isOwner ? 'Owner' : isLeader ? 'Leader' : 'Member'}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">
+                      <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 line-clamp-1">
                         {activeTeam.description || 'No description set for this team workspace.'}
                       </p>
                     </div>
@@ -905,18 +986,19 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                 </div>
 
                 {/* Tab Navigation */}
-                <div className="flex items-center gap-1.5 mt-4 pt-3 border-t border-slate-800/80">
+                <div className="flex items-center gap-1.5 mt-3 sm:mt-4 pt-2.5 sm:pt-3 border-t border-slate-800/80 overflow-x-auto no-scrollbar">
                   <button
                     type="button"
                     onClick={() => setActiveTab('members')}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                    className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
                       activeTab === 'members'
                         ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-xs'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
                     }`}
                   >
                     <Users className="w-3.5 h-3.5" />
-                    <span>Members & Roles</span>
+                    <span className="sm:hidden">Members</span>
+                    <span className="hidden sm:inline">Members & Roles</span>
                     <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
                       {activeTeam.members?.length || 0}
                     </span>
@@ -925,14 +1007,15 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                   <button
                     type="button"
                     onClick={() => setActiveTab('shares')}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                    className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
                       activeTab === 'shares'
                         ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 shadow-xs'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
                     }`}
                   >
                     <FolderOpen className="w-3.5 h-3.5" />
-                    <span>Shared Workspaces</span>
+                    <span className="sm:hidden">Shares</span>
+                    <span className="hidden sm:inline">Shared Workspaces</span>
                     <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
                       {teamShares.length}
                     </span>
@@ -941,32 +1024,33 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                   <button
                     type="button"
                     onClick={() => setActiveTab('settings')}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                    className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
                       activeTab === 'settings'
                         ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30 shadow-xs'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
                     }`}
                   >
                     <Settings className="w-3.5 h-3.5" />
-                    <span>Team Settings</span>
+                    <span className="sm:hidden">Settings</span>
+                    <span className="hidden sm:inline">Team Settings</span>
                   </button>
                 </div>
               </div>
 
               {/* Modal Body */}
-              <div className="p-4 sm:p-5 overflow-y-auto space-y-5 relative z-10 flex-1">
+              <div className="p-3.5 sm:p-5 overflow-y-auto space-y-4 sm:space-y-5 relative z-10 flex-1">
                 {/* TAB 1: MEMBERS & ROLES */}
                 {activeTab === 'members' && (
                   <div className="space-y-4">
                     {/* Add Member Section */}
                     {canManage && (
-                      <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
-                        <div className="flex items-center justify-between gap-2">
+                      <div className="p-3 sm:p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           <h4 className="text-xs font-bold text-slate-200 flex items-center gap-2">
                             <UserPlus className="w-4 h-4 text-emerald-400" />
                             <span>Add Teammate</span>
                           </h4>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 self-start sm:self-auto">
                             <span className="text-[11px] text-slate-400 font-medium">Assign Role:</span>
                             <select
                               value={newMemberRole}
@@ -992,7 +1076,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
 
                         {/* Dropdown list of available users matching query */}
                         {addMemberQuery.trim() && (
-                          <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-850 divide-y divide-slate-850 bg-slate-900/60 p-1">
+                          <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-850 divide-y divide-slate-855 bg-slate-900/60 p-1">
                             {availableUsers
                               .filter(
                                 (au) =>
@@ -1025,7 +1109,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                                   <button
                                     type="button"
                                     onClick={() => handleAddMemberToActiveTeam(au.id)}
-                                    className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[11px] font-semibold shrink-0"
+                                    className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[11px] font-semibold shrink-0 ml-2"
                                   >
                                     Add as {newMemberRole}
                                   </button>
@@ -1037,7 +1121,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                     )}
 
                     {/* Member Filters & Search */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
                       <div className="relative flex-1">
                         <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500" />
                         <input
@@ -1057,13 +1141,13 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                         )}
                       </div>
 
-                      <div className="flex items-center gap-1 shrink-0 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                      <div className="grid grid-cols-3 sm:flex gap-1 shrink-0 bg-slate-950 p-1 rounded-xl border border-slate-800">
                         {['all', 'leaders', 'members'].map((rf) => (
                           <button
                             key={rf}
                             type="button"
                             onClick={() => setMemberRoleFilter(rf)}
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold capitalize transition-colors ${
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold capitalize transition-colors text-center ${
                               memberRoleFilter === rf
                                 ? 'bg-blue-600 text-white shadow-xs'
                                 : 'text-slate-400 hover:text-slate-200'
@@ -1430,7 +1514,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                           <button
                             type="submit"
                             disabled={isSavingSettings}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 disabled:opacity-50 transition-all"
+                            className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-4 py-2.5 sm:py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 disabled:opacity-50 transition-all"
                           >
                             <Check className="w-3.5 h-3.5" />
                             <span>{isSavingSettings ? 'Saving Changes...' : 'Save Team Changes'}</span>
@@ -1456,7 +1540,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                             <button
                               type="button"
                               onClick={() => handleCopyTeamId(activeTeam.id)}
-                              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors shrink-0"
+                              className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors shrink-0"
                               title="Copy Team ID"
                             >
                               {copiedTeamId ? (
@@ -1494,7 +1578,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                           <select
                             value={transferOwnerId}
                             onChange={(e) => setTransferOwnerId(e.target.value)}
-                            className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-hidden focus:border-amber-500"
+                            className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-hidden focus:border-amber-500 min-w-0"
                           >
                             <option value="">Select a member to transfer ownership...</option>
                             {(activeTeam.members || [])
@@ -1510,7 +1594,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                             type="button"
                             disabled={!transferOwnerId || isTransferring}
                             onClick={handleTransferOwnership}
-                            className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors shadow-xs shrink-0"
+                            className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors shadow-xs shrink-0"
                           >
                             {isTransferring ? 'Transferring...' : 'Transfer Ownership'}
                           </button>
@@ -1541,7 +1625,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                           <button
                             type="button"
                             onClick={() => handleDeleteTeam(activeTeam.id)}
-                            className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-md shadow-red-600/20 transition-colors shrink-0"
+                            className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2.5 sm:py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-md shadow-red-600/20 transition-colors shrink-0"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                             <span>Delete Team</span>
@@ -1550,7 +1634,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                           <button
                             type="button"
                             onClick={() => handleRemoveMember(user?.id)}
-                            className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-600/20 hover:bg-red-600/40 text-red-300 border border-red-500/30 text-xs font-bold transition-colors shrink-0"
+                            className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2.5 sm:py-2 rounded-xl bg-red-600/20 hover:bg-red-600/40 text-red-300 border border-red-500/30 text-xs font-bold transition-colors shrink-0"
                           >
                             <UserMinus className="w-3.5 h-3.5" />
                             <span>Leave Team</span>
@@ -1563,7 +1647,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
               </div>
 
               {/* Modal Footer */}
-              <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-slate-950 flex items-center justify-between relative z-10 shrink-0">
+              <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-slate-950 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 relative z-10 shrink-0">
                 <div className="text-[11px] text-slate-500 font-mono hidden sm:block">
                   Workspace: <span className="text-slate-400 font-semibold">{activeTeam.name}</span>
                 </div>
@@ -1571,7 +1655,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                 <button
                   type="button"
                   onClick={() => setActiveTeam(null)}
-                  className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors ml-auto"
+                  className="w-full sm:w-auto px-5 py-2.5 sm:py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors text-center"
                 >
                   Close
                 </button>

@@ -81,6 +81,40 @@ export default function AdminPage({ onBackToDrive }) {
   const [inspectError, setInspectError] = useState('');
   const [copiedUUID, setCopiedUUID] = useState('');
   const fileDropRef = useRef(null);
+  const [isForensicDragOver, setIsForensicDragOver] = useState(false);
+
+  const handleForensicDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isForensicDragOver) {
+      setIsForensicDragOver(true);
+    }
+  };
+
+  const handleForensicDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsForensicDragOver(true);
+  };
+
+  const handleForensicDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.currentTarget.contains(e.relatedTarget)) return;
+    setIsForensicDragOver(false);
+  };
+
+  const handleForensicDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsForensicDragOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const droppedFile = e.dataTransfer.files[0];
+      setInspectFile(droppedFile);
+      setInspectError('');
+      toast.info(`Loaded suspect file: ${droppedFile.name}`);
+    }
+  };
 
   // Users Tab
   const [users, setUsers] = useState([]);
@@ -1099,7 +1133,15 @@ export default function AdminPage({ onBackToDrive }) {
                     </label>
                     <div
                       onClick={() => fileDropRef.current?.click()}
-                      className="border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-2xl p-3 sm:p-4 text-center cursor-pointer transition-colors bg-slate-950/40 hover:bg-slate-950/80 flex flex-col items-center justify-center min-h-[100px] sm:min-h-[110px]"
+                      onDragOver={handleForensicDragOver}
+                      onDragEnter={handleForensicDragEnter}
+                      onDragLeave={handleForensicDragLeave}
+                      onDrop={handleForensicDrop}
+                      className={`relative border-2 border-dashed rounded-2xl p-3 sm:p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[110px] sm:min-h-[120px] ${
+                        isForensicDragOver
+                          ? 'border-blue-400 bg-blue-500/20 ring-4 ring-blue-500/20 shadow-lg shadow-blue-500/20 scale-[1.01]'
+                          : 'border-slate-700 hover:border-blue-500 bg-slate-950/40 hover:bg-slate-950/80'
+                      }`}
                     >
                       <input
                         ref={fileDropRef}
@@ -1108,10 +1150,17 @@ export default function AdminPage({ onBackToDrive }) {
                         onChange={(e) => {
                           if (e.target.files && e.target.files[0]) {
                             setInspectFile(e.target.files[0]);
+                            setInspectError('');
                           }
                         }}
                       />
-                      {inspectFile ? (
+                      {isForensicDragOver ? (
+                        <div className="flex flex-col items-center justify-center pointer-events-none animate-pulse text-blue-400 py-2">
+                          <UploadCloud className="w-8 h-8 mb-1.5 animate-bounce" />
+                          <span className="text-xs font-bold text-blue-300">Release file to inspect</span>
+                          <span className="text-[10px] text-blue-400/80">Extract binary trailer & metadata</span>
+                        </div>
+                      ) : inspectFile ? (
                         <div className="flex items-center gap-2.5 sm:gap-3 text-left w-full justify-between">
                           <div className="flex items-center gap-2.5 truncate min-w-0">
                             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
