@@ -556,6 +556,13 @@ func (h *AdminHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		"chunk_upload_enabled":           strconv.FormatBool(req.ChunkUploadEnabled),
 	}
 
+	if claims.Role != "owner" {
+		// Non-owner administrators have no access to modify Forensic Attribution & Security settings
+		delete(pairs, "forensic_watermarking_enabled")
+		delete(pairs, "steganographic_canary_enabled")
+		delete(pairs, "log_forensic_downloads")
+	}
+
 	for k, v := range pairs {
 		_, _ = db.DB.Exec(`
 			INSERT INTO system_settings (key, value, updated_at) 
@@ -563,6 +570,12 @@ func (h *AdminHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 			ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
 		`, k, v)
 	}
+
+	// Broadcast real-time maintenance event to all connected clients
+	events.Broadcast("system:maintenance", "system", "maintenance", "", "", claims.UserID, map[string]interface{}{
+		"maintenance_mode":   req.MaintenanceMode,
+		"maintenance_notice": req.MaintenanceNotice,
+	})
 
 	db.LogActivity(claims.UserID, claims.Username, "settings_update", "system", "settings", "Platform Settings", "Updated global platform settings")
 

@@ -116,6 +116,9 @@ func main() {
 
 	// API Routes
 	r.Route("/api", func(api chi.Router) {
+		// Enforce platform maintenance mode across all API endpoints (with bypass for admins, owners, live streams, and login)
+		api.Use(middleware.MaintenanceMiddleware(cfg))
+
 		// Real-time Event Streams & Webhooks (load everything in real time with adblocker immunity & polling fallback)
 		api.Get("/realtime", events.GlobalHub.ServeHTTP)
 		api.Get("/events", events.GlobalHub.ServeHTTP)
@@ -125,6 +128,9 @@ func main() {
 		api.Get("/live-sync/poll", events.HandleSyncPoll)
 		api.Post("/webhook", events.HandleWebhook)
 		api.Post("/webhooks/drive", events.HandleWebhook)
+
+		// Public System Status
+		api.Get("/system/status", authHandler.GetSystemStatus)
 
 		// Public Auth
 		api.Post("/auth/register", authHandler.Register)

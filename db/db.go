@@ -441,3 +441,16 @@ func LogActivity(userID, userName, action, itemType, itemID, itemName, details s
 
 	utils.LogActivityToFile(userID, userName, action, itemType, itemID, itemName, details)
 }
+
+func GetMaintenanceStatus() (bool, string) {
+	if DB == nil {
+		return false, ""
+	}
+	var isMaintStr, notice string
+	_ = DB.QueryRow("SELECT value FROM main.system_settings WHERE key = 'maintenance_mode'").Scan(&isMaintStr)
+	_ = DB.QueryRow("SELECT value FROM main.system_settings WHERE key = 'maintenance_notice'").Scan(&notice)
+	if notice == "" {
+		notice = "Platform is currently undergoing scheduled maintenance. Please check back shortly."
+	}
+	return (isMaintStr == "true" || isMaintStr == "1"), notice
+}

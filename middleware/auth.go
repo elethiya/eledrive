@@ -2,12 +2,14 @@ package middleware
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"eledrive/config"
+	"eledrive/db"
 	"eledrive/utils"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -122,4 +124,60 @@ func GetUserClaims(ctx context.Context) *JWTClaims {
 		return val
 	}
 	return nil
+}
+
+func MaintenanceMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			isMaint, notice := db.GetMaintenanceStatus()
+			if !isMaint {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Whitelist public system endpoints and live events
+			path := r.URL.Path
+			if strings.HasPrefix(path, "/api/system/status") ||
+				strings.HasPrefix(path, "/api/realtime") ||
+				strings.HasPrefix(path, "/api/events") ||
+				strings.HasPrefix(path, "/api/sync") ||
+				strings.HasPrefix(path, "/api/live-sync") {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Allow login requests to pass through to AuthHandler.Login (which validates admin/owner role)
+			if strings.HasPrefix(path, "/api/auth/login") {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// If request has authenticated claims or valid admin/owner token, allow
+			claims := GetUserClaims(r.Context())
+			if claims == nil && cfg != nil {
+				if tokenStr := extractToken(r); tokenStr != "" {
+					claims, _ = parseToken(tokenStr, cfg)
+				}
+			}
+
+			if claims != nil && (claims.Role == "admin" || claims.Role == "owner") {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			if notice == "" {
+				notice = "The platform is currently undergoing scheduled maintenance. Please check back shortly."
+			}
+
+			// Block all other requests with 503 Service Unavailable
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"success":          false,
+				"error":            notice,
+				"maintenance_mode": true,
+				"message":          notice,
+			})
+		})
+	}
 }

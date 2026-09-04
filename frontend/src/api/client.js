@@ -22,10 +22,19 @@ api.interceptors.response.use(
         localStorage.removeItem('eledrive_user');
       }
     }
+    if (error.response?.status === 503 && error.response?.data?.maintenance_mode) {
+      window.dispatchEvent(new CustomEvent('eledrive:maintenance', { detail: error.response.data }));
+    }
     const message = error.response?.data?.error || error.message || 'Something went wrong';
-    return Promise.reject(new Error(message));
+    const err = new Error(message);
+    err.response = error.response;
+    return Promise.reject(err);
   }
 );
+
+export const systemAPI = {
+  getStatus: () => api.get('/system/status'),
+};
 
 export const authAPI = {
   login: (data) => api.post('/auth/login', data),

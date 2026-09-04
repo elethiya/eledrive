@@ -72,6 +72,15 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if platform is under maintenance
+	if isMaint, notice := db.GetMaintenanceStatus(); isMaint {
+		if notice == "" {
+			notice = "The platform is currently undergoing scheduled maintenance. Please check back shortly."
+		}
+		utils.RespondError(w, http.StatusServiceUnavailable, "Registration is currently unavailable: "+notice)
+		return
+	}
+
 	// Check if email or username already exists
 	var existingCount int
 	err := db.DB.QueryRow("SELECT COUNT(*) FROM users WHERE email = ? OR username = ?", req.Email, req.Username).Scan(&existingCount)
@@ -222,6 +231,15 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Verify account status
 	if user.Role != "admin" && user.Role != "owner" {
+		// Check platform maintenance mode
+		if isMaint, notice := db.GetMaintenanceStatus(); isMaint {
+			if notice == "" {
+				notice = "The platform is currently undergoing scheduled maintenance. Please check back shortly."
+			}
+			utils.RespondError(w, http.StatusServiceUnavailable, "Platform is currently under maintenance: "+notice)
+			return
+		}
+
 		switch user.Status {
 		case "pending":
 			utils.RespondError(w, http.StatusForbidden, "Your account is pending administrator verification and approval. Please wait for an administrator to approve your account.")
@@ -458,3 +476,25 @@ func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Reques
 		"email":    user.Email,
 	})
 }
+
+func (h *AuthHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request) {
+	isMaint, notice := db.GetMaintenanceStatus()
+
+	var allowRegStr string
+	_ = db.DB.QueryRow("SELECT value FROM main.system_settings WHERE key = 'allow_public_registration'").Scan(&allowRegStr)
+	allowReg := allowRegStr != "false" && allowRegStr != "0"
+
+	var siteName string
+	_ = db.DB.QueryRow("SELECT value FROM main.system_settings WHERE key = 'site_name'").Scan(&siteName)
+	if siteName == "" {
+		siteName = "EleDrive"
+	}
+
+	utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"maintenance_mode":          isMaint,
+		"maintenance_notice":        notice,
+		"allow_public_registration": allowReg,
+		"site_name":                 siteName,
+	})
+}
+

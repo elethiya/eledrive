@@ -481,6 +481,10 @@ export default function AdminPage({ onBackToDrive }) {
   };
 
   const openCategoryModal = (catId) => {
+    if (catId === 'forensics' && !isOwner) {
+      toast.error("Access Denied: 'Forensic Attribution & Security' settings can only be accessed and modified by the Workspace Owner.");
+      return;
+    }
     setActiveCategory(catId);
     setDraftSettings({ ...settings });
     setSettingsSuccess('');
@@ -497,6 +501,10 @@ export default function AdminPage({ onBackToDrive }) {
   const handleSaveCategorySettings = async (e) => {
     if (e) e.preventDefault();
     if (!draftSettings) return;
+    if (activeCategory === 'forensics' && !isOwner) {
+      toast.error("Access Denied: 'Forensic Attribution & Security' can only be modified by the Workspace Owner.");
+      return;
+    }
     setSavingSettings(true);
     setSettingsSuccess('');
     setSettingsError('');
@@ -2155,32 +2163,78 @@ export default function AdminPage({ onBackToDrive }) {
                 </div>
               </div>
 
-              {/* 6. Forensic Attribution */}
+              {/* 6. Forensic Attribution & Security (Owner Only) */}
               <div
-                onClick={() => openCategoryModal('forensics')}
-                className="group relative bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-teal-500/40 rounded-3xl p-5 shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between select-none"
+                onClick={() => {
+                  if (!isOwner) {
+                    toast.error("Access Denied: 'Forensic Attribution & Security' can only be configured by the Workspace Owner.");
+                    return;
+                  }
+                  openCategoryModal('forensics');
+                }}
+                className={`group relative rounded-3xl p-5 shadow-lg transition-all duration-200 flex flex-col justify-between select-none ${
+                  isOwner
+                    ? 'bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-teal-500/40 cursor-pointer'
+                    : 'bg-slate-950/60 border border-slate-800/60 opacity-75 cursor-not-allowed'
+                }`}
               >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="p-3 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-teal-400 group-hover:scale-105 transition-transform">
+                    <div
+                      className={`p-3 rounded-2xl border ${
+                        isOwner
+                          ? 'bg-teal-500/10 border-teal-500/20 text-teal-400 group-hover:scale-105'
+                          : 'bg-slate-900 border-slate-800 text-slate-500'
+                      } transition-transform`}
+                    >
                       <Fingerprint className="w-6 h-6" />
                     </div>
-                    <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-medium text-emerald-400">
-                      {settings.forensic_watermarking_enabled ? 'Watermarks Active' : 'Off'}
-                    </span>
+                    {isOwner ? (
+                      <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-medium text-emerald-400">
+                        {settings.forensic_watermarking_enabled ? 'Watermarks Active' : 'Off'}
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] font-medium text-amber-400 flex items-center gap-1">
+                        <Lock className="w-3 h-3" />
+                        Owner Only
+                      </span>
+                    )}
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-slate-100 group-hover:text-teal-300 transition-colors">
-                      Forensic Attribution & Security
-                    </h4>
+                    <div className="flex items-center gap-2">
+                      <h4
+                        className={`text-sm font-bold ${
+                          isOwner ? 'text-slate-100 group-hover:text-teal-300' : 'text-slate-300'
+                        } transition-colors`}
+                      >
+                        Forensic Attribution & Security
+                      </h4>
+                      {!isOwner && (
+                        <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded-sm bg-slate-800 text-amber-400 border border-amber-500/20">
+                          Restricted
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                       Steganographic binary trailers, cryptographic UUID injection, forensic ZIP signatures, and download tracking.
                     </p>
                   </div>
                 </div>
-                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-teal-400 font-semibold group-hover:translate-x-0.5 transition-all">
-                  <span>Configure Forensics</span>
-                  <ChevronRight className="w-4 h-4" />
+                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs font-semibold">
+                  {isOwner ? (
+                    <>
+                      <span className="text-teal-400 group-hover:translate-x-0.5 transition-all">Configure Forensics</span>
+                      <ChevronRight className="w-4 h-4 text-teal-400" />
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-slate-500 flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-amber-400/80" />
+                        Restricted to Workspace Owner
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-600">Locked</span>
+                    </>
+                  )}
                 </div>
               </div>
 
