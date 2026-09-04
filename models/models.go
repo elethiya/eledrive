@@ -238,3 +238,17 @@ type AddTeamMemberRequest struct {
 	UserEmail string `json:"user_email"`
 	Role      string `json:"role"` // "member" or "leader"
 }
+
+type PasswordResetRequest struct {
+	ID           string     `json:"id"`
+	UserID       string     `json:"user_id"`
+	UserName     string     `json:"user_name"`
+	UserEmail    string     `json:"user_email"`
+	UserUsername string     `json:"user_username"`
+	AvatarColor  string     `json:"avatar_color,omitempty"`
+	Status       string     `json:"status"` // 'pending', 'resolved', 'rejected'
+	Reason       string     `json:"reason"`
+	CreatedAt    time.Time  `json:"created_at"`
+	ResolvedAt   *time.Time `json:"resolved_at,omitempty"`
+	ResolvedBy   *string    `json:"resolved_by,omitempty"`
+}

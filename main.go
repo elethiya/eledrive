@@ -118,6 +118,7 @@ func main() {
 		// Public Auth
 		api.Post("/auth/register", authHandler.Register)
 		api.Post("/auth/login", authHandler.Login)
+		api.Post("/auth/reset-password-request", authHandler.RequestPasswordReset)
 
 		// Public Share endpoints (no account needed)
 		api.Get("/public/share/{token}", publicShareHandler.GetPublicShareInfo)
@@ -204,6 +205,10 @@ func main() {
 				admin.Delete("/admin/users/{id}", adminHandler.DeleteUser)
 				admin.Get("/admin/settings", adminHandler.GetSettings)
 				admin.Put("/admin/settings", adminHandler.UpdateSettings)
+
+				// Password Reset Requests
+				admin.Get("/admin/password-resets", adminHandler.ListPasswordResets)
+				admin.Post("/admin/password-resets/{id}/resolve", adminHandler.ResolvePasswordReset)
 
 				// Security & Forensic Leak Tracker
 				admin.Post("/admin/security/inspect", adminHandler.InspectLeak)

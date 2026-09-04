@@ -272,6 +272,11 @@ func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		hashed, err := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
 		if err == nil {
 			_, _ = db.DB.Exec("UPDATE users SET password_hash = ? WHERE id = ?", string(hashed), targetUserID)
+			actorName := claims.Username
+			if actorName == "" {
+				actorName = claims.Email
+			}
+			_, _ = db.DB.Exec("UPDATE main.password_resets SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP, resolved_by = ? WHERE user_id = ? AND status = 'pending'", actorName, targetUserID)
 		}
 	}
 
@@ -748,5 +753,155 @@ func (h *AdminHandler) GetSecurityStats(w http.ResponseWriter, r *http.Request) 
 	}
 
 	utils.RespondJSON(w, http.StatusOK, stats)
+}
+
+func (h *AdminHandler) ListPasswordResets(w http.ResponseWriter, r *http.Request) {
+	// Ensure table exists
+	_, _ = db.DB.Exec(`
+		CREATE TABLE IF NOT EXISTS main.password_resets (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL,
+			user_name TEXT NOT NULL,
+			user_email TEXT NOT NULL,
+			user_username TEXT NOT NULL,
+			status TEXT DEFAULT 'pending',
+			reason TEXT DEFAULT '',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			resolved_at DATETIME,
+			resolved_by TEXT
+		)
+	`)
+
+	rows, err := db.DB.Query(`
+		SELECT pr.id, pr.user_id, pr.user_name, pr.user_email, pr.user_username,
+		       COALESCE(u.avatar_color, '#3b82f6') AS avatar_color,
+		       pr.status, pr.reason, pr.created_at, pr.resolved_at, pr.resolved_by
+		FROM main.password_resets pr
+		LEFT JOIN main.users u ON pr.user_id = u.id
+		ORDER BY CASE pr.status WHEN 'pending' THEN 1 ELSE 2 END, pr.created_at DESC
+		LIMIT 100
+	`)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to fetch password reset requests")
+		return
+	}
+	defer rows.Close()
+
+	resets := make([]models.PasswordResetRequest, 0)
+	for rows.Next() {
+		var pr models.PasswordResetRequest
+		var resolvedAt sql.NullTime
+		var resolvedBy sql.NullString
+		if err := rows.Scan(
+			&pr.ID, &pr.UserID, &pr.UserName, &pr.UserEmail, &pr.UserUsername,
+			&pr.AvatarColor, &pr.Status, &pr.Reason, &pr.CreatedAt, &resolvedAt, &resolvedBy,
+		); err == nil {
+			if resolvedAt.Valid {
+				pr.ResolvedAt = &resolvedAt.Time
+			}
+			if resolvedBy.Valid {
+				pr.ResolvedBy = &resolvedBy.String
+			}
+			resets = append(resets, pr)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to read password reset requests")
+		return
+	}
+
+	utils.RespondJSON(w, http.StatusOK, resets)
+}
+
+type ResolvePasswordResetRequest struct {
+	Action      string `json:"action"` // "reset" or "reject"
+	NewPassword string `json:"new_password,omitempty"`
+}
+
+func (h *AdminHandler) ResolvePasswordReset(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+	resetID := chi.URLParam(r, "id")
+
+	var req ResolvePasswordResetRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	var userID, userName, userEmail, userUsername string
+	err := db.DB.QueryRow(`
+		SELECT user_id, user_name, user_email, user_username
+		FROM main.password_resets
+		WHERE id = ?
+	`, resetID).Scan(&userID, &userName, &userEmail, &userUsername)
+	if err != nil {
+		utils.RespondError(w, http.StatusNotFound, "Password reset request not found")
+		return
+	}
+
+	actorName := claims.Username
+	if actorName == "" {
+		actorName = claims.Email
+	}
+
+	if req.Action == "reject" {
+		_, err := db.DB.Exec(`
+			UPDATE main.password_resets
+			SET status = 'rejected', resolved_at = CURRENT_TIMESTAMP, resolved_by = ?
+			WHERE id = ?
+		`, actorName, resetID)
+		if err != nil {
+			utils.RespondError(w, http.StatusInternalServerError, "Failed to reject request")
+			return
+		}
+
+		db.LogActivity(claims.UserID, actorName, "admin_password_reset_reject", "user", userID, userName, fmt.Sprintf("Admin @%s rejected password reset request for @%s", actorName, userUsername))
+		utils.RespondSuccess(w, http.StatusOK, "Password reset request rejected", nil)
+		return
+	}
+
+	// Action is "reset"
+	newPassword := strings.TrimSpace(req.NewPassword)
+	if len(newPassword) < 6 {
+		utils.RespondError(w, http.StatusBadRequest, "New password must be at least 6 characters")
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to hash password")
+		return
+	}
+
+	_, err = db.DB.Exec(`
+		UPDATE main.users
+		SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, string(hash), userID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to update user password")
+		return
+	}
+
+	// Mark this request as resolved
+	_, _ = db.DB.Exec(`
+		UPDATE main.password_resets
+		SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP, resolved_by = ?
+		WHERE id = ?
+	`, actorName, resetID)
+
+	// Also resolve any other pending requests for this user
+	_, _ = db.DB.Exec(`
+		UPDATE main.password_resets
+		SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP, resolved_by = ?
+		WHERE user_id = ? AND status = 'pending'
+	`, actorName, userID)
+
+	db.LogActivity(claims.UserID, actorName, "admin_password_reset", "user", userID, userName, fmt.Sprintf("Admin @%s reset password for user @%s", actorName, userUsername))
+
+	utils.RespondSuccess(w, http.StatusOK, fmt.Sprintf("Password for @%s successfully reset!", userUsername), map[string]interface{}{
+		"user_id":  userID,
+		"username": userUsername,
+	})
 }
 

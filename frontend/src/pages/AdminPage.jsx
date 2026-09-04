@@ -90,6 +90,16 @@ export default function AdminPage({ onBackToDrive }) {
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [savingUserEdit, setSavingUserEdit] = useState(false);
 
+  // Password Resets Queue
+  const [passwordResets, setPasswordResets] = useState([]);
+  const [loadingResets, setLoadingResets] = useState(false);
+  const [showResetsModal, setShowResetsModal] = useState(false);
+  const [selectedReset, setSelectedReset] = useState(null);
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [showNewAdminPassword, setShowNewAdminPassword] = useState(false);
+  const [resolvingReset, setResolvingReset] = useState(false);
+  const [resetFilter, setResetFilter] = useState('pending'); // 'pending' | 'all' | 'resolved' | 'rejected'
+
   const handleOpenViewModal = (targetUser) => {
     if (targetUser?.role === 'owner' && user?.role !== 'owner') {
       toast.error("Admins cannot open, view, or touch the Workspace Owner account");
@@ -123,36 +133,6 @@ export default function AdminPage({ onBackToDrive }) {
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSuccess, setSettingsSuccess] = useState('');
   const [settingsError, setSettingsError] = useState('');
-
-  // Check admin/owner privileges
-  if (user?.role !== 'admin' && user?.role !== 'owner') {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-slate-950 p-6 text-center text-slate-100">
-        <div className="w-16 h-16 rounded-3xl bg-red-500/20 text-red-400 flex items-center justify-center mb-4 border border-red-500/30">
-          <Shield className="w-8 h-8" />
-        </div>
-        <h2 className="text-xl font-bold text-slate-100 mb-1">Access Restricted</h2>
-        <p className="text-xs text-slate-400 max-w-sm mb-6">
-          You need Administrator or Owner privileges to access this area.
-        </p>
-        <button
-          onClick={onBackToDrive}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to My Drive</span>
-        </button>
-      </div>
-    );
-  }
-
-  useEffect(() => {
-    loadStats();
-    loadUsers();
-    loadLogs();
-    loadSettings();
-    loadSecurityStats();
-  }, []);
 
   const loadStats = async () => {
     setLoadingStats(true);
@@ -190,6 +170,50 @@ export default function AdminPage({ onBackToDrive }) {
     }
   };
 
+  const loadPasswordResets = async () => {
+    setLoadingResets(true);
+    try {
+      const res = await adminAPI.listPasswordResets();
+      if (res) {
+        setPasswordResets(Array.isArray(res) ? res : res.data || []);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingResets(false);
+    }
+  };
+
+  const handleResolveReset = async (action, reqItem = selectedReset) => {
+    if (!reqItem) return;
+    if (action === 'reset' && (!newAdminPassword || newAdminPassword.trim().length < 6)) {
+      toast.error('Please enter a secure password with at least 6 characters');
+      return;
+    }
+
+    setResolvingReset(true);
+    try {
+      await adminAPI.resolvePasswordReset(reqItem.id, {
+        action,
+        new_password: action === 'reset' ? newAdminPassword.trim() : undefined,
+      });
+      toast.success(
+        action === 'reset'
+          ? `Password for @${reqItem.user_username} has been reset!`
+          : `Password reset request for @${reqItem.user_username} dismissed.`
+      );
+      setSelectedReset(null);
+      setNewAdminPassword('');
+      loadPasswordResets();
+      loadUsers();
+      loadLogs();
+    } catch (err) {
+      toast.error(err.message || 'Failed to resolve password reset request');
+    } finally {
+      setResolvingReset(false);
+    }
+  };
+
   const loadLogs = async () => {
     setLoadingLogs(true);
     try {
@@ -218,6 +242,39 @@ export default function AdminPage({ onBackToDrive }) {
       console.error(e);
     }
   };
+
+  useEffect(() => {
+    if (user?.role === 'admin' || user?.role === 'owner') {
+      loadStats();
+      loadUsers();
+      loadLogs();
+      loadSettings();
+      loadSecurityStats();
+      loadPasswordResets();
+    }
+  }, [user?.role]);
+
+  // Check admin/owner privileges
+  if (user?.role !== 'admin' && user?.role !== 'owner') {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center bg-slate-950 p-6 text-center text-slate-100">
+        <div className="w-16 h-16 rounded-3xl bg-red-500/20 text-red-400 flex items-center justify-center mb-4 border border-red-500/30">
+          <Shield className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-100 mb-1">Access Restricted</h2>
+        <p className="text-xs text-slate-400 max-w-sm mb-6">
+          You need Administrator or Owner privileges to access this area.
+        </p>
+        <button
+          onClick={onBackToDrive}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to My Drive</span>
+        </button>
+      </div>
+    );
+  }
 
   const handleCopyUUID = (uuid) => {
     navigator.clipboard.writeText(uuid);
@@ -352,6 +409,11 @@ export default function AdminPage({ onBackToDrive }) {
     const matchesStatus = statusFilter === 'all' || u.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const pendingResets = passwordResets.filter((pr) => pr.status === 'pending');
+  const filteredResets = passwordResets.filter(
+    (pr) => resetFilter === 'all' || pr.status === resetFilter
+  );
 
   const isOwner = user?.role === 'owner';
 
@@ -559,6 +621,36 @@ export default function AdminPage({ onBackToDrive }) {
         {/* TAB 1: USERS MANAGEMENT */}
         {activeTab === 'users' && (
           <div className="space-y-4">
+            {/* Pending Password Reset Requests Alert Banner */}
+            {pendingResets.length > 0 && (
+              <div className="bg-gradient-to-r from-amber-950/40 via-amber-900/20 to-slate-900 border border-amber-500/30 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg shadow-amber-950/20">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
+                    <KeyRound className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-bold text-slate-100">
+                        {pendingResets.length} Password Reset {pendingResets.length === 1 ? 'Request' : 'Requests'} Pending
+                      </h4>
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Users requested credential resets via the login screen. You can review requests and assign new passwords.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowResetsModal(true)}
+                  className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 shadow-md shadow-amber-500/20"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>Review Requests ({pendingResets.length})</span>
+                </button>
+              </div>
+            )}
+
             {/* Search & Status Filters */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900 p-3 rounded-2xl border border-slate-800">
               <div className="relative w-full sm:w-80">
@@ -596,6 +688,25 @@ export default function AdminPage({ onBackToDrive }) {
                     {st}
                   </button>
                 ))}
+
+                <button
+                  type="button"
+                  onClick={() => setShowResetsModal(true)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 flex items-center gap-1.5 border ml-1 ${
+                    pendingResets.length > 0
+                      ? 'bg-amber-500/15 text-amber-300 border-amber-500/40 hover:bg-amber-500/25 shadow-xs'
+                      : 'text-slate-400 border-slate-800 hover:bg-slate-800'
+                  }`}
+                  title="View all password reset requests"
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Reset Requests</span>
+                  {pendingResets.length > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 text-[10px] font-bold">
+                      {pendingResets.length}
+                    </span>
+                  )}
+                </button>
               </div>
             </div>
 
@@ -689,17 +800,39 @@ export default function AdminPage({ onBackToDrive }) {
                               </span>
                             </td>
                             <td className="py-3.5 px-4">
-                              <span
-                                className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-                                  u.status === 'approved'
-                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                                    : u.status === 'pending'
-                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                                    : 'bg-red-500/10 text-red-400 border-red-500/30'
-                                }`}
-                              >
-                                {u.status}
-                              </span>
+                              <div className="flex flex-col items-start gap-1">
+                                <span
+                                  className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                                    u.status === 'approved'
+                                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                      : u.status === 'pending'
+                                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                      : 'bg-red-500/10 text-red-400 border-red-500/30'
+                                  }`}
+                                >
+                                  {u.status}
+                                </span>
+                                {(() => {
+                                  const resetReq = pendingResets.find((pr) => pr.user_id === u.id);
+                                  if (!resetReq) return null;
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedReset(resetReq);
+                                        setNewAdminPassword('');
+                                        setShowNewAdminPassword(false);
+                                        setShowResetsModal(true);
+                                      }}
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-semibold hover:bg-amber-500/30 transition-colors"
+                                      title={`Reset requested: "${resetReq.reason}"`}
+                                    >
+                                      <KeyRound className="w-2.5 h-2.5 text-amber-400" />
+                                      <span>Reset Requested</span>
+                                    </button>
+                                  );
+                                })()}
+                              </div>
                             </td>
                             <td className="py-3.5 px-4">
                               {u.role === 'owner' && user?.role !== 'owner' ? (
@@ -1283,6 +1416,8 @@ export default function AdminPage({ onBackToDrive }) {
                   className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-hidden font-medium"
                 >
                   <option value="all">All Actions</option>
+                  <option value="password_reset_request">Reset Requests</option>
+                  <option value="admin_password_reset">Password Resets</option>
                   <option value="forensic_inspect">Forensic Scans</option>
                   <option value="upload">Uploads</option>
                   <option value="download">Downloads</option>
@@ -1337,7 +1472,17 @@ export default function AdminPage({ onBackToDrive }) {
                             {l.user_name}
                           </td>
                           <td className="py-3 px-4">
-                            {l.action === 'forensic_inspect' ? (
+                            {l.action === 'password_reset_request' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/30 font-mono text-[10px] uppercase font-bold text-amber-300 shadow-xs">
+                                <KeyRound className="w-3 h-3 text-amber-400" />
+                                <span>Reset Request</span>
+                              </span>
+                            ) : l.action === 'admin_password_reset' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-purple-500/15 border border-purple-500/30 font-mono text-[10px] uppercase font-bold text-purple-300 shadow-xs">
+                                <KeyRound className="w-3 h-3 text-purple-400" />
+                                <span>Password Reset</span>
+                              </span>
+                            ) : l.action === 'forensic_inspect' ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 font-mono text-[10px] uppercase font-bold text-emerald-400 shadow-xs">
                                 <Fingerprint className="w-3 h-3 text-emerald-400" />
                                 <span>Forensic Scan</span>
@@ -1742,6 +1887,31 @@ export default function AdminPage({ onBackToDrive }) {
                   )}
                 </div>
 
+                {/* Pending Password Reset Notification inside Edit Modal */}
+                {(() => {
+                  const pending = pendingResets.find((pr) => pr.user_id === editUserModal.id);
+                  if (!pending) return null;
+                  return (
+                    <div className="p-3.5 bg-amber-950/40 border border-amber-500/30 rounded-2xl flex items-start gap-2.5 text-xs text-amber-200">
+                      <KeyRound className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 font-bold text-amber-300">
+                          <span>User Requested Password Reset</span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                        </div>
+                        {pending.reason && (
+                          <p className="text-[11px] text-amber-200/90 mt-1 italic">
+                            "{pending.reason}"
+                          </p>
+                        )}
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Setting a new password below will automatically mark this pending request as resolved.
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Password Reset Option */}
                 <div className="p-3.5 bg-slate-950/60 border border-slate-800 rounded-2xl space-y-2">
                   <label className="block text-[11px] font-semibold text-slate-300 flex items-center justify-between">
@@ -1818,6 +1988,7 @@ export default function AdminPage({ onBackToDrive }) {
                     setEditUserModal(null);
                     setResetPasswordInput('');
                     loadUsers();
+                    loadPasswordResets();
                     toast.success(
                       editUserModal.id === user?.id
                         ? 'Self profile & storage limit updated!'
@@ -2153,6 +2324,317 @@ export default function AdminPage({ onBackToDrive }) {
                 className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors shadow-md"
               >
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password Reset Requests Management Modal */}
+      {showResetsModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border-0 sm:border sm:border-slate-800 rounded-none sm:rounded-3xl max-w-2xl w-full h-full sm:h-auto sm:max-h-[85vh] flex flex-col shadow-2xl overflow-hidden relative">
+            {/* Ambient Background Glow */}
+            <div className="absolute -top-24 -right-24 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Fixed Header */}
+            <div className="h-14 sm:h-16 px-4 sm:px-6 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/95 backdrop-blur-sm relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center shadow-xs">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-100 flex items-center gap-2">
+                    <span>Password Reset Requests</span>
+                    {pendingResets.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30">
+                        {pendingResets.length} Pending
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Review and authorize credentials resets requested by team members
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={loadPasswordResets}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                  title="Refresh requests"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loadingResets ? 'animate-spin' : ''}`} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowResetsModal(false);
+                    setSelectedReset(null);
+                    setNewAdminPassword('');
+                  }}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                  title="Close"
+                >
+                  <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Sub-header Filter Tabs */}
+            <div className="px-4 sm:px-6 py-2.5 bg-slate-950/60 border-b border-slate-800/80 flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-1">
+                {['pending', 'all', 'resolved', 'rejected'].map((filter) => {
+                  const count =
+                    filter === 'all'
+                      ? passwordResets.length
+                      : passwordResets.filter((r) => r.status === filter).length;
+                  return (
+                    <button
+                      key={filter}
+                      type="button"
+                      onClick={() => setResetFilter(filter)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold capitalize transition-colors flex items-center gap-1.5 ${
+                        resetFilter === filter
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <span>{filter}</span>
+                      <span className="text-[10px] opacity-70">({count})</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <span className="text-[11px] text-slate-500 hidden sm:inline">
+                Real-time admin queue
+              </span>
+            </div>
+
+            {/* Scrollable Body */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-3 relative z-10">
+              {loadingResets ? (
+                <div className="py-12 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
+                  <RefreshCw className="w-5 h-5 animate-spin text-amber-400" />
+                  <span>Loading reset requests...</span>
+                </div>
+              ) : filteredResets.length === 0 ? (
+                <div className="py-12 text-center space-y-2">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-800/60 text-slate-500 flex items-center justify-center mx-auto">
+                    <CheckCircle className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <h4 className="text-xs font-bold text-slate-200">No {resetFilter !== 'all' ? resetFilter : ''} requests found</h4>
+                  <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                    When users click "Forgot password?" or request a reset on the login portal, their requests will appear here.
+                  </p>
+                </div>
+              ) : (
+                filteredResets.map((req) => {
+                  const isSelected = selectedReset?.id === req.id;
+                  return (
+                    <div
+                      key={req.id}
+                      className={`p-3.5 sm:p-4 rounded-2xl border transition-all ${
+                        req.status === 'pending'
+                          ? isSelected
+                            ? 'bg-amber-950/30 border-amber-500/50 shadow-md ring-1 ring-amber-500/30'
+                            : 'bg-slate-950/60 border-amber-500/20 hover:border-amber-500/40'
+                          : req.status === 'resolved'
+                          ? 'bg-slate-950/40 border-emerald-500/20'
+                          : 'bg-slate-950/40 border-slate-800'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start sm:items-center gap-3">
+                          <div
+                            className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-sm shrink-0 shadow-xs"
+                            style={{ backgroundColor: req.avatar_color || '#3b82f6' }}
+                          >
+                            {req.user_name?.charAt(0).toUpperCase() || 'U'}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-xs text-slate-100">{req.user_name}</span>
+                              <span className="text-[11px] text-slate-400">@{req.user_username}</span>
+                              {req.status === 'pending' && (
+                                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-semibold flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                  Pending
+                                </span>
+                              )}
+                              {req.status === 'resolved' && (
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-semibold flex items-center gap-1">
+                                  <Check className="w-3 h-3 text-emerald-400" />
+                                  Resolved
+                                </span>
+                              )}
+                              {req.status === 'rejected' && (
+                                <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[10px] font-semibold">
+                                  Rejected
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2 flex-wrap">
+                              <span className="text-slate-300">{req.user_email}</span>
+                              <span>•</span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-slate-500" />
+                                {formatDate(req.created_at)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action buttons if pending */}
+                        {req.status === 'pending' && (
+                          <div className="flex items-center gap-2 self-end sm:self-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isSelected) {
+                                  setSelectedReset(null);
+                                } else {
+                                  setSelectedReset(req);
+                                  setNewAdminPassword('');
+                                }
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+                            >
+                              <KeyRound className="w-3.5 h-3.5" />
+                              <span>{isSelected ? 'Close Reset Form' : 'Reset Password'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={resolvingReset}
+                              onClick={() => handleResolveReset('reject', req)}
+                              className="p-1.5 rounded-xl bg-slate-800 hover:bg-red-950 hover:text-red-300 text-slate-400 transition-colors border border-transparent hover:border-red-500/30"
+                              title="Dismiss / Reject request"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+
+                        {req.status === 'resolved' && (
+                          <div className="text-[11px] text-emerald-400/80 font-medium self-end sm:self-center text-right">
+                            <span>Reset by @{req.resolved_by || 'admin'}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Reason note */}
+                      {req.reason && (
+                        <div className="mt-2.5 p-2.5 bg-slate-900/90 rounded-xl border border-slate-800 text-[11px] text-slate-300 flex items-start gap-2">
+                          <span className="text-slate-500 font-semibold shrink-0">Note:</span>
+                          <span className="italic text-slate-300">"{req.reason}"</span>
+                        </div>
+                      )}
+
+                      {/* Inline Reset Form if this item is selected */}
+                      {isSelected && req.status === 'pending' && (
+                        <div className="mt-3 p-3.5 bg-slate-900 border border-amber-500/30 rounded-xl space-y-3 animate-in fade-in duration-150">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+                              <KeyRound className="w-3.5 h-3.5" />
+                              <span>Assign New Password for @{req.user_username}</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const randomPass = Math.random().toString(36).slice(-8) + '!A9';
+                                setNewAdminPassword(randomPass);
+                                setShowNewAdminPassword(true);
+                                toast.success('Generated random secure password');
+                              }}
+                              className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold hover:underline flex items-center gap-1"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                              <span>Generate Random Password</span>
+                            </button>
+                          </div>
+
+                          <div className="relative">
+                            <input
+                              type={showNewAdminPassword ? 'text' : 'password'}
+                              value={newAdminPassword}
+                              onChange={(e) => setNewAdminPassword(e.target.value)}
+                              placeholder="Enter new password (min 6 chars)..."
+                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-amber-500 pr-16 font-mono"
+                            />
+                            <div className="absolute right-2 top-2 flex items-center gap-1">
+                              {newAdminPassword && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(newAdminPassword);
+                                    toast.success('Password copied to clipboard!');
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-slate-200"
+                                  title="Copy password"
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowNewAdminPassword(!showNewAdminPassword)}
+                                className="p-1 text-slate-400 hover:text-slate-200"
+                                title={showNewAdminPassword ? 'Hide password' : 'Show password'}
+                              >
+                                {showNewAdminPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2 pt-1">
+                            <p className="text-[10px] text-slate-400">
+                              Copy and share this new password securely with the user.
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedReset(null)}
+                                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                disabled={resolvingReset || !newAdminPassword || newAdminPassword.trim().length < 6}
+                                onClick={() => handleResolveReset('reset', req)}
+                                className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/20 flex items-center gap-1.5"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>{resolvingReset ? 'Saving...' : 'Apply & Complete Reset'}</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Fixed Footer */}
+            <div className="h-14 sm:h-16 px-4 sm:px-6 border-t border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/95 backdrop-blur-sm relative z-10">
+              <span className="text-[11px] text-slate-500">
+                {passwordResets.length} total request records
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowResetsModal(false);
+                  setSelectedReset(null);
+                  setNewAdminPassword('');
+                }}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors"
+              >
+                Close
               </button>
             </div>
           </div>

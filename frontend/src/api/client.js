@@ -33,6 +33,7 @@ export const authAPI = {
   getMe: () => api.get('/auth/me'),
   searchUsers: (q) => api.get(`/users/search?q=${encodeURIComponent(q)}`),
   listMembers: () => api.get('/users'),
+  requestPasswordReset: (data) => api.post('/auth/reset-password-request', data),
 };
 
 export const folderAPI = {
@@ -140,6 +141,8 @@ export const adminAPI = {
     return api.post('/admin/security/inspect', formDataOrJson);
   },
   getSecurityStats: () => api.get('/admin/security/stats'),
+  listPasswordResets: () => api.get('/admin/password-resets'),
+  resolvePasswordReset: (id, data) => api.post(`/admin/password-resets/${id}/resolve`, data),
 };
 
 export const teamAPI = {

@@ -177,12 +177,26 @@ func migrate() error {
 		UNIQUE(team_id, user_id)
 	);
 
+	CREATE TABLE IF NOT EXISTS main.password_resets (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL,
+		user_name TEXT NOT NULL,
+		user_email TEXT NOT NULL,
+		user_username TEXT NOT NULL,
+		status TEXT DEFAULT 'pending', -- 'pending', 'resolved', 'rejected'
+		reason TEXT DEFAULT '',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		resolved_at DATETIME,
+		resolved_by TEXT
+	);
+
 	CREATE INDEX IF NOT EXISTS main.idx_activity_logs_created ON activity_logs(created_at DESC);
 	CREATE INDEX IF NOT EXISTS main.idx_download_logs_target ON download_logs(target_id, downloaded_at DESC);
 	CREATE INDEX IF NOT EXISTS main.idx_download_logs_uuid ON download_logs(secret_uuid);
 	CREATE INDEX IF NOT EXISTS main.idx_teams_creator ON teams(created_by_user_id);
 	CREATE INDEX IF NOT EXISTS main.idx_team_members_team ON team_members(team_id);
 	CREATE INDEX IF NOT EXISTS main.idx_team_members_user ON team_members(user_id);
+	CREATE INDEX IF NOT EXISTS main.idx_password_resets_status ON password_resets(status, created_at DESC);
 	`
 
 	if _, err := DB.Exec(accountSchema); err != nil {
@@ -311,6 +325,9 @@ func migrate() error {
 				_, _ = DB.Exec("UPDATE drive.files SET secret_uuid = ? WHERE id = ?", uuid.New().String(), fid)
 			}
 		}
+		if err := fileRows.Err(); err != nil {
+			_ = err
+		}
 	}
 
 	folderRows, err := DB.Query("SELECT id FROM drive.folders WHERE secret_uuid IS NULL OR secret_uuid = ''")
@@ -322,7 +339,27 @@ func migrate() error {
 				_, _ = DB.Exec("UPDATE drive.folders SET secret_uuid = ? WHERE id = ?", uuid.New().String(), fldID)
 			}
 		}
+		if err := folderRows.Err(); err != nil {
+			_ = err
+		}
 	}
+
+	// Ensure password_resets exists
+	_, _ = DB.Exec(`
+		CREATE TABLE IF NOT EXISTS main.password_resets (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL,
+			user_name TEXT NOT NULL,
+			user_email TEXT NOT NULL,
+			user_username TEXT NOT NULL,
+			status TEXT DEFAULT 'pending',
+			reason TEXT DEFAULT '',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			resolved_at DATETIME,
+			resolved_by TEXT
+		);
+		CREATE INDEX IF NOT EXISTS main.idx_password_resets_status ON password_resets(status, created_at DESC);
+	`)
 
 	// Ensure exactly one owner exists: if no owner exists, promote the first admin
 	var ownerCount int

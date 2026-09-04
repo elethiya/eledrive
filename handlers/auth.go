@@ -3,12 +3,14 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"eledrive/config"
 	"eledrive/db"
+	"eledrive/events"
 	"eledrive/middleware"
 	"eledrive/models"
 	"eledrive/storage"
@@ -323,4 +325,105 @@ func (h *AuthHandler) ListTeamMembers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.RespondJSON(w, http.StatusOK, users)
+}
+
+type PasswordResetRequestPayload struct {
+	EmailOrUsername string `json:"email_or_username"`
+	Reason          string `json:"reason"`
+}
+
+// RequestPasswordReset creates a password reset request for administrator review
+func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
+	var req PasswordResetRequestPayload
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	identifier := strings.TrimSpace(req.EmailOrUsername)
+	if identifier == "" {
+		utils.RespondError(w, http.StatusBadRequest, "Email or username is required")
+		return
+	}
+
+	// Ensure table exists safely
+	_, _ = db.DB.Exec(`
+		CREATE TABLE IF NOT EXISTS main.password_resets (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL,
+			user_name TEXT NOT NULL,
+			user_email TEXT NOT NULL,
+			user_username TEXT NOT NULL,
+			status TEXT DEFAULT 'pending',
+			reason TEXT DEFAULT '',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			resolved_at DATETIME,
+			resolved_by TEXT
+		)
+	`)
+
+	var user models.User
+	err := db.DB.QueryRow(`
+		SELECT id, email, username, name, avatar_color, role, status
+		FROM main.users
+		WHERE LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)
+		LIMIT 1
+	`, identifier, identifier).Scan(
+		&user.ID, &user.Email, &user.Username, &user.Name, &user.AvatarColor, &user.Role, &user.Status,
+	)
+	if err != nil {
+		utils.RespondError(w, http.StatusNotFound, "No account found matching this email or username")
+		return
+	}
+
+	// Check if already has a pending reset request
+	var existingID string
+	err = db.DB.QueryRow(`
+		SELECT id FROM main.password_resets
+		WHERE user_id = ? AND status = 'pending'
+		LIMIT 1
+	`, user.ID).Scan(&existingID)
+	if err == nil && existingID != "" {
+		utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
+			"message":         "A password reset request is already pending administrator review.",
+			"already_pending": true,
+			"username":        user.Username,
+			"email":           user.Email,
+		})
+		return
+	}
+
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		reason = "User requested password reset via login portal"
+	}
+
+	resetID := uuid.New().String()
+	_, err = db.DB.Exec(`
+		INSERT INTO main.password_resets (id, user_id, user_name, user_email, user_username, status, reason, created_at)
+		VALUES (?, ?, ?, ?, ?, 'pending', ?, CURRENT_TIMESTAMP)
+	`, resetID, user.ID, user.Name, user.Email, user.Username, reason)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to submit reset request")
+		return
+	}
+
+	// Log activity
+	db.LogActivity(user.ID, user.Username, "password_reset_request", "user", user.ID, user.Name, fmt.Sprintf("User @%s requested password reset. Reason: %s", user.Username, reason))
+
+	// Broadcast real-time event to active admin panels
+	events.Broadcast("admin:password_reset_request", "user", "reset_request", user.ID, user.Name, "", map[string]interface{}{
+		"reset_id":  resetID,
+		"user_id":   user.ID,
+		"username":  user.Username,
+		"user_name": user.Name,
+		"email":     user.Email,
+		"reason":    reason,
+	})
+
+	utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"message":  "Password reset request submitted successfully. Workspace administrators have been notified.",
+		"username": user.Username,
+		"email":    user.Email,
+	})
 }
