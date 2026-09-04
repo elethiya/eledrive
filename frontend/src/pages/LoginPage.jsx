@@ -298,7 +298,7 @@ export default function LoginPage({ onNavigateRegister }) {
               </button>
             </form>
 
-            <div className="mt-6 text-center text-xs text-slate-400">
+            <div className="mt-4 text-center text-xs text-slate-400">
               Don't have an account?{' '}
               <button
                 onClick={onNavigateRegister}
@@ -311,7 +311,7 @@ export default function LoginPage({ onNavigateRegister }) {
         )}
 
         {/* Footer Attribution */}
-        <div className="mt-8 pt-4 border-t border-slate-800/60 text-center">
+        <div className="mt-4 pt-3 border-t border-slate-800/60 text-center">
           <p className="text-[11px] text-slate-500 font-medium tracking-wide">
             Developed and Powered by{' '}
             <span className="font-bold text-slate-400 tracking-wider">ELETHIYA</span>

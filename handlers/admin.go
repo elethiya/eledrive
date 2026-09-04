@@ -67,24 +67,25 @@ func (h *AdminHandler) GetLogs(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 
 	query := `
-		SELECT id, user_id, user_name, action, item_type, item_id, item_name, details, created_at 
-		FROM activity_logs 
+		SELECT l.id, l.user_id, l.user_name, COALESCE(u.username, '') AS user_username, l.action, l.item_type, l.item_id, l.item_name, l.details, l.created_at 
+		FROM activity_logs l
+		LEFT JOIN users u ON l.user_id = u.id
 		WHERE 1=1
 	`
 	var args []interface{}
 
 	if actionFilter != "" && actionFilter != "all" {
-		query += " AND action = ?"
+		query += " AND l.action = ?"
 		args = append(args, actionFilter)
 	}
 
 	if q != "" {
 		pattern := "%" + strings.ToLower(q) + "%"
-		query += " AND (LOWER(user_name) LIKE ? OR LOWER(item_name) LIKE ? OR LOWER(details) LIKE ?)"
-		args = append(args, pattern, pattern, pattern)
+		query += " AND (LOWER(l.user_name) LIKE ? OR LOWER(COALESCE(u.username, '')) LIKE ? OR LOWER(l.item_name) LIKE ? OR LOWER(l.details) LIKE ?)"
+		args = append(args, pattern, pattern, pattern, pattern)
 	}
 
-	query += " ORDER BY created_at DESC LIMIT 100"
+	query += " ORDER BY l.created_at DESC LIMIT 100"
 
 	rows, err := db.DB.Query(query, args...)
 	if err != nil {
@@ -98,7 +99,7 @@ func (h *AdminHandler) GetLogs(w http.ResponseWriter, r *http.Request) {
 		var logEntry models.ActivityLog
 		var details sql.NullString
 		if err := rows.Scan(
-			&logEntry.ID, &logEntry.UserID, &logEntry.UserName, &logEntry.Action,
+			&logEntry.ID, &logEntry.UserID, &logEntry.UserName, &logEntry.UserUsername, &logEntry.Action,
 			&logEntry.ItemType, &logEntry.ItemID, &logEntry.ItemName, &details, &logEntry.CreatedAt,
 		); err == nil {
 			if details.Valid {

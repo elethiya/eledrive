@@ -1468,8 +1468,11 @@ export default function AdminPage({ onBackToDrive }) {
                           <td className="py-3 px-4 font-mono text-[11px] text-slate-400 whitespace-nowrap">
                             {formatDate(l.created_at)}
                           </td>
-                          <td className="py-3 px-4 font-semibold text-slate-200">
-                            {l.user_name}
+                          <td className="py-3 px-4">
+                            <div className="font-semibold text-slate-200 leading-tight">{l.user_name}</div>
+                            {l.user_username && (
+                              <div className="text-[10px] text-slate-400 font-mono mt-0.5">@{l.user_username}</div>
+                            )}
                           </td>
                           <td className="py-3 px-4">
                             {l.action === 'password_reset_request' ? (

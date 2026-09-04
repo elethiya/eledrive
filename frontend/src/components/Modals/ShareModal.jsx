@@ -253,8 +253,8 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                 <div className="relative flex-1">
                   <input
                     type="text"
-                    placeholder="Search name or email..."
-                    value={selectedUser ? `${selectedUser.name} (${selectedUser.email})` : searchQuery}
+                    placeholder="Search by username, name or email..."
+                    value={selectedUser ? `${selectedUser.name} (@${selectedUser.username})` : searchQuery}
                     onChange={(e) => {
                       setSelectedUser(null);
                       setSearchQuery(e.target.value);
@@ -302,14 +302,16 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                       className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-800 rounded-lg text-left transition-colors"
                     >
                       <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[11px] font-bold"
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0"
                         style={{ backgroundColor: u.avatar_color }}
                       >
-                        {u.name.charAt(0)}
+                        {u.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="truncate">
                         <span className="text-xs font-semibold text-slate-100 block">{u.name}</span>
-                        <span className="text-[10px] text-slate-400 block">{u.email}</span>
+                        <span className="text-[10px] text-slate-400 font-mono block">
+                          @{u.username} • {u.email}
+                        </span>
                       </div>
                     </button>
                   ))}
@@ -355,15 +357,18 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                         key={u.id}
                         type="button"
                         onClick={() => setSelectedUser(u)}
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-xs text-slate-200 transition-colors"
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-xs text-slate-200 transition-colors group text-left"
                       >
                         <div
-                          className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] font-bold"
+                          className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
                           style={{ backgroundColor: u.avatar_color || '#3b82f6' }}
                         >
-                          {u.name.charAt(0)}
+                          {u.name.charAt(0).toUpperCase()}
                         </div>
-                        <span>{u.name}</span>
+                        <div className="min-w-0">
+                          <span className="block text-xs font-semibold text-slate-200 leading-tight truncate">{u.name}</span>
+                          <span className="block text-[9px] text-slate-400 font-mono leading-tight truncate">@{u.username}</span>
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -389,7 +394,9 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                       <span className="text-xs font-semibold text-slate-200 block">
                         {user?.name} (You)
                       </span>
-                      <span className="text-[10px] text-slate-500 block">{user?.email}</span>
+                      <span className="text-[10px] text-slate-400 block font-mono">
+                        {user?.username ? `@${user.username} • ${user.email}` : user?.email}
+                      </span>
                     </div>
                   </div>
                   <span className="text-[10px] font-bold text-slate-400 px-2 py-0.5 bg-slate-800 rounded-md">
@@ -414,8 +421,8 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                         <span className="text-xs font-semibold text-slate-200 block truncate">
                           {s.shared_with?.name}
                         </span>
-                        <span className="text-[10px] text-slate-500 block truncate">
-                          {s.shared_with?.email}
+                        <span className="text-[10px] text-slate-400 block truncate font-mono">
+                          {s.shared_with?.username ? `@${s.shared_with?.username} • ${s.shared_with?.email}` : s.shared_with?.email}
                         </span>
                       </div>
                     </div>

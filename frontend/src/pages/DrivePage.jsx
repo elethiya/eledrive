@@ -27,6 +27,7 @@ import {
   Archive,
   Layers,
   RefreshCw,
+  Search,
 } from 'lucide-react';
 import { formatBytes, formatDate, getFileTypeCategory } from '../utils/formatters';
 
@@ -292,7 +293,6 @@ export default function DrivePage({
         breadcrumbs={breadcrumbs}
         currentFolder={folder}
         onNavigate={(id) => setCurrentFolderId(id)}
-        onShareFolder={() => onOpenShare(folder || { id: 'root', name: 'My Drive' }, folder ? 'folder' : 'drive')}
       />
 
       {/* Modern Content Listing Toolbar (Always in same row as counting section) */}

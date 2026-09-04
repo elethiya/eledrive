@@ -59,7 +59,14 @@ export default function DetailsModal({ isOpen, onClose, item, isFolder }) {
             <span className="text-slate-500 font-medium flex items-center gap-1.5">
               <User className="w-3.5 h-3.5" /> Owner
             </span>
-            <span className="font-semibold text-slate-200 truncate max-w-[200px] text-right">{item.owner_name || item.owner_email || 'You'}</span>
+            <div className="text-right truncate max-w-[200px]">
+              <span className="font-semibold text-slate-200 block truncate">{item.owner_name || item.owner_email || 'You'}</span>
+              {(item.owner_username || (item.owner_name && item.owner_email)) && (
+                <span className="text-[10px] text-slate-400 font-mono block truncate">
+                  {item.owner_username ? `@${item.owner_username}` : item.owner_email}
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center justify-between py-1.5 border-b border-slate-800/80">

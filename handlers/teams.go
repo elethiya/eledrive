@@ -31,7 +31,7 @@ func (h *TeamHandler) ListTeams(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r.Context())
 
 	rows, err := db.DB.Query(`
-		SELECT t.id, t.name, t.description, t.avatar_color, t.created_by_user_id, u.name as creator_name,
+		SELECT t.id, t.name, t.description, t.avatar_color, t.created_by_user_id, u.name as creator_name, COALESCE(u.username, '') as creator_username,
 		       (SELECT COUNT(*) FROM main.team_members WHERE team_id = t.id) as members_count,
 		       COALESCE(tm.role, CASE WHEN t.created_by_user_id = ? THEN 'leader' ELSE 'member' END) as user_role,
 		       t.created_at, t.updated_at
@@ -53,7 +53,7 @@ func (h *TeamHandler) ListTeams(w http.ResponseWriter, r *http.Request) {
 		var tm models.Team
 		var desc sql.NullString
 		if err := rows.Scan(
-			&tm.ID, &tm.Name, &desc, &tm.AvatarColor, &tm.CreatedByUserID, &tm.CreatorName,
+			&tm.ID, &tm.Name, &desc, &tm.AvatarColor, &tm.CreatedByUserID, &tm.CreatorName, &tm.CreatorUsername,
 			&tm.MembersCount, &tm.UserRole, &tm.CreatedAt, &tm.UpdatedAt,
 		); err == nil {
 			if desc.Valid {
@@ -153,13 +153,13 @@ func (h *TeamHandler) GetTeam(w http.ResponseWriter, r *http.Request) {
 	var desc sql.NullString
 
 	err := db.DB.QueryRow(`
-		SELECT t.id, t.name, t.description, t.avatar_color, t.created_by_user_id, u.name as creator_name,
+		SELECT t.id, t.name, t.description, t.avatar_color, t.created_by_user_id, u.name as creator_name, COALESCE(u.username, '') as creator_username,
 		       t.created_at, t.updated_at
 		FROM main.teams t
 		JOIN main.users u ON t.created_by_user_id = u.id
 		WHERE t.id = ?
 	`, teamID).Scan(
-		&tm.ID, &tm.Name, &desc, &tm.AvatarColor, &tm.CreatedByUserID, &tm.CreatorName,
+		&tm.ID, &tm.Name, &desc, &tm.AvatarColor, &tm.CreatedByUserID, &tm.CreatorName, &tm.CreatorUsername,
 		&tm.CreatedAt, &tm.UpdatedAt,
 	)
 

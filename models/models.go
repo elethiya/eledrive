@@ -95,15 +95,16 @@ type ShareLink struct {
 }
 
 type ActivityLog struct {
-	ID        string    `json:"id"`
-	UserID    string    `json:"user_id"`
-	UserName  string    `json:"user_name"`
-	Action    string    `json:"action"` // upload, download, share, create_folder, delete, rename, move
-	ItemType  string    `json:"item_type"` // file or folder
-	ItemID    string    `json:"item_id"`
-	ItemName  string    `json:"item_name"`
-	Details   string    `json:"details,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	ID           string    `json:"id"`
+	UserID       string    `json:"user_id"`
+	UserName     string    `json:"user_name"`
+	UserUsername string    `json:"user_username,omitempty"`
+	Action       string    `json:"action"` // upload, download, share, create_folder, delete, rename, move
+	ItemType     string    `json:"item_type"` // file or folder
+	ItemID       string    `json:"item_id"`
+	ItemName     string    `json:"item_name"`
+	Details      string    `json:"details,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type Breadcrumb struct {
@@ -208,6 +209,7 @@ type Team struct {
 	AvatarColor     string       `json:"avatar_color"`
 	CreatedByUserID string       `json:"created_by_user_id"`
 	CreatorName     string       `json:"creator_name,omitempty"`
+	CreatorUsername string       `json:"creator_username,omitempty"`
 	MembersCount    int          `json:"members_count"`
 	UserRole        string       `json:"user_role,omitempty"` // "leader" or "member"
 	CreatedAt       time.Time    `json:"created_at"`

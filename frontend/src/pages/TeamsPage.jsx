@@ -415,9 +415,9 @@ export default function TeamsPage() {
                           <span className="font-semibold text-slate-100 group-hover:text-blue-400 transition-colors truncate">
                             {t.name}
                           </span>
-                          {t.creator_name && (
-                            <span className="text-[10px] text-slate-500 hidden lg:inline">
-                              by {t.creator_name}
+                          {(t.creator_name || t.creator_username) && (
+                            <span className="text-[10px] text-slate-400 font-mono hidden lg:inline">
+                              by {t.creator_name} {t.creator_username && `(@${t.creator_username})`}
                             </span>
                           )}
                         </div>
@@ -583,7 +583,7 @@ export default function TeamsPage() {
                             </div>
                             <div>
                               <div className="text-xs font-medium text-slate-200">{u.name}</div>
-                              <div className="text-[10px] text-slate-500">{u.email}</div>
+                              <div className="text-[10px] text-slate-400 font-mono">@{u.username} • {u.email}</div>
                             </div>
                           </div>
 
@@ -692,7 +692,8 @@ export default function TeamsPage() {
                           (au) =>
                             !activeTeam.members?.some((m) => m.user_id === au.id) &&
                             (au.name.toLowerCase().includes(addMemberQuery.toLowerCase()) ||
-                              au.email.toLowerCase().includes(addMemberQuery.toLowerCase()))
+                              au.email.toLowerCase().includes(addMemberQuery.toLowerCase()) ||
+                              (au.username && au.username.toLowerCase().includes(addMemberQuery.toLowerCase())))
                         )
                         .slice(0, 5)
                         .map((au) => (
@@ -707,8 +708,10 @@ export default function TeamsPage() {
                               >
                                 {au.name.charAt(0).toUpperCase()}
                               </div>
-                              <span className="text-xs text-slate-200">{au.name}</span>
-                              <span className="text-[10px] text-slate-500">({au.email})</span>
+                              <div>
+                                <span className="text-xs font-medium text-slate-200 block">{au.name}</span>
+                                <span className="text-[10px] text-slate-400 font-mono block">@{au.username} • {au.email}</span>
+                              </div>
                             </div>
 
                             <button
@@ -761,7 +764,9 @@ export default function TeamsPage() {
                                       <Crown className="w-3.5 h-3.5 text-amber-400" />
                                     )}
                                   </div>
-                                  <div className="text-[10px] text-slate-500">{m.email}</div>
+                                  <div className="text-[10px] text-slate-400 font-mono">
+                                    {m.username ? `@${m.username} • ${m.email}` : m.email}
+                                  </div>
                                 </div>
                               </div>
                             </td>
