@@ -143,11 +143,16 @@ export const adminAPI = {
   getSecurityStats: () => api.get('/admin/security/stats'),
   listPasswordResets: () => api.get('/admin/password-resets'),
   resolvePasswordReset: (id, data) => api.post(`/admin/password-resets/${id}/resolve`, data),
+  listTeamRequests: (status) => api.get('/admin/team-requests', { params: { status } }),
+  approveTeamRequest: (id) => api.post(`/admin/team-requests/${id}/approve`),
+  rejectTeamRequest: (id, data) => api.post(`/admin/team-requests/${id}/reject`, data),
 };
 
 export const teamAPI = {
   listTeams: () => api.get('/teams'),
   createTeam: (data) => api.post('/teams', data),
+  requestTeam: (data) => api.post('/teams/request', data),
+  getMyRequests: () => api.get('/teams/my-requests'),
   getTeam: (id) => api.get(`/teams/${id}`),
   updateTeam: (id, data) => api.put(`/teams/${id}`, data),
   addMember: (teamId, data) => api.post(`/teams/${teamId}/members`, data),

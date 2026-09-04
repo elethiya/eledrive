@@ -26,21 +26,37 @@ func NewTeamHandler(cfg *config.Config) *TeamHandler {
 	return &TeamHandler{cfg: cfg}
 }
 
-// ListTeams returns all teams the user belongs to or created
+// ListTeams returns all teams the user belongs to or created, or all teams in workspace if caller is owner
 func (h *TeamHandler) ListTeams(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r.Context())
 
-	rows, err := db.DB.Query(`
-		SELECT t.id, t.name, t.description, t.avatar_color, t.created_by_user_id, u.name as creator_name, COALESCE(u.username, '') as creator_username,
-		       (SELECT COUNT(*) FROM main.team_members WHERE team_id = t.id) as members_count,
-		       COALESCE(tm.role, CASE WHEN t.created_by_user_id = ? THEN 'leader' ELSE 'member' END) as user_role,
-		       t.created_at, t.updated_at
-		FROM main.teams t
-		JOIN main.users u ON t.created_by_user_id = u.id
-		LEFT JOIN main.team_members tm ON tm.team_id = t.id AND tm.user_id = ?
-		WHERE t.created_by_user_id = ? OR tm.user_id = ?
-		ORDER BY t.updated_at DESC
-	`, claims.UserID, claims.UserID, claims.UserID, claims.UserID)
+	var rows *sql.Rows
+	var err error
+
+	if claims.Role == "owner" {
+		rows, err = db.DB.Query(`
+			SELECT t.id, t.name, t.description, t.avatar_color, t.created_by_user_id, u.name as creator_name, COALESCE(u.username, '') as creator_username, u.role as creator_role,
+			       (SELECT COUNT(*) FROM main.team_members WHERE team_id = t.id) as members_count,
+			       COALESCE(tm.role, CASE WHEN t.created_by_user_id = ? THEN 'leader' ELSE 'owner' END) as user_role,
+			       t.created_at, t.updated_at
+			FROM main.teams t
+			JOIN main.users u ON t.created_by_user_id = u.id
+			LEFT JOIN main.team_members tm ON tm.team_id = t.id AND tm.user_id = ?
+			ORDER BY t.updated_at DESC
+		`, claims.UserID, claims.UserID)
+	} else {
+		rows, err = db.DB.Query(`
+			SELECT t.id, t.name, t.description, t.avatar_color, t.created_by_user_id, u.name as creator_name, COALESCE(u.username, '') as creator_username, u.role as creator_role,
+			       (SELECT COUNT(*) FROM main.team_members WHERE team_id = t.id) as members_count,
+			       COALESCE(tm.role, CASE WHEN t.created_by_user_id = ? THEN 'leader' ELSE 'member' END) as user_role,
+			       t.created_at, t.updated_at
+			FROM main.teams t
+			JOIN main.users u ON t.created_by_user_id = u.id
+			LEFT JOIN main.team_members tm ON tm.team_id = t.id AND tm.user_id = ?
+			WHERE t.created_by_user_id = ? OR tm.user_id = ?
+			ORDER BY t.updated_at DESC
+		`, claims.UserID, claims.UserID, claims.UserID, claims.UserID)
+	}
 
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, "Failed to fetch teams")
@@ -53,7 +69,7 @@ func (h *TeamHandler) ListTeams(w http.ResponseWriter, r *http.Request) {
 		var tm models.Team
 		var desc sql.NullString
 		if err := rows.Scan(
-			&tm.ID, &tm.Name, &desc, &tm.AvatarColor, &tm.CreatedByUserID, &tm.CreatorName, &tm.CreatorUsername,
+			&tm.ID, &tm.Name, &desc, &tm.AvatarColor, &tm.CreatedByUserID, &tm.CreatorName, &tm.CreatorUsername, &tm.CreatorRole,
 			&tm.MembersCount, &tm.UserRole, &tm.CreatedAt, &tm.UpdatedAt,
 		); err == nil {
 			if desc.Valid {
@@ -70,9 +86,131 @@ func (h *TeamHandler) ListTeams(w http.ResponseWriter, r *http.Request) {
 	utils.RespondJSON(w, http.StatusOK, teams)
 }
 
-// CreateTeam creates a new team and adds the creator as leader
+// RequestTeam allows any user to submit a team creation request for administrator review
+func (h *TeamHandler) RequestTeam(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+	var req models.SubmitTeamRequestPayload
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		utils.RespondError(w, http.StatusBadRequest, "Team name cannot be empty")
+		return
+	}
+
+	color := strings.TrimSpace(req.AvatarColor)
+	if color == "" {
+		color = "#3b82f6"
+	}
+
+	if req.InitialMembers == nil {
+		req.InitialMembers = make([]string, 0)
+	}
+	membersJSON, _ := json.Marshal(req.InitialMembers)
+	requestID := uuid.New().String()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	var requesterName string
+	_ = db.DB.QueryRow("SELECT name FROM main.users WHERE id = ?", claims.UserID).Scan(&requesterName)
+	if requesterName == "" {
+		requesterName = claims.Username
+	}
+
+	_, err := db.DB.Exec(`
+		INSERT INTO main.team_requests (id, user_id, user_name, user_email, user_username, name, description, avatar_color, initial_members, status, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+	`, requestID, claims.UserID, requesterName, claims.Email, claims.Username, name, req.Description, color, string(membersJSON), now)
+
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to submit team request")
+		return
+	}
+
+	db.LogActivity(claims.UserID, claims.Username, "request_team", "team_request", requestID, name, fmt.Sprintf("Submitted request to create team '%s'", name))
+
+	res := models.TeamCreationRequest{
+		ID:             requestID,
+		UserID:         claims.UserID,
+		UserName:       requesterName,
+		UserEmail:      claims.Email,
+		UserUsername:   claims.Username,
+		Name:           name,
+		Description:    req.Description,
+		AvatarColor:    color,
+		InitialMembers: req.InitialMembers,
+		Status:         "pending",
+		CreatedAt:      now,
+	}
+
+	events.Broadcast("team:request_create", "team_request", "create", requestID, "", claims.UserID, res)
+	utils.RespondJSON(w, http.StatusCreated, res)
+}
+
+// GetMyRequests returns team requests submitted by the current user
+func (h *TeamHandler) GetMyRequests(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+
+	rows, err := db.DB.Query(`
+		SELECT id, user_id, user_name, user_email, user_username, name, description, avatar_color, initial_members, status, admin_note, created_at, reviewed_at, COALESCE(reviewed_by, '')
+		FROM main.team_requests
+		WHERE user_id = ?
+		ORDER BY created_at DESC
+	`, claims.UserID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to fetch team requests")
+		return
+	}
+	defer rows.Close()
+
+	requests := make([]models.TeamCreationRequest, 0)
+	for rows.Next() {
+		var tr models.TeamCreationRequest
+		var initialMembersStr, desc, adminNote, revBy sql.NullString
+		var revAt sql.NullTime
+		if err := rows.Scan(
+			&tr.ID, &tr.UserID, &tr.UserName, &tr.UserEmail, &tr.UserUsername,
+			&tr.Name, &desc, &tr.AvatarColor, &initialMembersStr, &tr.Status,
+			&adminNote, &tr.CreatedAt, &revAt, &revBy,
+		); err == nil {
+			if desc.Valid {
+				tr.Description = desc.String
+			}
+			if adminNote.Valid {
+				tr.AdminNote = adminNote.String
+			}
+			if revBy.Valid {
+				tr.ReviewedBy = revBy.String
+			}
+			if revAt.Valid {
+				tr.ReviewedAt = &revAt.Time
+			}
+			tr.InitialMembers = make([]string, 0)
+			if initialMembersStr.Valid && initialMembersStr.String != "" {
+				_ = json.Unmarshal([]byte(initialMembersStr.String), &tr.InitialMembers)
+			}
+			requests = append(requests, tr)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		_ = err
+	}
+
+	utils.RespondJSON(w, http.StatusOK, requests)
+}
+
+// CreateTeam creates a new team directly (available to workspace administrators and owner)
 func (h *TeamHandler) CreateTeam(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r.Context())
+
+	// Non-admin / non-owner users must submit a request
+	if claims.Role != "admin" && claims.Role != "owner" {
+		utils.RespondError(w, http.StatusForbidden, "Team creation requires administrator approval. Please submit a team creation request.")
+		return
+	}
+
 	var req models.CreateTeamRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.RespondError(w, http.StatusBadRequest, "Invalid request payload")
@@ -153,13 +291,13 @@ func (h *TeamHandler) GetTeam(w http.ResponseWriter, r *http.Request) {
 	var desc sql.NullString
 
 	err := db.DB.QueryRow(`
-		SELECT t.id, t.name, t.description, t.avatar_color, t.created_by_user_id, u.name as creator_name, COALESCE(u.username, '') as creator_username,
+		SELECT t.id, t.name, t.description, t.avatar_color, t.created_by_user_id, u.name as creator_name, COALESCE(u.username, '') as creator_username, u.role as creator_role,
 		       t.created_at, t.updated_at
 		FROM main.teams t
 		JOIN main.users u ON t.created_by_user_id = u.id
 		WHERE t.id = ?
 	`, teamID).Scan(
-		&tm.ID, &tm.Name, &desc, &tm.AvatarColor, &tm.CreatedByUserID, &tm.CreatorName, &tm.CreatorUsername,
+		&tm.ID, &tm.Name, &desc, &tm.AvatarColor, &tm.CreatedByUserID, &tm.CreatorName, &tm.CreatorUsername, &tm.CreatorRole,
 		&tm.CreatedAt, &tm.UpdatedAt,
 	)
 
@@ -184,15 +322,18 @@ func (h *TeamHandler) GetTeam(w http.ResponseWriter, r *http.Request) {
 	if userRole == "" && tm.CreatedByUserID == claims.UserID {
 		userRole = "leader"
 	}
+	if userRole == "" && claims.Role == "owner" {
+		userRole = "owner"
+	}
 	tm.UserRole = userRole
 
 	// Fetch members
 	membersRows, err := db.DB.Query(`
-		SELECT tm.id, tm.team_id, tm.user_id, u.name, u.username, u.email, u.avatar_color, tm.role, tm.joined_at
+		SELECT tm.id, tm.team_id, tm.user_id, u.name, u.username, u.email, u.avatar_color, tm.role, tm.joined_at, u.role as workspace_role
 		FROM main.team_members tm
 		JOIN main.users u ON tm.user_id = u.id
 		WHERE tm.team_id = ?
-		ORDER BY CASE tm.role WHEN 'leader' THEN 1 ELSE 2 END, u.name ASC
+		ORDER BY CASE WHEN u.role = 'owner' THEN 1 WHEN tm.role = 'leader' THEN 2 ELSE 3 END, u.name ASC
 	`, teamID)
 
 	tm.Members = make([]models.TeamMember, 0)
@@ -200,7 +341,7 @@ func (h *TeamHandler) GetTeam(w http.ResponseWriter, r *http.Request) {
 		defer membersRows.Close()
 		for membersRows.Next() {
 			var m models.TeamMember
-			if err := membersRows.Scan(&m.ID, &m.TeamID, &m.UserID, &m.Name, &m.Username, &m.Email, &m.AvatarColor, &m.Role, &m.JoinedAt); err == nil {
+			if err := membersRows.Scan(&m.ID, &m.TeamID, &m.UserID, &m.Name, &m.Username, &m.Email, &m.AvatarColor, &m.Role, &m.JoinedAt, &m.WorkspaceRole); err == nil {
 				tm.Members = append(tm.Members, m)
 			}
 		}
@@ -254,9 +395,19 @@ func (h *TeamHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	role := "member"
-	if req.Role == "leader" {
+	var role string
+	var targetUserRole string
+	_ = db.DB.QueryRow("SELECT role FROM main.users WHERE id = ?", targetUser.ID).Scan(&targetUserRole)
+	if targetUserRole == "owner" {
+		if claims.Role != "owner" {
+			utils.RespondError(w, http.StatusForbidden, "Admins cannot modify the workspace owner's team membership")
+			return
+		}
 		role = "leader"
+	} else if req.Role == "leader" {
+		role = "leader"
+	} else {
+		role = "member"
 	}
 
 	memberID := uuid.New().String()
@@ -304,6 +455,14 @@ func (h *TeamHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 	_ = db.DB.QueryRow("SELECT created_by_user_id FROM main.teams WHERE id = ?", teamID).Scan(&creatorID)
 	_ = db.DB.QueryRow("SELECT role FROM main.team_members WHERE team_id = ? AND user_id = ?", teamID, claims.UserID).Scan(&callerRole)
 
+	// Check if target user is workspace owner
+	var targetUserRole string
+	_ = db.DB.QueryRow("SELECT role FROM main.users WHERE id = ?", targetUserID).Scan(&targetUserRole)
+	if targetUserRole == "owner" {
+		utils.RespondError(w, http.StatusForbidden, "The workspace owner cannot be removed from any team")
+		return
+	}
+
 	// User can remove themselves (leave team) or leader/admin can remove them
 	if targetUserID != claims.UserID && creatorID != claims.UserID && callerRole != "leader" && claims.Role != "admin" && claims.Role != "owner" {
 		utils.RespondError(w, http.StatusForbidden, "No permission to remove member from team")
@@ -333,8 +492,15 @@ func (h *TeamHandler) DeleteTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var creatorRole string
+	_ = db.DB.QueryRow("SELECT u.role FROM main.teams t JOIN main.users u ON t.created_by_user_id = u.id WHERE t.id = ?", teamID).Scan(&creatorRole)
+	if creatorRole == "owner" && claims.Role != "owner" {
+		utils.RespondError(w, http.StatusForbidden, "Admins cannot delete teams created by the workspace owner")
+		return
+	}
+
 	if creatorID != claims.UserID && claims.Role != "admin" && claims.Role != "owner" {
-		utils.RespondError(w, http.StatusForbidden, "Only the team creator or workspace admin can delete this team")
+		utils.RespondError(w, http.StatusForbidden, "Only the team creator or workspace owner can delete this team")
 		return
 	}
 
@@ -355,7 +521,7 @@ func (h *TeamHandler) DeleteTeam(w http.ResponseWriter, r *http.Request) {
 func (h *TeamHandler) GetAvailableUsers(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r.Context())
 	rows, err := db.DB.Query(`
-		SELECT id, email, username, name, avatar_color
+		SELECT id, email, username, name, avatar_color, role
 		FROM main.users
 		WHERE status = 'approved' AND id != ?
 		ORDER BY name ASC
@@ -369,7 +535,7 @@ func (h *TeamHandler) GetAvailableUsers(w http.ResponseWriter, r *http.Request) 
 	users := make([]models.UserPublic, 0)
 	for rows.Next() {
 		var u models.UserPublic
-		if err := rows.Scan(&u.ID, &u.Email, &u.Username, &u.Name, &u.AvatarColor); err == nil {
+		if err := rows.Scan(&u.ID, &u.Email, &u.Username, &u.Name, &u.AvatarColor, &u.Role); err == nil {
 			users = append(users, u)
 		}
 	}
@@ -469,6 +635,19 @@ func (h *TeamHandler) UpdateMemberRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var targetUserRole string
+	_ = db.DB.QueryRow("SELECT role FROM main.users WHERE id = ?", targetUserID).Scan(&targetUserRole)
+	if targetUserRole == "owner" {
+		if claims.Role != "owner" {
+			utils.RespondError(w, http.StatusForbidden, "Admins cannot change the workspace owner's role in any team")
+			return
+		}
+		if role != "leader" {
+			utils.RespondError(w, http.StatusForbidden, "The workspace owner cannot be demoted from leader")
+			return
+		}
+	}
+
 	if targetUserID == creatorID && role != "leader" && claims.Role != "admin" && claims.Role != "owner" {
 		utils.RespondError(w, http.StatusForbidden, "The team creator cannot be demoted from leader")
 		return
@@ -501,6 +680,13 @@ func (h *TeamHandler) TransferOwnership(w http.ResponseWriter, r *http.Request) 
 	err := db.DB.QueryRow("SELECT created_by_user_id FROM main.teams WHERE id = ?", teamID).Scan(&creatorID)
 	if err != nil {
 		utils.RespondError(w, http.StatusNotFound, "Team not found")
+		return
+	}
+
+	var creatorRole string
+	_ = db.DB.QueryRow("SELECT u.role FROM main.teams t JOIN main.users u ON t.created_by_user_id = u.id WHERE t.id = ?", teamID).Scan(&creatorRole)
+	if creatorRole == "owner" && claims.Role != "owner" {
+		utils.RespondError(w, http.StatusForbidden, "Admins cannot transfer ownership of teams owned by the workspace owner")
 		return
 	}
 

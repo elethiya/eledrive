@@ -32,6 +32,8 @@ import {
   Lock,
   ArrowRightLeft,
   Info,
+  Clock,
+  XCircle,
 } from 'lucide-react';
 import { teamAPI } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -98,18 +100,44 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
   const [transferOwnerId, setTransferOwnerId] = useState('');
   const [isTransferring, setIsTransferring] = useState(false);
 
+  const isAdminOrOwner = user?.role === 'admin' || user?.role === 'owner';
+
+  // Team Creation Requests State (for regular users)
+  const [myRequests, setMyRequests] = useState([]);
+  const [loadingMyRequests, setLoadingMyRequests] = useState(false);
+  const [showMyRequestsModal, setShowMyRequestsModal] = useState(false);
+
   useEffect(() => {
     loadTeams(true);
     loadAvailableUsers();
+    loadMyRequests();
   }, []);
 
-  // Real-time Event Subscription for teams and members
+  // Real-time Event Subscription for teams, members, and requests
   useRealtimeEvent(['team', 'sync'], () => {
     loadTeams(false);
     if (activeTeam?.id) {
       loadTeamShares(activeTeam.id, false);
     }
+    loadMyRequests();
   });
+
+  const loadMyRequests = async () => {
+    setLoadingMyRequests(true);
+    try {
+      const res = await teamAPI.getMyRequests();
+      if (Array.isArray(res.data)) {
+        setMyRequests(res.data);
+      } else {
+        setMyRequests([]);
+      }
+    } catch (err) {
+      console.error('Failed to load team requests:', err);
+      setMyRequests([]);
+    } finally {
+      setLoadingMyRequests(false);
+    }
+  };
 
   const loadTeams = async (showSpinner = false) => {
     if (showSpinner || teams.length === 0) setLoading(true);
@@ -216,32 +244,49 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
     setCreating(true);
     setCreateError('');
     try {
-      const res = await teamAPI.createTeam({
-        name: newTeamName.trim(),
-        description: newTeamDesc.trim() || undefined,
-        avatar_color: newTeamColor,
-      });
+      if (isAdminOrOwner) {
+        const res = await teamAPI.createTeam({
+          name: newTeamName.trim(),
+          description: newTeamDesc.trim() || undefined,
+          avatar_color: newTeamColor,
+        });
 
-      const createdTeam = res.data;
-      if (selectedInitialMembers.length > 0 && createdTeam?.id) {
-        for (const userId of selectedInitialMembers) {
-          try {
-            await teamAPI.addMember(createdTeam.id, { user_id: userId, role: 'member' });
-          } catch (mErr) {
-            console.warn('Failed to add initial member:', mErr);
+        const createdTeam = res.data;
+        if (selectedInitialMembers.length > 0 && createdTeam?.id) {
+          for (const userId of selectedInitialMembers) {
+            try {
+              await teamAPI.addMember(createdTeam.id, { user_id: userId, role: 'member' });
+            } catch (mErr) {
+              console.warn('Failed to add initial member:', mErr);
+            }
           }
         }
-      }
 
-      setCreateModalOpen(false);
-      setNewTeamName('');
-      setNewTeamDesc('');
-      setSelectedInitialMembers([]);
-      loadTeams();
-      toast.success(`Team "${createdTeam?.name || 'New Team'}" created successfully!`);
+        setCreateModalOpen(false);
+        setNewTeamName('');
+        setNewTeamDesc('');
+        setSelectedInitialMembers([]);
+        loadTeams();
+        toast.success(`Team "${createdTeam?.name || 'New Team'}" created successfully!`);
+      } else {
+        await teamAPI.requestTeam({
+          name: newTeamName.trim(),
+          description: newTeamDesc.trim() || undefined,
+          avatar_color: newTeamColor,
+          initial_members: selectedInitialMembers,
+        });
+
+        setCreateModalOpen(false);
+        setNewTeamName('');
+        setNewTeamDesc('');
+        setSelectedInitialMembers([]);
+        loadMyRequests();
+        toast.success('Team proposal submitted! An administrator will review your request.');
+      }
     } catch (err) {
-      setCreateError(err.response?.data?.error || err.message || 'Failed to create team');
-      toast.error(err.response?.data?.error || err.message || 'Failed to create team');
+      const errMsg = err.response?.data?.error || err.message || 'Failed to submit team request';
+      setCreateError(errMsg);
+      toast.error(errMsg);
     } finally {
       setCreating(false);
     }
@@ -482,11 +527,28 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {!isAdminOrOwner && myRequests.length > 0 && (
+            <button
+              onClick={() => setShowMyRequestsModal(true)}
+              className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-2 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-slate-100 border border-slate-800 rounded-xl text-xs font-semibold transition-all group shadow-xs"
+              title="View my submitted team creation requests"
+            >
+              <Clock className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">My Proposals</span>
+              {myRequests.filter((r) => r.status === 'pending').length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 font-black text-[10px]">
+                  {myRequests.filter((r) => r.status === 'pending').length}
+                </span>
+              )}
+            </button>
+          )}
+
           <button
             onClick={async () => {
               setIsRefreshing(true);
               try {
                 await loadTeams();
+                if (!isAdminOrOwner) await loadMyRequests();
               } finally {
                 setTimeout(() => setIsRefreshing(false), 600);
               }
@@ -506,16 +568,46 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
           <button
             onClick={() => setCreateModalOpen(true)}
             className="flex items-center justify-center gap-1.5 px-2.5 py-2 sm:px-3 sm:py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/20 transition-all transform hover:-translate-y-0.5"
-            title="Create New Team"
+            title={isAdminOrOwner ? 'Create New Team' : 'Request New Team'}
           >
             <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Create New Team</span>
+            <span className="hidden sm:inline">{isAdminOrOwner ? 'Create New Team' : 'Request New Team'}</span>
           </button>
         </div>
       </div>
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 space-y-4 sm:space-y-6">
+        {/* Pending Requests Banner for Regular Users */}
+        {!isAdminOrOwner && myRequests.some((r) => r.status === 'pending') && (
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0">
+                <Clock className="w-4 h-4 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-bold text-slate-100">
+                    {myRequests.filter((r) => r.status === 'pending').length} Team Proposal Pending Admin Approval
+                  </h4>
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Your proposal will be reviewed by an administrator. Once approved, the team workspace will be automatically created.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowMyRequestsModal(true)}
+              className="px-3.5 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-semibold transition-colors shrink-0 flex items-center justify-center gap-1.5"
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>Track Proposal Status</span>
+            </button>
+          </div>
+        )}
+
         {/* Search Bar */}
         <div className="w-full max-w-md relative">
           <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
@@ -557,7 +649,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-md"
             >
               <Plus className="w-4 h-4" />
-              <span>Create Your First Team</span>
+              <span>{isAdminOrOwner ? 'Create Your First Team' : 'Request Your First Team'}</span>
             </button>
           </div>
         ) : (
@@ -828,7 +920,9 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                 <div className="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold shadow-md shadow-blue-500/10">
                   <Users className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-100">Create New Team</h3>
+                <h3 className="text-sm font-bold text-slate-100">
+                  {isAdminOrOwner ? 'Create New Team' : 'Request New Team Workspace'}
+                </h3>
               </div>
               <button
                 onClick={() => setCreateModalOpen(false)}
@@ -837,6 +931,15 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {!isAdminOrOwner && (
+              <div className="p-2.5 rounded-xl bg-blue-950/40 border border-blue-500/20 text-blue-300 text-[11px] flex items-start gap-2 shrink-0">
+                <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-blue-400" />
+                <span>
+                  Team creation requires administrator approval. Your proposal will be submitted for review, and upon approval, you will be appointed team leader.
+                </span>
+              </div>
+            )}
 
             <form onSubmit={handleCreateTeam} className="space-y-4 overflow-y-auto flex-1 pr-0.5">
               <div>
@@ -891,7 +994,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
               {/* Add Teammates Checklist */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Add Teammates Now ({selectedInitialMembers.length} selected)
+                  Requested Teammates ({selectedInitialMembers.length} selected)
                 </label>
                 <div className="max-h-32 sm:max-h-36 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-2 divide-y divide-slate-900">
                   {availableUsers.length === 0 ? (
@@ -931,7 +1034,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                               isSelected ? 'bg-blue-600 border-blue-500 text-white' : 'border-slate-700'
                             }`}
                           >
-                            {isSelected && <Check className="w-3 h-3" />}
+                            {isSelected && <Check className="w-3.5 h-3.5" />}
                           </div>
                         </div>
                       );
@@ -957,7 +1060,13 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                   disabled={creating}
                   className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 disabled:opacity-50"
                 >
-                  {creating ? 'Creating...' : 'Create Team'}
+                  {creating
+                    ? isAdminOrOwner
+                      ? 'Creating...'
+                      : 'Submitting Proposal...'
+                    : isAdminOrOwner
+                    ? 'Create Team'
+                    : 'Submit Team Proposal'}
                 </button>
               </div>
             </form>
@@ -965,9 +1074,116 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
         </div>
       )}
 
+      {/* User's Team Creation Requests Tracking Modal */}
+      {showMyRequestsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
+          <div className="relative bg-slate-900 rounded-2xl sm:rounded-3xl max-w-lg w-full border border-slate-800 p-4 sm:p-6 shadow-2xl shadow-black/80 space-y-4 overflow-hidden max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between relative z-10 shrink-0 border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-bold">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100">My Team Creation Proposals</h3>
+                  <p className="text-[11px] text-slate-400">Track the approval status of teams you requested</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowMyRequestsModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 space-y-3 pr-1">
+              {myRequests.length === 0 ? (
+                <div className="p-8 text-center text-slate-500 text-xs">
+                  You haven't submitted any team creation proposals yet.
+                </div>
+              ) : (
+                myRequests.map((req) => (
+                  <div
+                    key={req.id}
+                    className="p-3.5 rounded-2xl bg-slate-950 border border-slate-850 space-y-2 hover:border-slate-800 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-white text-xs shrink-0 shadow-xs"
+                          style={{ backgroundColor: req.avatar_color || '#3b82f6' }}
+                        >
+                          {req.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-xs font-bold text-slate-200 truncate">{req.name}</h4>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            Requested {formatDate(req.created_at)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0">
+                        {req.status === 'pending' ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-amber-500/15 text-amber-300 border-amber-500/30">
+                            <Clock className="w-3 h-3 animate-pulse" />
+                            Pending Review
+                          </span>
+                        ) : req.status === 'approved' ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-emerald-500/15 text-emerald-300 border-emerald-500/30">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Approved & Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-red-500/15 text-red-300 border-red-500/30">
+                            <XCircle className="w-3 h-3" />
+                            Rejected
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {req.description && (
+                      <p className="text-[11px] text-slate-400 line-clamp-2 pl-10">
+                        {req.description}
+                      </p>
+                    )}
+
+                    {req.initial_members && req.initial_members.length > 0 && (
+                      <div className="text-[10px] text-slate-500 pl-10 font-mono">
+                        Included teammates: {req.initial_members.length} requested
+                      </div>
+                    )}
+
+                    {req.status === 'rejected' && req.admin_note && (
+                      <div className="ml-10 p-2 rounded-xl bg-red-950/20 border border-red-500/20 text-[11px] text-red-300">
+                        <span className="font-semibold">Admin feedback: </span>
+                        {req.admin_note}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-800 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowMyRequestsModal(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Team Details / Manage Modal */}
       {activeTeam && (() => {
         const isOwner = activeTeam.created_by_user_id === user?.id || user?.role === 'admin' || user?.role === 'owner';
+        const isTeamCreatedByOwner = activeTeam.creator_role === 'owner';
+        const isCallerWorkspaceOwner = user?.role === 'owner';
         const isLeader = activeTeam.user_role === 'leader' || isOwner;
         const canManage = isLeader || isOwner;
 
@@ -1251,6 +1467,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                           ) : (
                             filteredMembers.map((m) => {
                               const isMemberOwner = m.user_id === activeTeam.created_by_user_id;
+                              const isWorkspaceOwner = m.workspace_role === 'owner';
                               const isMemberLeader = m.role === 'leader';
                               const isSelf = m.user_id === user?.id;
 
@@ -1279,7 +1496,12 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                                   </td>
 
                                   <td className="py-2.5 px-3 whitespace-nowrap">
-                                    {isMemberOwner ? (
+                                    {isWorkspaceOwner ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-xs" title="Workspace Owner • Unmodifiable">
+                                        <Crown className="w-3 h-3 text-amber-400" />
+                                        Owner • Protected
+                                      </span>
+                                    ) : isMemberOwner ? (
                                       <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-amber-500/15 text-amber-300 border-amber-500/30">
                                         <Crown className="w-3 h-3 text-amber-400" />
                                         Owner
@@ -1303,7 +1525,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                                   <td className="py-2.5 px-3 text-right whitespace-nowrap">
                                     <div className="flex items-center justify-end gap-1.5">
                                       {/* Role toggle button (Promote/Demote) */}
-                                      {canManage && !isMemberOwner && (
+                                      {canManage && !isMemberOwner && !isWorkspaceOwner && (
                                         <button
                                           type="button"
                                           onClick={() => handleToggleMemberRole(m.user_id, m.role)}
@@ -1330,7 +1552,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
 
                                       {/* Remove or Leave button */}
                                       {isSelf ? (
-                                        !isMemberOwner && (
+                                        !isMemberOwner && !isWorkspaceOwner && (
                                           <button
                                             type="button"
                                             onClick={() => handleRemoveMember(m.user_id, m.name)}
@@ -1344,15 +1566,25 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                                       ) : (
                                         canManage &&
                                         !isMemberOwner && (
-                                          <button
-                                            type="button"
-                                            onClick={() => handleRemoveMember(m.user_id, m.name)}
-                                            className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 border border-red-500/20 text-[10px] font-semibold transition-colors flex items-center gap-1"
-                                            title="Remove member from team"
-                                          >
-                                            <Trash2 className="w-3 h-3" />
-                                            <span className="hidden md:inline">Remove</span>
-                                          </button>
+                                          isWorkspaceOwner ? (
+                                            <span
+                                              className="text-[10px] text-slate-500 font-mono flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900 border border-slate-800"
+                                              title="Workspace Owner cannot be removed from any team"
+                                            >
+                                              <Lock className="w-3 h-3 text-amber-400/80" />
+                                              <span className="hidden md:inline">Protected</span>
+                                            </span>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleRemoveMember(m.user_id, m.name)}
+                                              className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 border border-red-500/20 text-[10px] font-semibold transition-colors flex items-center gap-1"
+                                              title="Remove member from team"
+                                            >
+                                              <Trash2 className="w-3 h-3" />
+                                              <span className="hidden md:inline">Remove</span>
+                                            </button>
+                                          )
                                         )
                                       )}
                                     </div>
@@ -1668,35 +1900,45 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                           <ArrowRightLeft className="w-4 h-4 text-amber-400" />
                           <span>Transfer Team Ownership</span>
                         </h4>
-                        <p className="text-[11px] text-slate-400 leading-relaxed">
-                          Transfer primary ownership to another member in this team. The new owner will have full control including the ability to delete the team workspace.
-                        </p>
 
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                          <select
-                            value={transferOwnerId}
-                            onChange={(e) => setTransferOwnerId(e.target.value)}
-                            className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-hidden focus:border-amber-500 min-w-0"
-                          >
-                            <option value="">Select a member to transfer ownership...</option>
-                            {(activeTeam.members || [])
-                              .filter((m) => m.user_id !== activeTeam.created_by_user_id)
-                              .map((m) => (
-                                <option key={m.id} value={m.user_id}>
-                                  {m.name} ({m.email})
-                                </option>
-                              ))}
-                          </select>
+                        {isTeamCreatedByOwner && !isCallerWorkspaceOwner ? (
+                          <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-amber-400 flex items-center gap-2">
+                            <Lock className="w-3.5 h-3.5 shrink-0" />
+                            <span>This team was created by the Workspace Owner. Ownership cannot be transferred by administrators.</span>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-[11px] text-slate-400 leading-relaxed">
+                              Transfer primary ownership to another member in this team. The new owner will have full control including the ability to delete the team workspace.
+                            </p>
 
-                          <button
-                            type="button"
-                            disabled={!transferOwnerId || isTransferring}
-                            onClick={handleTransferOwnership}
-                            className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors shadow-xs shrink-0"
-                          >
-                            {isTransferring ? 'Transferring...' : 'Transfer Ownership'}
-                          </button>
-                        </div>
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                              <select
+                                value={transferOwnerId}
+                                onChange={(e) => setTransferOwnerId(e.target.value)}
+                                className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-hidden focus:border-amber-500 min-w-0"
+                              >
+                                <option value="">Select a member to transfer ownership...</option>
+                                {(activeTeam.members || [])
+                                  .filter((m) => m.user_id !== activeTeam.created_by_user_id)
+                                  .map((m) => (
+                                    <option key={m.id} value={m.user_id}>
+                                      {m.name} ({m.email})
+                                    </option>
+                                  ))}
+                              </select>
+
+                              <button
+                                type="button"
+                                disabled={!transferOwnerId || isTransferring}
+                                onClick={handleTransferOwnership}
+                                className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors shadow-xs shrink-0"
+                              >
+                                {isTransferring ? 'Transferring...' : 'Transfer Ownership'}
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
 
@@ -1720,14 +1962,21 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                         </div>
 
                         {isOwner ? (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteTeam(activeTeam.id)}
-                            className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2.5 sm:py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-md shadow-red-600/20 transition-colors shrink-0"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Delete Team</span>
-                          </button>
+                          isTeamCreatedByOwner && !isCallerWorkspaceOwner ? (
+                            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-amber-400 text-xs font-medium shrink-0">
+                              <Lock className="w-3.5 h-3.5 shrink-0" />
+                              <span>Created by Workspace Owner. Admins cannot delete this team.</span>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTeam(activeTeam.id)}
+                              className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2.5 sm:py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-md shadow-red-600/20 transition-colors shrink-0"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete Team</span>
+                            </button>
+                          )
                         ) : (
                           <button
                             type="button"

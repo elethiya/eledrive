@@ -20,6 +20,7 @@ import (
 	"eledrive/storage"
 	"eledrive/utils"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -58,8 +59,9 @@ func (h *AdminHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = db.DB.QueryRow("SELECT COUNT(*) FROM share_links").Scan(&stats.TotalShareLinks)
-	_ = db.DB.QueryRow("SELECT COUNT(*) FROM shares").Scan(&stats.TotalDirectShares)
 	_ = db.DB.QueryRow("SELECT COUNT(*) FROM users WHERE status = 'pending'").Scan(&stats.PendingApprovals)
+	_ = db.DB.QueryRow("SELECT COUNT(*) FROM main.team_requests WHERE status = 'pending'").Scan(&stats.PendingTeamRequests)
+	_ = db.DB.QueryRow("SELECT COUNT(*) FROM main.password_resets WHERE status = 'pending'").Scan(&stats.PendingResets)
 
 	utils.RespondJSON(w, http.StatusOK, stats)
 }
@@ -1084,4 +1086,235 @@ func (h *AdminHandler) ResolvePasswordReset(w http.ResponseWriter, r *http.Reque
 		"username": userUsername,
 	})
 }
+
+// ListTeamRequests returns team creation requests for admin review
+func (h *AdminHandler) ListTeamRequests(w http.ResponseWriter, r *http.Request) {
+	statusFilter := r.URL.Query().Get("status")
+	if statusFilter == "" {
+		statusFilter = "pending"
+	}
+
+	query := `
+		SELECT id, user_id, user_name, user_email, user_username, name, description, avatar_color, initial_members, status, admin_note, created_at, reviewed_at, COALESCE(reviewed_by, '')
+		FROM main.team_requests
+	`
+	var args []interface{}
+	if statusFilter != "all" {
+		query += " WHERE status = ?"
+		args = append(args, statusFilter)
+	}
+	query += " ORDER BY CASE status WHEN 'pending' THEN 1 ELSE 2 END, created_at DESC LIMIT 100"
+
+	rows, err := db.DB.Query(query, args...)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to fetch team requests")
+		return
+	}
+	defer rows.Close()
+
+	requests := make([]models.TeamCreationRequest, 0)
+	for rows.Next() {
+		var tr models.TeamCreationRequest
+		var initialMembersStr, desc, adminNote, revBy sql.NullString
+		var revAt sql.NullTime
+		if err := rows.Scan(
+			&tr.ID, &tr.UserID, &tr.UserName, &tr.UserEmail, &tr.UserUsername,
+			&tr.Name, &desc, &tr.AvatarColor, &initialMembersStr, &tr.Status,
+			&adminNote, &tr.CreatedAt, &revAt, &revBy,
+		); err == nil {
+			if desc.Valid {
+				tr.Description = desc.String
+			}
+			if adminNote.Valid {
+				tr.AdminNote = adminNote.String
+			}
+			if revBy.Valid {
+				tr.ReviewedBy = revBy.String
+			}
+			if revAt.Valid {
+				tr.ReviewedAt = &revAt.Time
+			}
+			tr.InitialMembers = make([]string, 0)
+			if initialMembersStr.Valid && initialMembersStr.String != "" {
+				_ = json.Unmarshal([]byte(initialMembersStr.String), &tr.InitialMembers)
+			}
+			requests = append(requests, tr)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		_ = err
+	}
+
+	utils.RespondJSON(w, http.StatusOK, requests)
+}
+
+// ApproveTeamRequest approves a team creation request and creates the team
+func (h *AdminHandler) ApproveTeamRequest(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+	requestID := chi.URLParam(r, "id")
+
+	var tr models.TeamCreationRequest
+	var initialMembersStr, desc, adminNote, revBy sql.NullString
+	var revAt sql.NullTime
+
+	err := db.DB.QueryRow(`
+		SELECT id, user_id, user_name, user_email, user_username, name, description, avatar_color, initial_members, status, admin_note, created_at, reviewed_at, COALESCE(reviewed_by, '')
+		FROM main.team_requests
+		WHERE id = ?
+	`, requestID).Scan(
+		&tr.ID, &tr.UserID, &tr.UserName, &tr.UserEmail, &tr.UserUsername,
+		&tr.Name, &desc, &tr.AvatarColor, &initialMembersStr, &tr.Status,
+		&adminNote, &tr.CreatedAt, &revAt, &revBy,
+	)
+	if err != nil {
+		utils.RespondError(w, http.StatusNotFound, "Team creation request not found")
+		return
+	}
+
+	if tr.Status != "pending" {
+		utils.RespondError(w, http.StatusBadRequest, fmt.Sprintf("Request has already been %s", tr.Status))
+		return
+	}
+
+	if desc.Valid {
+		tr.Description = desc.String
+	}
+	tr.InitialMembers = make([]string, 0)
+	if initialMembersStr.Valid && initialMembersStr.String != "" {
+		_ = json.Unmarshal([]byte(initialMembersStr.String), &tr.InitialMembers)
+	}
+
+	teamID := uuid.New().String()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	tx, err := db.DB.Begin()
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to begin transaction")
+		return
+	}
+	defer tx.Rollback()
+
+	// Insert into teams
+	_, err = tx.Exec(`
+		INSERT INTO main.teams (id, name, description, avatar_color, created_by_user_id, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, teamID, tr.Name, tr.Description, tr.AvatarColor, tr.UserID, now, now)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to create team")
+		return
+	}
+
+	// Insert creator as leader
+	memberID := uuid.New().String()
+	_, err = tx.Exec(`
+		INSERT INTO main.team_members (id, team_id, user_id, role, joined_at)
+		VALUES (?, ?, ?, 'leader', ?)
+	`, memberID, teamID, tr.UserID, now)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to add creator as leader")
+		return
+	}
+
+	// Insert initial members
+	for _, memberUID := range tr.InitialMembers {
+		if memberUID == tr.UserID || memberUID == "" {
+			continue
+		}
+		var memRole string
+		_ = tx.QueryRow("SELECT role FROM main.users WHERE id = ?", memberUID).Scan(&memRole)
+		assignedRole := "member"
+		if memRole == "owner" {
+			assignedRole = "leader"
+		}
+		mID := uuid.New().String()
+		_, _ = tx.Exec(`
+			INSERT OR IGNORE INTO main.team_members (id, team_id, user_id, role, joined_at)
+			VALUES (?, ?, ?, ?, ?)
+		`, mID, teamID, memberUID, assignedRole, now)
+	}
+
+	// Mark request as approved
+	actorName := claims.Username
+	if actorName == "" {
+		actorName = "Admin"
+	}
+	_, err = tx.Exec(`
+		UPDATE main.team_requests
+		SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?
+		WHERE id = ?
+	`, actorName, requestID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to update request status")
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to commit approved team")
+		return
+	}
+
+	createdTeam := models.Team{
+		ID:              teamID,
+		Name:            tr.Name,
+		Description:     tr.Description,
+		AvatarColor:     tr.AvatarColor,
+		CreatedByUserID: tr.UserID,
+		MembersCount:    1 + len(tr.InitialMembers),
+		UserRole:        "leader",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+
+	db.LogActivity(claims.UserID, actorName, "approve_team_request", "team", teamID, tr.Name, fmt.Sprintf("Admin @%s approved team creation request for '%s' (creator @%s)", actorName, tr.Name, tr.UserUsername))
+	events.Broadcast("team:create", "team", "create", teamID, "", claims.UserID, createdTeam)
+	events.Broadcast("team:request_approved", "team_request", "approve", requestID, "", claims.UserID, map[string]interface{}{
+		"request_id": requestID,
+		"team_id":    teamID,
+		"user_id":    tr.UserID,
+	})
+
+	utils.RespondSuccess(w, http.StatusOK, fmt.Sprintf("Team '%s' approved and created successfully!", tr.Name), createdTeam)
+}
+
+// RejectTeamRequest rejects a team creation request
+func (h *AdminHandler) RejectTeamRequest(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+	requestID := chi.URLParam(r, "id")
+
+	var req models.RejectTeamRequestPayload
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		req.Note = ""
+	}
+
+	var trName, trUser string
+	err := db.DB.QueryRow("SELECT name, user_username FROM main.team_requests WHERE id = ?", requestID).Scan(&trName, &trUser)
+	if err != nil {
+		utils.RespondError(w, http.StatusNotFound, "Team creation request not found")
+		return
+	}
+
+	actorName := claims.Username
+	if actorName == "" {
+		actorName = "Admin"
+	}
+
+	_, err = db.DB.Exec(`
+		UPDATE main.team_requests
+		SET status = 'rejected', admin_note = ?, reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?
+		WHERE id = ?
+	`, req.Note, actorName, requestID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to reject team request")
+		return
+	}
+
+	db.LogActivity(claims.UserID, actorName, "reject_team_request", "team_request", requestID, trName, fmt.Sprintf("Admin @%s rejected team request for '%s' (@%s)", actorName, trName, trUser))
+	events.Broadcast("team:request_rejected", "team_request", "reject", requestID, "", claims.UserID, map[string]interface{}{
+		"request_id": requestID,
+		"note":       req.Note,
+	})
+
+	utils.RespondSuccess(w, http.StatusOK, "Team request rejected", nil)
+}
+
 

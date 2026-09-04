@@ -67,6 +67,13 @@ func CheckFileAccess(userID string, fileID string) (*models.File, string, error)
 		f.TrashedAt = &trashedAt.Time
 	}
 
+	// If caller is workspace owner, owner has full oversight access across the workspace
+	var callerRole string
+	_ = db.DB.QueryRow("SELECT role FROM main.users WHERE id = ?", userID).Scan(&callerRole)
+	if callerRole == "owner" {
+		return &f, "owner", nil
+	}
+
 	if f.OwnerID == userID {
 		return &f, "owner", nil
 	}
@@ -393,16 +400,31 @@ func (h *FileHandler) Search(w http.ResponseWriter, r *http.Request) {
 	pattern := "%" + strings.ToLower(q) + "%"
 
 	// Find matching files
-	query := `
-		SELECT f.id, f.name, f.original_name, f.folder_id, f.owner_id, u.name, u.email,
-		       f.size, f.mime_type, f.extension, f.is_starred, f.is_trashed, f.created_at, f.updated_at
-		FROM files f
-		JOIN users u ON f.owner_id = u.id
-		WHERE (f.owner_id = ? OR f.id IN (SELECT target_id FROM shares WHERE target_type = 'file' AND shared_with_user_id = ?))
-		  AND f.is_trashed = 0
-		  AND LOWER(f.name) LIKE ?
-	`
-	args := []interface{}{claims.UserID, claims.UserID, pattern}
+	var query string
+	var args []interface{}
+
+	if claims.Role == "owner" {
+		query = `
+			SELECT f.id, f.name, f.original_name, f.folder_id, f.owner_id, u.name, u.email,
+			       f.size, f.mime_type, f.extension, f.is_starred, f.is_trashed, f.created_at, f.updated_at
+			FROM files f
+			JOIN users u ON f.owner_id = u.id
+			WHERE f.is_trashed = 0
+			  AND LOWER(f.name) LIKE ?
+		`
+		args = []interface{}{pattern}
+	} else {
+		query = `
+			SELECT f.id, f.name, f.original_name, f.folder_id, f.owner_id, u.name, u.email,
+			       f.size, f.mime_type, f.extension, f.is_starred, f.is_trashed, f.created_at, f.updated_at
+			FROM files f
+			JOIN users u ON f.owner_id = u.id
+			WHERE (f.owner_id = ? OR f.id IN (SELECT target_id FROM shares WHERE target_type = 'file' AND shared_with_user_id = ?))
+			  AND f.is_trashed = 0
+			  AND LOWER(f.name) LIKE ?
+		`
+		args = []interface{}{claims.UserID, claims.UserID, pattern}
+	}
 
 	if category != "" && category != "all" {
 		switch category {
@@ -450,17 +472,31 @@ func (h *FileHandler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Find matching folders
-	fRows, err := db.DB.Query(`
-		SELECT f.id, f.name, f.parent_id, f.owner_id, u.name, u.email, f.is_starred, f.is_trashed, f.color, f.created_at, f.updated_at,
-		       (SELECT COUNT(*) FROM files WHERE folder_id = f.id AND is_trashed = 0) +
-		       (SELECT COUNT(*) FROM folders WHERE parent_id = f.id AND is_trashed = 0) AS item_count
-		FROM folders f
-		JOIN users u ON f.owner_id = u.id
-		WHERE (f.owner_id = ? OR f.id IN (SELECT target_id FROM shares WHERE target_type = 'folder' AND shared_with_user_id = ?))
-		  AND f.is_trashed = 0
-		  AND LOWER(f.name) LIKE ?
-		ORDER BY f.name ASC LIMIT 20
-	`, claims.UserID, claims.UserID, pattern)
+	var fRows *sql.Rows
+	if claims.Role == "owner" {
+		fRows, err = db.DB.Query(`
+			SELECT f.id, f.name, f.parent_id, f.owner_id, u.name, u.email, f.is_starred, f.is_trashed, f.color, f.created_at, f.updated_at,
+			       (SELECT COUNT(*) FROM files WHERE folder_id = f.id AND is_trashed = 0) +
+			       (SELECT COUNT(*) FROM folders WHERE parent_id = f.id AND is_trashed = 0) AS item_count
+			FROM folders f
+			JOIN users u ON f.owner_id = u.id
+			WHERE f.is_trashed = 0
+			  AND LOWER(f.name) LIKE ?
+			ORDER BY f.name ASC LIMIT 20
+		`, pattern)
+	} else {
+		fRows, err = db.DB.Query(`
+			SELECT f.id, f.name, f.parent_id, f.owner_id, u.name, u.email, f.is_starred, f.is_trashed, f.color, f.created_at, f.updated_at,
+			       (SELECT COUNT(*) FROM files WHERE folder_id = f.id AND is_trashed = 0) +
+			       (SELECT COUNT(*) FROM folders WHERE parent_id = f.id AND is_trashed = 0) AS item_count
+			FROM folders f
+			JOIN users u ON f.owner_id = u.id
+			WHERE (f.owner_id = ? OR f.id IN (SELECT target_id FROM shares WHERE target_type = 'folder' AND shared_with_user_id = ?))
+			  AND f.is_trashed = 0
+			  AND LOWER(f.name) LIKE ?
+			ORDER BY f.name ASC LIMIT 20
+		`, claims.UserID, claims.UserID, pattern)
+	}
 
 	folders := make([]models.Folder, 0)
 	if err == nil {

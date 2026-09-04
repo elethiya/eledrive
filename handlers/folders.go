@@ -77,6 +77,13 @@ func CheckFolderAccess(userID string, folderID string) (*models.Folder, string, 
 		f.TrashedAt = &trashedAt.Time
 	}
 
+	// If caller is workspace owner, owner has full oversight access across the workspace
+	var callerRole string
+	_ = db.DB.QueryRow("SELECT role FROM main.users WHERE id = ?", userID).Scan(&callerRole)
+	if callerRole == "owner" {
+		return &f, "owner", nil
+	}
+
 	if f.OwnerID == userID {
 		return &f, "owner", nil
 	}
@@ -135,6 +142,106 @@ func (h *FolderHandler) GetContents(w http.ResponseWriter, r *http.Request) {
 	permission := "owner"
 	breadcrumbs := []models.Breadcrumb{
 		{ID: "", Name: "My Drive"},
+	}
+
+	if folderID == "shared" {
+		breadcrumbs = []models.Breadcrumb{
+			{ID: "shared", Name: "Shared with me"},
+		}
+
+		// Shared folders (includes direct shares and team shares)
+		folderRows, err := db.DB.Query(`
+			SELECT DISTINCT f.id, f.name, f.parent_id, f.owner_id, u.name, u.email, f.is_starred, f.is_trashed, f.color, f.created_at, f.updated_at,
+			       (SELECT COUNT(*) FROM files WHERE folder_id = f.id AND is_trashed = 0) +
+			       (SELECT COUNT(*) FROM folders WHERE parent_id = f.id AND is_trashed = 0) AS item_count,
+			       COALESCE(s.permission, ts.permission, 'viewer') AS permission
+			FROM folders f
+			JOIN users u ON f.owner_id = u.id
+			LEFT JOIN shares s ON s.target_type = 'folder' AND s.target_id = f.id AND s.shared_with_user_id = ?
+			LEFT JOIN team_shares ts ON (
+				(ts.target_type = 'folder' AND ts.target_id = f.id) OR
+				(ts.target_type = 'drive' AND ts.shared_by_user_id = f.owner_id AND f.parent_id IS NULL)
+			) AND ts.team_id IN (SELECT team_id FROM main.team_members WHERE user_id = ?)
+			WHERE f.is_trashed = 0 AND (s.id IS NOT NULL OR ts.id IS NOT NULL)
+			ORDER BY f.name COLLATE NOCASE ASC
+		`, claims.UserID, claims.UserID)
+
+		subfolders := make([]models.Folder, 0)
+		if err == nil {
+			defer folderRows.Close()
+			for folderRows.Next() {
+				var f models.Folder
+				var pID, col sql.NullString
+				var perm string
+				if err := folderRows.Scan(
+					&f.ID, &f.Name, &pID, &f.OwnerID, &f.OwnerName, &f.OwnerEmail,
+					&f.IsStarred, &f.IsTrashed, &col, &f.CreatedAt, &f.UpdatedAt,
+					&f.ItemCount, &perm,
+				); err == nil {
+					if pID.Valid {
+						f.ParentID = &pID.String
+					}
+					if col.Valid {
+						f.Color = &col.String
+					}
+					f.SharedPermission = &perm
+					subfolders = append(subfolders, f)
+				}
+			}
+			if err := folderRows.Err(); err != nil {
+				_ = err
+			}
+		}
+
+		// Shared files (includes direct shares and team shares)
+		fileRows, err := db.DB.Query(`
+			SELECT DISTINCT f.id, f.name, f.original_name, f.folder_id, f.owner_id, u.name, u.email,
+			       f.size, f.mime_type, f.extension, f.is_starred, f.is_trashed, f.created_at, f.updated_at,
+			       COALESCE(s.permission, ts.permission, 'viewer') AS permission
+			FROM files f
+			JOIN users u ON f.owner_id = u.id
+			LEFT JOIN shares s ON s.target_type = 'file' AND s.target_id = f.id AND s.shared_with_user_id = ?
+			LEFT JOIN team_shares ts ON (
+				(ts.target_type = 'file' AND ts.target_id = f.id) OR
+				(ts.target_type = 'drive' AND ts.shared_by_user_id = f.owner_id AND f.folder_id IS NULL)
+			) AND ts.team_id IN (SELECT team_id FROM main.team_members WHERE user_id = ?)
+			WHERE f.is_trashed = 0 AND (s.id IS NOT NULL OR ts.id IS NOT NULL)
+			ORDER BY f.name COLLATE NOCASE ASC
+		`, claims.UserID, claims.UserID)
+
+		files := make([]models.File, 0)
+		if err == nil {
+			defer fileRows.Close()
+			for fileRows.Next() {
+				var f models.File
+				var pID sql.NullString
+				var perm string
+				if err := fileRows.Scan(
+					&f.ID, &f.Name, &f.OriginalName, &pID, &f.OwnerID, &f.OwnerName, &f.OwnerEmail,
+					&f.Size, &f.MimeType, &f.Extension, &f.IsStarred, &f.IsTrashed, &f.CreatedAt, &f.UpdatedAt,
+					&perm,
+				); err == nil {
+					if pID.Valid {
+						f.FolderID = &pID.String
+					}
+					f.SharedPermission = &perm
+					files = append(files, f)
+				}
+			}
+			if err := fileRows.Err(); err != nil {
+				_ = err
+			}
+		}
+
+		resp := models.FolderContentsResponse{
+			Folder:      nil,
+			Breadcrumbs: breadcrumbs,
+			Subfolders:  subfolders,
+			Files:       files,
+			Permission:  "viewer",
+		}
+		utils.RespondJSON(w, http.StatusOK, resp)
+		return
 	}
 
 	if folderID != "" {

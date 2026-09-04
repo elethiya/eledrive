@@ -190,6 +190,23 @@ func migrate() error {
 		resolved_by TEXT
 	);
 
+	CREATE TABLE IF NOT EXISTS main.team_requests (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL,
+		user_name TEXT NOT NULL,
+		user_email TEXT NOT NULL,
+		user_username TEXT NOT NULL,
+		name TEXT NOT NULL,
+		description TEXT DEFAULT '',
+		avatar_color TEXT DEFAULT '#3b82f6',
+		initial_members TEXT DEFAULT '[]',
+		status TEXT DEFAULT 'pending', -- 'pending', 'approved', 'rejected'
+		admin_note TEXT DEFAULT '',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		reviewed_at DATETIME,
+		reviewed_by TEXT
+	);
+
 	CREATE INDEX IF NOT EXISTS main.idx_activity_logs_created ON activity_logs(created_at DESC);
 	CREATE INDEX IF NOT EXISTS main.idx_download_logs_target ON download_logs(target_id, downloaded_at DESC);
 	CREATE INDEX IF NOT EXISTS main.idx_download_logs_uuid ON download_logs(secret_uuid);
@@ -197,6 +214,8 @@ func migrate() error {
 	CREATE INDEX IF NOT EXISTS main.idx_team_members_team ON team_members(team_id);
 	CREATE INDEX IF NOT EXISTS main.idx_team_members_user ON team_members(user_id);
 	CREATE INDEX IF NOT EXISTS main.idx_password_resets_status ON password_resets(status, created_at DESC);
+	CREATE INDEX IF NOT EXISTS main.idx_team_requests_status ON team_requests(status, created_at DESC);
+	CREATE INDEX IF NOT EXISTS main.idx_team_requests_user ON team_requests(user_id);
 	`
 
 	if _, err := DB.Exec(accountSchema); err != nil {

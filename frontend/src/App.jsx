@@ -306,6 +306,19 @@ function AppContent() {
     setTimeout(() => setCurrentFolderId(temp), 50);
   };
 
+  // Separate Standalone Admin Panel
+  if (currentView === 'admin') {
+    if (user && user.role !== 'admin' && user.role !== 'owner') {
+      setCurrentView('drive');
+      return null;
+    }
+    return (
+      <div className="dark bg-slate-950 text-slate-100 h-screen w-screen overflow-y-auto font-sans">
+        <AdminPage onBackToDrive={() => setCurrentView('drive')} />
+      </div>
+    );
+  }
+
   return (
     <div className="dark bg-slate-950 text-slate-100 flex h-screen w-screen overflow-hidden font-sans select-none">
       {/* Left Sidebar */}
@@ -461,6 +474,7 @@ function AppContent() {
                   }}
                   onUploadFiles={handleUploadFiles}
                   onOpenNewFolder={() => setNewFolderOpen(true)}
+                  onNavigateView={(view) => setCurrentView(view)}
                 />
               )}
 
@@ -551,10 +565,6 @@ function AppContent() {
               {currentView === 'trash' && <TrashPage />}
 
               {currentView === 'profile' && <ProfilePage />}
-
-              {currentView === 'admin' && (
-                <AdminPage onBackToDrive={() => setCurrentView('drive')} />
-              )}
             </>
           )}
         </div>

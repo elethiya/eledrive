@@ -23,6 +23,7 @@ type UserPublic struct {
 	Username    string `json:"username"`
 	Name        string `json:"name"`
 	AvatarColor string `json:"avatar_color"`
+	Role        string `json:"role,omitempty"`
 }
 
 type Folder struct {
@@ -155,13 +156,15 @@ type SystemSettings struct {
 }
 
 type AdminStats struct {
-	TotalUsers        int   `json:"total_users"`
-	TotalFiles        int   `json:"total_files"`
-	TotalFolders      int   `json:"total_folders"`
-	TotalStorageUsed  int64 `json:"total_storage_used"`
-	TotalShareLinks   int   `json:"total_share_links"`
-	TotalDirectShares int   `json:"total_direct_shares"`
-	PendingApprovals  int   `json:"pending_approvals"`
+	TotalUsers          int   `json:"total_users"`
+	TotalFiles          int   `json:"total_files"`
+	TotalFolders        int   `json:"total_folders"`
+	TotalStorageUsed    int64 `json:"total_storage_used"`
+	TotalShareLinks     int   `json:"total_share_links"`
+	TotalDirectShares   int   `json:"total_direct_shares"`
+	PendingApprovals    int   `json:"pending_approvals"`
+	PendingTeamRequests int   `json:"pending_team_requests"`
+	PendingResets       int   `json:"pending_resets"`
 }
 
 type AdminUserDetail struct {
@@ -228,23 +231,25 @@ type Team struct {
 	CreatedByUserID string       `json:"created_by_user_id"`
 	CreatorName     string       `json:"creator_name,omitempty"`
 	CreatorUsername string       `json:"creator_username,omitempty"`
+	CreatorRole     string       `json:"creator_role,omitempty"`
 	MembersCount    int          `json:"members_count"`
-	UserRole        string       `json:"user_role,omitempty"` // "leader" or "member"
+	UserRole        string       `json:"user_role,omitempty"` // "leader", "member", or "owner"
 	CreatedAt       time.Time    `json:"created_at"`
 	UpdatedAt       time.Time    `json:"updated_at"`
 	Members         []TeamMember `json:"members,omitempty"`
 }
 
 type TeamMember struct {
-	ID          string    `json:"id"`
-	TeamID      string    `json:"team_id"`
-	UserID      string    `json:"user_id"`
-	Name        string    `json:"name"`
-	Username    string    `json:"username"`
-	Email       string    `json:"email"`
-	AvatarColor string    `json:"avatar_color"`
-	Role        string    `json:"role"` // "leader" or "member"
-	JoinedAt    time.Time `json:"joined_at"`
+	ID            string    `json:"id"`
+	TeamID        string    `json:"team_id"`
+	UserID        string    `json:"user_id"`
+	Name          string    `json:"name"`
+	Username      string    `json:"username"`
+	Email         string    `json:"email"`
+	AvatarColor   string    `json:"avatar_color"`
+	Role          string    `json:"role"` // "leader" or "member"
+	WorkspaceRole string    `json:"workspace_role,omitempty"`
+	JoinedAt      time.Time `json:"joined_at"`
 }
 
 type CreateTeamRequest struct {
@@ -298,3 +303,32 @@ type PasswordResetRequest struct {
 	ResolvedAt   *time.Time `json:"resolved_at,omitempty"`
 	ResolvedBy   *string    `json:"resolved_by,omitempty"`
 }
+
+type TeamCreationRequest struct {
+	ID             string     `json:"id"`
+	UserID         string     `json:"user_id"`
+	UserName       string     `json:"user_name"`
+	UserEmail      string     `json:"user_email"`
+	UserUsername   string     `json:"user_username"`
+	Name           string     `json:"name"`
+	Description    string     `json:"description"`
+	AvatarColor    string     `json:"avatar_color"`
+	InitialMembers []string   `json:"initial_members"`
+	Status         string     `json:"status"` // 'pending', 'approved', 'rejected'
+	AdminNote      string     `json:"admin_note"`
+	CreatedAt      time.Time  `json:"created_at"`
+	ReviewedAt     *time.Time `json:"reviewed_at,omitempty"`
+	ReviewedBy     string     `json:"reviewed_by,omitempty"`
+}
+
+type SubmitTeamRequestPayload struct {
+	Name           string   `json:"name"`
+	Description    string   `json:"description"`
+	AvatarColor    string   `json:"avatar_color"`
+	InitialMembers []string `json:"initial_members"`
+}
+
+type RejectTeamRequestPayload struct {
+	Note string `json:"note"`
+}
+

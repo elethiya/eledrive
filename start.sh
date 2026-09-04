@@ -5,16 +5,17 @@ echo "=================================================="
 echo "          EleDrive - Team Cloud Drive             "
 echo "=================================================="
 
-# Check if frontend/dist exists, if not build it
-if [ ! -d "frontend/dist" ]; then
-    echo -e "\033[1;34m[BUILD]\033[0m Building React frontend..."
-    (cd frontend && npm install && npm run build)
+# Verify that the backend binary has been compiled
+if [ ! -f "eledrive-app" ]; then
+    echo -e "\033[1;31m[ERROR]\033[0m Backend binary 'eledrive-app' not found."
+    echo -e "\033[1;33m[INFO]\033[0m Please compile the project first using: \033[1;36m./build.sh\033[0m"
+    exit 1
 fi
 
-# Build Go application if binary doesn't exist or main.go is newer
-if [ ! -f "eledrive-app" ] || [ "main.go" -nt "eledrive-app" ]; then
-    echo -e "\033[1;34m[BUILD]\033[0m Compiling Golang backend..."
-    go build -ldflags="-s -w" -o eledrive-app .
+# Check if frontend distribution is present
+if [ ! -f "frontend/dist/index.html" ]; then
+    echo -e "\033[1;33m[WARN]\033[0m Frontend distribution 'frontend/dist/index.html' not found."
+    echo -e "\033[1;33m[INFO]\033[0m Run \033[1;36m./build.sh -f\033[0m to compile frontend assets."
 fi
 
 # Load environment variables from .env or .evn if present
@@ -30,4 +31,4 @@ fi
 
 SERVER_PORT="${PORT:-8080}"
 echo -e "\033[1;32m[START]\033[0m Starting EleDrive server on http://localhost:${SERVER_PORT} ..."
-./eledrive-app
+exec ./eledrive-app

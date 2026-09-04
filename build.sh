@@ -22,6 +22,8 @@ BINARY_NAME="eledrive-app"
 BUILD_FRONTEND=true
 BUILD_BACKEND=true
 CLEAN=false
+INIT_DB=false
+SKIP_VET=false
 
 # ------------------------------------------------------------------------------
 # Usage / Help
@@ -34,6 +36,8 @@ ${BOLD}Options:${RESET}
   -f, --frontend-only    Build only the React / Vite frontend
   -b, --backend-only     Compile only the Golang backend binary
   -c, --clean            Clean previous build artifacts before compiling
+  -i, --init-db          Initialize / migrate database schema after compilation
+      --skip-vet         Skip 'go vet' source code verification
   -h, --help             Show this help message
 
 ${BOLD}Examples:${RESET}
@@ -41,6 +45,7 @@ ${BOLD}Examples:${RESET}
   ./build.sh --clean     # Clean previous builds and recompile everything
   ./build.sh -f          # Build only frontend
   ./build.sh -b          # Build only backend
+  ./build.sh -b -i       # Build backend and initialize database
 EOF
 }
 
@@ -59,6 +64,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         -c|--clean)
             CLEAN=true
+            shift
+            ;;
+        -i|--init-db)
+            INIT_DB=true
+            shift
+            ;;
+        --skip-vet)
+            SKIP_VET=true
             shift
             ;;
         -h|--help)
@@ -154,9 +167,20 @@ if [ "$BUILD_BACKEND" = true ]; then
     echo -e "\n${BOLD}${CYAN}[BUILD][${STEP_NUM}]${RESET} Compiling Golang Backend (${BINARY_NAME})..."
     cd "${ROOT_DIR}"
 
-    # Check formatting / vet
-    echo -e "  ${BLUE}[VET]${RESET} Verifying Go source code..."
-    go vet ./...
+    # Ensure required data directories exist
+    mkdir -p "${ROOT_DIR}/database/uploads" "${ROOT_DIR}/database/logs"
+
+    # Ensure environment file exists
+    if [ ! -f "${ROOT_DIR}/.env" ] && [ ! -f "${ROOT_DIR}/.evn" ] && [ -f "${ROOT_DIR}/.env.example" ]; then
+        echo -e "  ${YELLOW}[ENV]${RESET} Creating .env from .env.example..."
+        cp "${ROOT_DIR}/.env.example" "${ROOT_DIR}/.env"
+    fi
+
+    # Check formatting / vet unless skipped
+    if [ "$SKIP_VET" = false ]; then
+        echo -e "  ${BLUE}[VET]${RESET} Verifying Go source code..."
+        go vet ./...
+    fi
 
     # Compile optimized binary (-s -w strips debug symbols for a leaner binary)
     echo -e "  ${BLUE}[GO]${RESET} Compiling binary: ${BINARY_NAME}..."
@@ -165,6 +189,12 @@ if [ "$BUILD_BACKEND" = true ]; then
 
     BIN_SIZE=$(du -sh "${BINARY_NAME}" | awk '{print $1}')
     echo -e "  ${GREEN}[SUCCESS]${RESET} Backend binary compiled: ${BINARY_NAME} (${BIN_SIZE})"
+
+    # Initialize database if requested or if database doesn't exist yet
+    if [ "$INIT_DB" = true ] || [ ! -f "${ROOT_DIR}/database/account.db" ]; then
+        echo -e "  ${BLUE}[DB]${RESET} Initializing / migrating SQLite database schema..."
+        "./${BINARY_NAME}" --init-db
+    fi
 fi
 
 END_TIME=$(date +%s)
@@ -178,9 +208,8 @@ echo -e "${BOLD}${GREEN}        [SUCCESS] Build completed in ${TOTAL_TIME} secon
 echo -e "${BOLD}${GREEN}======================================================${RESET}"
 
 if [ "$BUILD_BACKEND" = true ]; then
-    echo -e "\nTo start the server, run:"
-    echo -e "  ${BOLD}${CYAN}./${BINARY_NAME}${RESET}"
-    echo -e "\nOr run the starter script:"
-    echo -e "  ${BOLD}${CYAN}./start.sh${RESET}"
+    echo -e "\n${BOLD}Next steps:${RESET}"
+    echo -e "  1. Start server:           ${BOLD}${CYAN}./start.sh${RESET}  (or ./${BINARY_NAME})"
+    echo -e "  2. Manage Workspace Owner: ${BOLD}${CYAN}./ownership.sh${RESET}"
 fi
 echo ""

@@ -197,6 +197,8 @@ func main() {
 			// Teams Management & Workspaces
 			auth.Get("/teams", teamHandler.ListTeams)
 			auth.Post("/teams", teamHandler.CreateTeam)
+			auth.Post("/teams/request", teamHandler.RequestTeam)
+			auth.Get("/teams/my-requests", teamHandler.GetMyRequests)
 			auth.Get("/teams/{id}", teamHandler.GetTeam)
 			auth.Put("/teams/{id}", teamHandler.UpdateTeam)
 			auth.Post("/teams/{id}/members", teamHandler.AddMember)
@@ -225,6 +227,11 @@ func main() {
 				// Password Reset Requests
 				admin.Get("/admin/password-resets", adminHandler.ListPasswordResets)
 				admin.Post("/admin/password-resets/{id}/resolve", adminHandler.ResolvePasswordReset)
+
+				// Team Creation Requests
+				admin.Get("/admin/team-requests", adminHandler.ListTeamRequests)
+				admin.Post("/admin/team-requests/{id}/approve", adminHandler.ApproveTeamRequest)
+				admin.Post("/admin/team-requests/{id}/reject", adminHandler.RejectTeamRequest)
 
 				// Security & Forensic Leak Tracker
 				admin.Post("/admin/security/inspect", adminHandler.InspectLeak)

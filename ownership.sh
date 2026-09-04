@@ -35,7 +35,7 @@ elif [ -f "${ROOT_DIR}/.evn" ]; then
 fi
 PORT="${PORT:-8080}"
 
-DB_PATH="${ROOT_DIR}/database/account.db"
+DB_PATH="${ACCOUNT_DB_PATH:-${ROOT_DIR}/database/account.db}"
 
 # Fallback to legacy path if database/account.db not yet generated
 if [ ! -f "$DB_PATH" ] && [ -f "${ROOT_DIR}/data/eledrive.db" ]; then
@@ -48,11 +48,12 @@ if ! command -v sqlite3 &> /dev/null; then
     exit 1
 fi
 
-# Ensure eledrive-app binary is compiled
+# Ensure eledrive-app binary exists
 ensure_binary() {
     if [ ! -f "${ROOT_DIR}/eledrive-app" ]; then
-        echo -e "${BLUE}[BUILD]${RESET} Compiling backend binary..."
-        (cd "${ROOT_DIR}" && go build -ldflags="-s -w" -o eledrive-app .)
+        echo -e "${RED}[ERROR]${RESET} Application binary '${ROOT_DIR}/eledrive-app' not found."
+        echo -e "Please compile the application first using: ${BOLD}${CYAN}./build.sh -b${RESET}"
+        exit 1
     fi
 }
 
@@ -320,7 +321,7 @@ VALUES (
     'user',
     '${new_id}',
     '${name}',
-    'Created as Workspace Owner via set-owner.sh',
+    'Created as Workspace Owner via ownership.sh',
     CURRENT_TIMESTAMP
 );
 
@@ -378,7 +379,7 @@ VALUES (
     'user',
     '${tid}',
     '${tname}',
-    'Workspace ownership assigned via set-owner.sh',
+    'Workspace ownership assigned via ownership.sh',
     CURRENT_TIMESTAMP
 );
 

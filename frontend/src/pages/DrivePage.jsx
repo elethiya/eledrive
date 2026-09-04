@@ -43,6 +43,7 @@ export default function DrivePage({
   onOpenDetails,
   onUploadFiles,
   onOpenNewFolder,
+  onNavigateView,
 }) {
   const [folderData, setFolderData] = useState({
     folder: null,
@@ -292,7 +293,16 @@ export default function DrivePage({
       <Breadcrumbs
         breadcrumbs={breadcrumbs}
         currentFolder={folder}
-        onNavigate={(id) => setCurrentFolderId(id)}
+        onNavigate={(id) => {
+          if (id === 'shared') {
+            if (onNavigateView) {
+              onNavigateView('shared');
+            }
+            setCurrentFolderId('');
+          } else {
+            setCurrentFolderId(id);
+          }
+        }}
       />
 
       {/* Modern Content Listing Toolbar (Always in same row as counting section) */}

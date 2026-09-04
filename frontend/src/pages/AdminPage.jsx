@@ -40,6 +40,7 @@ import {
   Share2,
   ChevronRight,
   Sliders,
+  CheckCircle2,
 } from 'lucide-react';
 import { adminAPI } from '../api/client';
 
@@ -58,6 +59,7 @@ const QUOTA_PRESETS = [5, 10, 25, 50, 100, 250];
 import { useAuth } from '../context/AuthContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { useToast } from '../context/ToastContext';
+import { useRealtimeEvent } from '../context/RealtimeContext';
 import { formatBytes, formatDate } from '../utils/formatters';
 
 export default function AdminPage({ onBackToDrive }) {
@@ -138,6 +140,15 @@ export default function AdminPage({ onBackToDrive }) {
   const [showNewAdminPassword, setShowNewAdminPassword] = useState(false);
   const [resolvingReset, setResolvingReset] = useState(false);
   const [resetFilter, setResetFilter] = useState('pending'); // 'pending' | 'all' | 'resolved' | 'rejected'
+
+  // Team Creation Requests Queue
+  const [teamRequests, setTeamRequests] = useState([]);
+  const [loadingTeamRequests, setLoadingTeamRequests] = useState(false);
+  const [showTeamRequestsModal, setShowTeamRequestsModal] = useState(false);
+  const [teamRequestFilter, setTeamRequestFilter] = useState('pending'); // 'pending' | 'all' | 'approved' | 'rejected'
+  const [rejectingRequest, setRejectingRequest] = useState(null);
+  const [rejectAdminNote, setRejectAdminNote] = useState('');
+  const [processingTeamRequestId, setProcessingTeamRequestId] = useState(null);
 
   const handleOpenViewModal = (targetUser) => {
     if (targetUser?.role === 'owner' && user?.role !== 'owner') {
@@ -273,6 +284,56 @@ export default function AdminPage({ onBackToDrive }) {
     }
   };
 
+  const loadTeamRequests = async () => {
+    setLoadingTeamRequests(true);
+    try {
+      const res = await adminAPI.listTeamRequests();
+      if (res) {
+        setTeamRequests(Array.isArray(res) ? res : res.data || []);
+      }
+    } catch (e) {
+      console.error(e);
+      setTeamRequests([]);
+    } finally {
+      setLoadingTeamRequests(false);
+    }
+  };
+
+  const handleApproveTeamRequest = async (requestId, teamName) => {
+    setProcessingTeamRequestId(requestId);
+    try {
+      await adminAPI.approveTeamRequest(requestId);
+      toast.success(`Team "${teamName}" approved and created successfully!`);
+      loadTeamRequests();
+      loadStats();
+      loadLogs();
+    } catch (err) {
+      toast.error(err.response?.data?.error || err.message || 'Failed to approve team proposal');
+    } finally {
+      setProcessingTeamRequestId(null);
+    }
+  };
+
+  const handleRejectTeamRequest = async () => {
+    if (!rejectingRequest) return;
+    setProcessingTeamRequestId(rejectingRequest.id);
+    try {
+      await adminAPI.rejectTeamRequest(rejectingRequest.id, {
+        admin_note: rejectAdminNote.trim() || undefined,
+      });
+      toast.success(`Team proposal "${rejectingRequest.name}" rejected.`);
+      setRejectingRequest(null);
+      setRejectAdminNote('');
+      loadTeamRequests();
+      loadStats();
+      loadLogs();
+    } catch (err) {
+      toast.error(err.response?.data?.error || err.message || 'Failed to reject team proposal');
+    } finally {
+      setProcessingTeamRequestId(null);
+    }
+  };
+
   const loadLogs = async () => {
     setLoadingLogs(true);
     try {
@@ -328,8 +389,18 @@ export default function AdminPage({ onBackToDrive }) {
       loadSettings();
       loadSecurityStats();
       loadPasswordResets();
+      loadTeamRequests();
     }
   }, [user?.role]);
+
+  // Real-time Event Subscription for teams, users, and admin updates
+  useRealtimeEvent(['team', 'sync', 'user'], () => {
+    if (user?.role === 'admin' || user?.role === 'owner') {
+      loadStats();
+      loadTeamRequests();
+      loadPasswordResets();
+    }
+  });
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -526,6 +597,11 @@ export default function AdminPage({ onBackToDrive }) {
     (pr) => resetFilter === 'all' || pr.status === resetFilter
   );
 
+  const pendingTeamRequests = teamRequests.filter((tr) => tr.status === 'pending');
+  const filteredTeamRequests = teamRequests.filter(
+    (tr) => teamRequestFilter === 'all' || tr.status === teamRequestFilter
+  );
+
   const isOwner = user?.role === 'owner';
 
   return (
@@ -564,6 +640,17 @@ export default function AdminPage({ onBackToDrive }) {
           </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {onBackToDrive && (
+            <button
+              onClick={onBackToDrive}
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all border border-slate-700 shadow-xs"
+              title="Return to your Drive workspace"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Back to Drive</span>
+            </button>
+          )}
+
           <button
             onClick={async () => {
               setIsRefreshingStats(true);
@@ -573,6 +660,7 @@ export default function AdminPage({ onBackToDrive }) {
                   loadUsers(),
                   loadLogs(),
                   loadSecurityStats(),
+                  loadTeamRequests(),
                 ]);
               } finally {
                 setTimeout(() => setIsRefreshingStats(false), 600);
@@ -727,11 +815,56 @@ export default function AdminPage({ onBackToDrive }) {
             <span className="hidden sm:inline">Platform </span>
             <span>Settings</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setShowTeamRequestsModal(true)}
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+            title="Review user team creation requests"
+          >
+            <Users className="w-4 h-4 text-blue-400" />
+            <span>Team Proposals</span>
+            {pendingTeamRequests.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-blue-500 text-white font-black text-[10px]">
+                {pendingTeamRequests.length}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* TAB 1: USERS MANAGEMENT */}
         {activeTab === 'users' && (
           <div className="space-y-4">
+            {/* Pending Team Creation Proposals Alert Banner */}
+            {pendingTeamRequests.length > 0 && (
+              <div className="bg-gradient-to-r from-blue-950/40 via-blue-900/20 to-slate-900 border border-blue-500/30 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg shadow-blue-950/20">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-400 flex items-center justify-center shrink-0">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-bold text-slate-100">
+                        {pendingTeamRequests.length} Team Creation {pendingTeamRequests.length === 1 ? 'Proposal' : 'Proposals'} Pending
+                      </h4>
+                      <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Users submitted proposals to create new team workspaces. Review requested details and authorize team creation.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowTeamRequestsModal(true)}
+                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 shadow-md shadow-blue-600/20"
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Review Proposals ({pendingTeamRequests.length})</span>
+                </button>
+              </div>
+            )}
+
             {/* Pending Password Reset Requests Alert Banner */}
             {pendingResets.length > 0 && (
               <div className="bg-gradient-to-r from-amber-950/40 via-amber-900/20 to-slate-900 border border-amber-500/30 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg shadow-amber-950/20">
@@ -815,6 +948,25 @@ export default function AdminPage({ onBackToDrive }) {
                   {pendingResets.length > 0 && (
                     <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 text-[10px] font-bold">
                       {pendingResets.length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowTeamRequestsModal(true)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 flex items-center gap-1.5 border ml-1 ${
+                    pendingTeamRequests.length > 0
+                      ? 'bg-blue-500/15 text-blue-300 border-blue-500/40 hover:bg-blue-500/25 shadow-xs'
+                      : 'text-slate-400 border-slate-800 hover:bg-slate-800'
+                  }`}
+                  title="View team creation proposals"
+                >
+                  <Users className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Team Proposals</span>
+                  {pendingTeamRequests.length > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-blue-500 text-white text-[10px] font-bold">
+                      {pendingTeamRequests.length}
                     </span>
                   )}
                 </button>
@@ -3849,6 +4001,277 @@ export default function AdminPage({ onBackToDrive }) {
                   setShowResetsModal(false);
                   setSelectedReset(null);
                   setNewAdminPassword('');
+                }}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Team Creation Requests Management Modal */}
+      {showTeamRequestsModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200 select-none">
+          <div className="bg-slate-900 border-0 sm:border sm:border-slate-800 rounded-none sm:rounded-3xl max-w-2xl w-full h-full sm:h-auto sm:max-h-[85vh] flex flex-col shadow-2xl overflow-hidden relative">
+            {/* Ambient Background Glow */}
+            <div className="absolute -top-24 -right-24 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Fixed Header */}
+            <div className="h-14 sm:h-16 px-4 sm:px-6 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/95 backdrop-blur-sm relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-400 flex items-center justify-center shadow-xs">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-100 flex items-center gap-2">
+                    <span>Team Creation Proposals</span>
+                    {pendingTeamRequests.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-bold border border-blue-500/30">
+                        {pendingTeamRequests.length} Pending
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Review and authorize team workspace creation requests
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={loadTeamRequests}
+                  disabled={loadingTeamRequests}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors group disabled:opacity-60"
+                  title="Refresh proposals"
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 transition-transform duration-500 ${
+                      loadingTeamRequests ? 'animate-spin text-blue-400' : 'group-hover:rotate-180 text-slate-400 group-hover:text-slate-200'
+                    }`}
+                  />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTeamRequestsModal(false);
+                    setRejectingRequest(null);
+                    setRejectAdminNote('');
+                  }}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                  title="Close"
+                >
+                  <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Toolbar */}
+            <div className="px-4 sm:px-6 py-2.5 border-b border-slate-800 bg-slate-950/40 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+              {['pending', 'all', 'approved', 'rejected'].map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setTeamRequestFilter(f)}
+                  className={`px-3 py-1 rounded-xl text-xs font-semibold capitalize transition-colors shrink-0 ${
+                    teamRequestFilter === f
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  }`}
+                >
+                  {f === 'pending'
+                    ? `Pending (${pendingTeamRequests.length})`
+                    : f === 'all'
+                    ? `All (${teamRequests.length})`
+                    : f}
+                </button>
+              ))}
+            </div>
+
+            {/* Scrollable Proposals List */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3.5">
+              {loadingTeamRequests ? (
+                <div className="h-48 flex items-center justify-center text-xs text-slate-500">
+                  Loading proposals...
+                </div>
+              ) : filteredTeamRequests.length === 0 ? (
+                <div className="p-12 text-center text-slate-500 text-xs space-y-2">
+                  <Users className="w-8 h-8 mx-auto text-slate-600 opacity-50" />
+                  <p>No team proposals match the "{teamRequestFilter}" filter.</p>
+                </div>
+              ) : (
+                filteredTeamRequests.map((req) => {
+                  const isRejectingThis = rejectingRequest?.id === req.id;
+                  const isProcessing = processingTeamRequestId === req.id;
+
+                  return (
+                    <div
+                      key={req.id}
+                      className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 relative group hover:border-slate-700 transition-all"
+                    >
+                      {/* Requester & Team Details */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-sm shadow-md shrink-0 ring-1 ring-white/10"
+                            style={{ backgroundColor: req.avatar_color || '#3b82f6' }}
+                          >
+                            {req.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="text-sm font-bold text-slate-100 truncate">{req.name}</h4>
+                              <span className="text-[10px] text-slate-400 font-mono bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-800">
+                                Requested by <strong className="text-slate-200 font-semibold">{req.user_name}</strong> (@{req.user_username})
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-0.5">
+                              {req.user_email} • Submitted {formatDate(req.created_at)}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Status Badge */}
+                        <div className="shrink-0 self-start sm:self-auto">
+                          {req.status === 'pending' ? (
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg border bg-amber-500/15 text-amber-300 border-amber-500/30">
+                              <Clock className="w-3 h-3 animate-pulse" />
+                              Pending Review
+                            </span>
+                          ) : req.status === 'approved' ? (
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg border bg-emerald-500/15 text-emerald-300 border-emerald-500/30">
+                              <CheckCircle2 className="w-3 h-3" />
+                              Approved
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg border bg-red-500/15 text-red-300 border-red-500/30">
+                              <XCircle className="w-3 h-3" />
+                              Rejected
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Description */}
+                      {req.description && (
+                        <p className="text-xs text-slate-300 bg-slate-900/60 p-2.5 rounded-xl border border-slate-855">
+                          {req.description}
+                        </p>
+                      )}
+
+                      {/* Requested Initial Teammates */}
+                      {req.initial_members && req.initial_members.length > 0 && (
+                        <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5 text-blue-400" />
+                          <span>Requested Teammates: </span>
+                          <strong className="text-slate-200">{req.initial_members.length} members</strong>
+                        </div>
+                      )}
+
+                      {/* Review Metadata for processed items */}
+                      {req.status === 'approved' && req.reviewed_at && (
+                        <div className="text-[11px] text-emerald-400/90 font-mono bg-emerald-950/20 border border-emerald-500/20 p-2 rounded-xl flex items-center gap-1.5">
+                          <Check className="w-3 h-3 text-emerald-400" />
+                          <span>Approved by {req.reviewed_by || 'Admin'} on {formatDate(req.reviewed_at)}</span>
+                        </div>
+                      )}
+
+                      {req.status === 'rejected' && (
+                        <div className="text-[11px] text-red-400/90 bg-red-950/20 border border-red-500/20 p-2.5 rounded-xl space-y-1">
+                          <div className="font-semibold text-red-300 flex items-center gap-1">
+                            <X className="w-3 h-3" />
+                            <span>Rejected by {req.reviewed_by || 'Admin'} {req.reviewed_at ? `on ${formatDate(req.reviewed_at)}` : ''}</span>
+                          </div>
+                          {req.admin_note && (
+                            <p className="text-slate-300 text-[11px]">{req.admin_note}</p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Pending Actions */}
+                      {req.status === 'pending' && (
+                        <div className="pt-2 border-t border-slate-900">
+                          {isRejectingThis ? (
+                            <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2.5 animate-in fade-in duration-150">
+                              <label className="block text-xs font-semibold text-slate-200">
+                                Feedback / Rejection Reason (Optional):
+                              </label>
+                              <textarea
+                                rows={2}
+                                value={rejectAdminNote}
+                                onChange={(e) => setRejectAdminNote(e.target.value)}
+                                placeholder="Explain why this team proposal was not approved..."
+                                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-hidden focus:border-red-500 resize-none"
+                                autoFocus
+                              />
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRejectingRequest(null);
+                                    setRejectAdminNote('');
+                                  }}
+                                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-xl transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isProcessing}
+                                  onClick={handleRejectTeamRequest}
+                                  className="px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl transition-colors disabled:opacity-50"
+                                >
+                                  {isProcessing ? 'Rejecting...' : 'Confirm Rejection'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                disabled={isProcessing}
+                                onClick={() => {
+                                  setRejectingRequest(req);
+                                  setRejectAdminNote('');
+                                }}
+                                className="px-3 py-1.5 bg-slate-900 hover:bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                <span>Reject</span>
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isProcessing}
+                                onClick={() => handleApproveTeamRequest(req.id, req.name)}
+                                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>{isProcessing ? 'Approving...' : 'Approve & Create Team'}</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Fixed Footer */}
+            <div className="h-14 sm:h-16 px-4 sm:px-6 border-t border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/95 backdrop-blur-sm relative z-10">
+              <span className="text-[11px] text-slate-500 font-mono">
+                {teamRequests.length} total team proposals
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTeamRequestsModal(false);
+                  setRejectingRequest(null);
+                  setRejectAdminNote('');
                 }}
                 className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors"
               >
