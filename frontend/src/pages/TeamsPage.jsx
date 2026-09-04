@@ -1314,10 +1314,14 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                         type="button"
                         onClick={() => loadTeamShares(activeTeam.id)}
                         disabled={loadingShares}
-                        className="p-1.5 rounded-lg bg-slate-950 hover:bg-slate-850 border border-slate-800 text-slate-300 hover:text-slate-100 text-xs flex items-center gap-1 transition-colors"
+                        className="p-1.5 rounded-lg bg-slate-950 hover:bg-slate-850 border border-slate-800 text-slate-300 hover:text-slate-100 text-xs flex items-center gap-1 transition-all group disabled:opacity-60"
                         title="Refresh shared resources"
                       >
-                        <RefreshCw className={`w-3 h-3 ${loadingShares ? 'animate-spin text-blue-400' : ''}`} />
+                        <RefreshCw
+                          className={`w-3.5 h-3.5 transition-transform duration-500 ${
+                            loadingShares ? 'animate-spin text-blue-400' : 'group-hover:rotate-180 text-slate-400 group-hover:text-slate-200'
+                          }`}
+                        />
                         <span className="hidden sm:inline">Refresh</span>
                       </button>
                     </div>

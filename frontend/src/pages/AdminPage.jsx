@@ -70,6 +70,8 @@ export default function AdminPage({ onBackToDrive }) {
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [isRefreshingStats, setIsRefreshingStats] = useState(false);
+  const [isRefreshingUsers, setIsRefreshingUsers] = useState(false);
+  const [isRefreshingLogs, setIsRefreshingLogs] = useState(false);
 
   // Security & Forensic Leak Tracker
   const [securityStats, setSecurityStats] = useState(null);
@@ -816,6 +818,28 @@ export default function AdminPage({ onBackToDrive }) {
                     </span>
                   )}
                 </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsRefreshingUsers(true);
+                    try {
+                      await loadUsers();
+                    } finally {
+                      setTimeout(() => setIsRefreshingUsers(false), 600);
+                    }
+                  }}
+                  disabled={isRefreshingUsers}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-slate-100 border border-slate-800 hover:bg-slate-800 transition-all shrink-0 flex items-center gap-1.5 group disabled:opacity-60 shadow-xs ml-1"
+                  title="Refresh user accounts"
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 transition-transform duration-500 ${
+                      isRefreshingUsers ? 'animate-spin text-blue-400' : 'group-hover:rotate-180 text-slate-400 group-hover:text-slate-200'
+                    }`}
+                  />
+                  <span className="hidden sm:inline">Refresh</span>
+                </button>
               </div>
             </div>
 
@@ -1550,6 +1574,28 @@ export default function AdminPage({ onBackToDrive }) {
                   <option value="delete">Deletions</option>
                   <option value="ownership_transferred">Ownership</option>
                 </select>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsRefreshingLogs(true);
+                    try {
+                      await loadLogs();
+                    } finally {
+                      setTimeout(() => setIsRefreshingLogs(false), 600);
+                    }
+                  }}
+                  disabled={isRefreshingLogs}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-300 hover:text-slate-100 text-xs font-semibold border border-slate-800 transition-all group disabled:opacity-60 shadow-xs"
+                  title="Refresh activity logs"
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 transition-transform duration-500 ${
+                      isRefreshingLogs ? 'animate-spin text-blue-400' : 'group-hover:rotate-180 text-slate-400 group-hover:text-slate-200'
+                    }`}
+                  />
+                  <span className="hidden sm:inline">Refresh</span>
+                </button>
 
                 <button
                   onClick={handleClearLogs}
@@ -3393,10 +3439,15 @@ export default function AdminPage({ onBackToDrive }) {
                 <button
                   type="button"
                   onClick={loadPasswordResets}
-                  className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                  disabled={loadingResets}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors group disabled:opacity-60"
                   title="Refresh requests"
                 >
-                  <RefreshCw className={`w-4 h-4 ${loadingResets ? 'animate-spin' : ''}`} />
+                  <RefreshCw
+                    className={`w-4 h-4 transition-transform duration-500 ${
+                      loadingResets ? 'animate-spin text-blue-400' : 'group-hover:rotate-180 text-slate-400 group-hover:text-slate-200'
+                    }`}
+                  />
                 </button>
                 <button
                   type="button"
@@ -3579,9 +3630,9 @@ export default function AdminPage({ onBackToDrive }) {
                                 setShowNewAdminPassword(true);
                                 toast.success('Generated random secure password');
                               }}
-                              className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold hover:underline flex items-center gap-1"
+                              className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold hover:underline flex items-center gap-1 group"
                             >
-                              <RefreshCw className="w-3 h-3" />
+                              <RefreshCw className="w-3 h-3 transition-transform duration-500 group-hover:rotate-180" />
                               <span>Generate Random Password</span>
                             </button>
                           </div>

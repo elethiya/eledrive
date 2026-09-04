@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { shareAPI, folderAPI, fileAPI } from '../api/client';
 import FileCard from '../components/FileCard';
-import { Users } from 'lucide-react';
+import { Users, RefreshCw } from 'lucide-react';
 
 export default function SharedWithMePage({
   onOpenFolder,
@@ -13,6 +13,7 @@ export default function SharedWithMePage({
 }) {
   const [data, setData] = useState({ folders: [], files: [] });
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     loadShared();
@@ -53,14 +54,38 @@ export default function SharedWithMePage({
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950 text-slate-100">
       {/* Header */}
-      <div className="h-14 px-6 border-b border-slate-800 bg-slate-900/60 flex items-center justify-between shrink-0">
+      <div className="h-14 px-4 sm:px-6 border-b border-slate-800 bg-slate-900/60 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2 text-slate-100 font-bold text-xs">
           <Users className="w-4 h-4 text-blue-400" />
           <span>Shared with me</span>
         </div>
-        <span className="text-xs text-slate-400">
-          Items teammates have shared with you
-        </span>
+
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-400 hidden sm:inline">
+            Items teammates have shared with you
+          </span>
+
+          <button
+            onClick={async () => {
+              setIsRefreshing(true);
+              try {
+                await loadShared();
+              } finally {
+                setTimeout(() => setIsRefreshing(false), 600);
+              }
+            }}
+            disabled={isRefreshing}
+            className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-slate-100 border border-slate-800 rounded-xl text-xs font-semibold transition-all group disabled:opacity-60 shadow-xs"
+            title="Refresh shared items"
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 transition-transform duration-500 ${
+                isRefreshing ? 'animate-spin text-blue-400' : 'group-hover:rotate-180 text-slate-400 group-hover:text-slate-200'
+              }`}
+            />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3.5 sm:p-6">

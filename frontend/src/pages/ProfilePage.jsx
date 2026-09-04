@@ -12,6 +12,7 @@ import {
   AtSign,
   Palette,
   Crown,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -32,6 +33,7 @@ const AVATAR_COLORS = [
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
   const toast = useToast();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Profile Form state
   const [name, setName] = useState(user?.name || '');
@@ -169,17 +171,43 @@ export default function ProfilePage() {
           </div>
 
           <div className="flex-1 min-w-0 text-left">
-            <div className="flex flex-wrap items-center gap-2 mb-1">
-              <h1 className="text-base sm:text-xl md:text-2xl font-bold text-slate-100 truncate">{user?.name}</h1>
-              <span className={`px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full border shrink-0 ${
-                user?.role === 'owner'
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                  : user?.role === 'admin'
-                  ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-                  : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-              }`}>
-                {user?.role === 'owner' ? 'Workspace Owner' : user?.role === 'admin' ? 'Administrator' : 'Team Member'}
-              </span>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                <h1 className="text-base sm:text-xl md:text-2xl font-bold text-slate-100 truncate">{user?.name}</h1>
+                <span className={`px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full border shrink-0 ${
+                  user?.role === 'owner'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                    : user?.role === 'admin'
+                    ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                    : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                }`}>
+                  {user?.role === 'owner' ? 'Workspace Owner' : user?.role === 'admin' ? 'Administrator' : 'Team Member'}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsRefreshing(true);
+                  try {
+                    if (refreshUser) await refreshUser();
+                    await loadStats();
+                    toast.success('Account info refreshed');
+                  } finally {
+                    setTimeout(() => setIsRefreshing(false), 600);
+                  }
+                }}
+                disabled={isRefreshing}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 bg-slate-950/80 hover:bg-slate-800 text-slate-300 hover:text-slate-100 border border-slate-800 rounded-xl text-xs font-semibold transition-all group disabled:opacity-60 shadow-xs shrink-0"
+                title="Refresh profile & storage stats"
+              >
+                <RefreshCw
+                  className={`w-3.5 h-3.5 transition-transform duration-500 ${
+                    isRefreshing ? 'animate-spin text-blue-400' : 'group-hover:rotate-180 text-slate-400 group-hover:text-slate-200'
+                  }`}
+                />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
             </div>
 
             <p className="text-xs text-slate-400 mb-2 sm:mb-3 truncate">{user?.email}</p>

@@ -30,15 +30,62 @@ import { Search, X } from 'lucide-react';
 import FileCard from './components/FileCard';
 import { folderAPI, fileAPI } from './api/client';
 
+const VALID_VIEWS = ['drive', 'teams', 'shared', 'recent', 'starred', 'trash', 'profile', 'admin'];
+
+function parseNavigationFromLocation() {
+  const path = window.location.pathname;
+
+  // Public share route takes precedence
+  if (path.startsWith('/share/')) {
+    return { view: 'drive', folderId: '' };
+  }
+
+  // Check URL paths
+  if (path === '/admin' || path.startsWith('/admin/')) return { view: 'admin', folderId: '' };
+  if (path === '/teams' || path.startsWith('/teams/')) return { view: 'teams', folderId: '' };
+  if (path === '/shared' || path.startsWith('/shared/')) return { view: 'shared', folderId: '' };
+  if (path === '/recent' || path.startsWith('/recent/')) return { view: 'recent', folderId: '' };
+  if (path === '/starred' || path.startsWith('/starred/')) return { view: 'starred', folderId: '' };
+  if (path === '/trash' || path.startsWith('/trash/')) return { view: 'trash', folderId: '' };
+  if (path === '/profile' || path.startsWith('/profile/')) return { view: 'profile', folderId: '' };
+  if (path.startsWith('/folder/')) {
+    const folderId = path.split('/folder/')[1]?.split('/')[0] || '';
+    return { view: 'drive', folderId };
+  }
+
+  // Check URL query parameters (e.g. ?view=teams or ?folder=123)
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const qView = params.get('view');
+    const qFolder = params.get('folder');
+    if (qView && VALID_VIEWS.includes(qView)) {
+      return { view: qView, folderId: qFolder || '' };
+    }
+  } catch (e) {}
+
+  // Fallback to localStorage persistence
+  try {
+    const savedView = localStorage.getItem('eledrive_current_view');
+    const savedFolder = localStorage.getItem('eledrive_current_folder');
+    if (savedView && VALID_VIEWS.includes(savedView)) {
+      return {
+        view: savedView,
+        folderId: savedView === 'drive' && savedFolder ? savedFolder : '',
+      };
+    }
+  } catch (e) {}
+
+  return { view: 'drive', folderId: '' };
+}
+
 function AppContent() {
   const { user, loading, refreshUser } = useAuth();
 
-  // Navigation & View state
-  const initialPath = window.location.pathname;
-  const isInitialAdmin = initialPath === '/admin' || initialPath.startsWith('/admin/');
-  const [currentView, setCurrentView] = useState(isInitialAdmin ? 'admin' : 'drive'); // 'drive' | 'shared' | 'recent' | 'starred' | 'trash' | 'profile' | 'admin'
+  // Navigation & View state initialized from current URL and persistent storage
+  const initialNav = parseNavigationFromLocation();
+  const [currentView, setCurrentView] = useState(initialNav.view);
+  const [currentFolderId, setCurrentFolderId] = useState(initialNav.folderId);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [currentFolderId, setCurrentFolderId] = useState('');
   const [authView, setAuthView] = useState('login'); // 'login' | 'register'
 
   // Search state
@@ -61,32 +108,56 @@ function AppContent() {
   // Upload status tracker
   const [uploadStatus, setUploadStatus] = useState(null);
 
-  // Sync browser URL with currentView (for /admin and /)
+  // Sync browser URL & localStorage whenever currentView or currentFolderId changes
   useEffect(() => {
-    if (currentView === 'admin') {
-      if (window.location.pathname !== '/admin') {
-        window.history.pushState({}, '', '/admin');
-      }
-    } else if (!window.location.pathname.startsWith('/share/')) {
-      if (window.location.pathname === '/admin') {
-        window.history.pushState({}, '', '/');
-      }
-    }
-  }, [currentView]);
+    if (window.location.pathname.startsWith('/share/')) return;
 
-  // Handle browser popstate
+    try {
+      localStorage.setItem('eledrive_current_view', currentView);
+      if (currentView === 'drive' && currentFolderId) {
+        localStorage.setItem('eledrive_current_folder', currentFolderId);
+      } else {
+        localStorage.removeItem('eledrive_current_folder');
+      }
+    } catch (e) {}
+
+    let targetPath = '/';
+    if (currentView === 'admin') targetPath = '/admin';
+    else if (currentView === 'teams') targetPath = '/teams';
+    else if (currentView === 'shared') targetPath = '/shared';
+    else if (currentView === 'recent') targetPath = '/recent';
+    else if (currentView === 'starred') targetPath = '/starred';
+    else if (currentView === 'trash') targetPath = '/trash';
+    else if (currentView === 'profile') targetPath = '/profile';
+    else if (currentView === 'drive') {
+      targetPath = currentFolderId ? `/folder/${currentFolderId}` : '/';
+    }
+
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({ view: currentView, folderId: currentFolderId }, '', targetPath);
+    }
+  }, [currentView, currentFolderId]);
+
+  // Handle browser popstate (Back/Forward buttons)
   useEffect(() => {
     const handlePopState = () => {
       const p = window.location.pathname;
-      if (p === '/admin' || p.startsWith('/admin/')) {
-        setCurrentView('admin');
-      } else if (!p.startsWith('/share/')) {
-        setCurrentView('drive');
-      }
+      if (p.startsWith('/share/')) return;
+      const nav = parseNavigationFromLocation();
+      setCurrentView(nav.view);
+      setCurrentFolderId(nav.folderId);
+      setSearchResults(null);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  // Prevent non-admin/owner users from lingering on /admin
+  useEffect(() => {
+    if (user && currentView === 'admin' && user.role !== 'admin' && user.role !== 'owner') {
+      setCurrentView('drive');
+    }
+  }, [user, currentView]);
 
   // Check if current URL is a public share link
   const path = window.location.pathname;
