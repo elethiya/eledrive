@@ -70,17 +70,26 @@ type File struct {
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
+type TeamPublic struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	AvatarColor  string `json:"avatar_color"`
+	MembersCount int    `json:"members_count"`
+}
+
 type Share struct {
 	ID               string      `json:"id"`
-	TargetType       string      `json:"target_type"` // "folder" or "file"
+	TargetType       string      `json:"target_type"` // "folder", "file", or "drive"
 	TargetID         string      `json:"target_id"`
 	SharedByUserID   string      `json:"shared_by_user_id"`
-	SharedWithUserID string      `json:"shared_with_user_id"`
+	SharedWithUserID string      `json:"shared_with_user_id,omitempty"`
 	Permission       string      `json:"permission"` // "viewer" or "editor"
 	CreatedAt        time.Time   `json:"created_at"`
 	SharedWith       *UserPublic `json:"shared_with,omitempty"`
 	SharedBy         *UserPublic `json:"shared_by,omitempty"`
 	TargetName       string      `json:"target_name,omitempty"`
+	Team             *TeamPublic `json:"team,omitempty"`
+	IsTeam           bool        `json:"is_team"`
 }
 
 type ShareLink struct {

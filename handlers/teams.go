@@ -806,12 +806,24 @@ func (h *TeamHandler) RemoveTeamShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var targetType, targetID, sharedBy string
+	_ = db.DB.QueryRow("SELECT target_type, target_id, shared_by_user_id FROM drive.team_shares WHERE id = ?", shareID).
+		Scan(&targetType, &targetID, &sharedBy)
+
 	_, err := db.DB.Exec("DELETE FROM drive.team_shares WHERE id = ? AND team_id = ?", shareID, teamID)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, "Failed to remove team share")
 		return
 	}
 
+	if targetType != "" {
+		_, _ = db.DB.Exec(`
+			DELETE FROM drive.shares 
+			WHERE shared_by_user_id = ? AND target_type = ? AND (target_id = ? OR (target_id = 'root' AND ? = 'drive'))
+		`, sharedBy, targetType, targetID, targetType)
+	}
+
 	events.Broadcast("team:share_remove", "team", "share_remove", teamID, "", claims.UserID, map[string]interface{}{"share_id": shareID})
+	events.Broadcast("share:delete", "share", "delete", shareID, "", claims.UserID, nil)
 	utils.RespondSuccess(w, http.StatusOK, "Shared resource removed from team", nil)
 }

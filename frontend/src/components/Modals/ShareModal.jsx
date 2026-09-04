@@ -69,16 +69,21 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
 
   const loadTeamShares = async () => {
     try {
-      const res = await shareAPI.getTargetShares(itemType, item.id);
-      if (res.data) setSharedList(res.data);
+      const res = await shareAPI.getTargetShares(itemType, item.id || 'root');
+      if (res.data) {
+        setSharedList(Array.isArray(res.data) ? res.data : []);
+      } else {
+        setSharedList([]);
+      }
     } catch (e) {
       console.error(e);
+      setSharedList([]);
     }
   };
 
   const loadPublicLink = async () => {
     try {
-      const res = await publicShareAPI.getTargetLink(itemType, item.id);
+      const res = await publicShareAPI.getTargetLink(itemType, item.id || 'root');
       if (res.data && res.data.link) {
         setLinkInfo(res.data);
         setLinkPermission(res.data.link.permission);
@@ -98,7 +103,7 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
     try {
       await shareAPI.createShare({
         target_type: itemType,
-        target_id: item.id,
+        target_id: item.id || 'root',
         user_id: selectedUser.id,
         permission: memberPermission,
       });
@@ -152,10 +157,12 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
     }
   };
 
-  const handleRemoveShare = async (shareId) => {
+  const handleRemoveShare = async (shareId, isTeam = false, targetName = '') => {
     const ok = await confirm({
-      title: 'Revoke Share Access',
-      message: 'Are you sure you want to remove access for this collaborator? They will no longer be able to access this content.',
+      title: isTeam ? 'Revoke Team Access' : 'Revoke Share Access',
+      message: isTeam
+        ? `Are you sure you want to remove access for team "${targetName || 'this team'}"? All members of this team will immediately lose access.`
+        : `Are you sure you want to remove access for ${targetName ? `"${targetName}"` : 'this collaborator'}? They will no longer be able to access this content.`,
       confirmText: 'Revoke Access',
       cancelText: 'Cancel',
       variant: 'danger',
@@ -164,11 +171,13 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
 
     try {
       await shareAPI.deleteShare(shareId);
+      setSharedList((prev) => prev.filter((s) => s.id !== shareId));
       await loadTeamShares();
       window.dispatchEvent(new CustomEvent('eledrive:refresh_content'));
-      toast.success('Share access removed');
+      toast.success(isTeam ? 'Team share access revoked' : 'Share access removed');
     } catch (err) {
-      toast.error(err.message);
+      toast.error(err.response?.data?.error || err.message || 'Failed to remove share');
+      await loadTeamShares();
     }
   };
 
@@ -421,77 +430,139 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
               )}
             </div>
 
-            <div>
-              <span className="text-xs font-semibold text-slate-300 block mb-2">
-                People with access
-              </span>
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                {/* Owner */}
-                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800">
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                      style={{ backgroundColor: user?.avatar_color || '#3b82f6' }}
-                    >
-                      {user?.name?.charAt(0) || 'U'}
-                    </div>
-                    <div>
-                      <span className="text-xs font-semibold text-slate-200 block">
-                        {user?.name} (You)
-                      </span>
-                      <span className="text-[10px] text-slate-400 block font-mono">
-                        {user?.username ? `@${user.username} • ${user.email}` : user?.email}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-bold text-slate-400 px-2 py-0.5 bg-slate-800 rounded-md">
-                    Owner
+            <div className="space-y-3">
+              {/* Teams with Access Section */}
+              {sharedList.some((s) => s.is_team) && (
+                <div>
+                  <span className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5 mb-2">
+                    <Users className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Teams with access</span>
                   </span>
-                </div>
-
-                {/* Shared users */}
-                {sharedList.map((s) => (
-                  <div
-                    key={s.id}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 hover:border-slate-700 transition-colors"
-                  >
-                    <div className="flex items-center gap-2.5 truncate mr-2">
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                    {sharedList.filter((s) => s.is_team).map((s) => (
                       <div
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                        style={{ backgroundColor: s.shared_with?.avatar_color || '#10b981' }}
+                        key={s.id}
+                        className="flex items-center justify-between p-2.5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 hover:border-indigo-500/50 transition-colors"
                       >
-                        {s.shared_with?.name?.charAt(0) || 'M'}
-                      </div>
-                      <div className="truncate">
-                        <span className="text-xs font-semibold text-slate-200 block truncate">
-                          {s.shared_with?.name}
-                        </span>
-                        <span className="text-[10px] text-slate-400 block truncate font-mono">
-                          {s.shared_with?.username ? `@${s.shared_with?.username} • ${s.shared_with?.email}` : s.shared_with?.email}
-                        </span>
-                      </div>
-                    </div>
+                        <div className="flex items-center gap-2.5 truncate mr-2">
+                          <div
+                            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-xs"
+                            style={{ backgroundColor: s.team?.avatar_color || '#6366f1' }}
+                          >
+                            <Users className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="truncate">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-semibold text-slate-100 truncate">
+                                {s.team?.name || 'Team'}
+                              </span>
+                              <span className="text-[9px] font-bold text-indigo-300 bg-indigo-500/25 border border-indigo-400/40 px-1.5 py-0.2 rounded shrink-0">
+                                Team
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 block truncate font-mono">
+                              {s.team?.members_count || 0} member(s)
+                            </span>
+                          </div>
+                        </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span
-                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${
-                          s.permission === 'editor'
-                            ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-                            : 'bg-slate-800 text-slate-400 border-slate-700'
-                        }`}
-                      >
-                        {s.permission === 'editor' ? 'Can Edit' : 'Viewer'}
-                      </span>
-                      <button
-                        onClick={() => handleRemoveShare(s.id)}
-                        className="p-1 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-colors"
-                        title="Remove access"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+                              s.permission === 'editor'
+                                ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+                                : 'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}
+                          >
+                            {s.permission === 'editor' ? 'Can Edit' : 'Viewer'}
+                          </span>
+                          <button
+                            onClick={() => handleRemoveShare(s.id, true, s.team?.name)}
+                            className="p-1 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-colors"
+                            title="Revoke team access"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+              )}
+
+              {/* People with access Section */}
+              <div>
+                <span className="text-xs font-semibold text-slate-300 block mb-2">
+                  People with access
+                </span>
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {/* Owner */}
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                        style={{ backgroundColor: user?.avatar_color || '#3b82f6' }}
+                      >
+                        {user?.name?.charAt(0) || 'U'}
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-slate-200 block">
+                          {user?.name} (You)
+                        </span>
+                        <span className="text-[10px] text-slate-400 block font-mono">
+                          {user?.username ? `@${user.username} • ${user.email}` : user?.email}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-400 px-2 py-0.5 bg-slate-800 rounded-md">
+                      Owner
+                    </span>
+                  </div>
+
+                  {/* Direct Shared Users */}
+                  {sharedList.filter((s) => !s.is_team).map((s) => (
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 hover:border-slate-700 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 truncate mr-2">
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                          style={{ backgroundColor: s.shared_with?.avatar_color || '#10b981' }}
+                        >
+                          {s.shared_with?.name?.charAt(0) || 'M'}
+                        </div>
+                        <div className="truncate">
+                          <span className="text-xs font-semibold text-slate-200 block truncate">
+                            {s.shared_with?.name}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block truncate font-mono">
+                            {s.shared_with?.username ? `@${s.shared_with?.username} • ${s.shared_with?.email}` : s.shared_with?.email}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span
+                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+                            s.permission === 'editor'
+                              ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                              : 'bg-slate-800 text-slate-400 border-slate-700'
+                          }`}
+                        >
+                          {s.permission === 'editor' ? 'Can Edit' : 'Viewer'}
+                        </span>
+                        <button
+                          onClick={() => handleRemoveShare(s.id, false, s.shared_with?.name)}
+                          className="p-1 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-colors"
+                          title="Remove access"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

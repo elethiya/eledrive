@@ -76,7 +76,7 @@ func (h *ShareHandler) Create(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC().Truncate(time.Second)
 	nowStr := now.Format("2006-01-02 15:04:05")
 
-	// Case 1: Share with a Team
+	// Case 1: Share with a team
 	if req.TeamID != "" {
 		var team models.Team
 		err := db.DB.QueryRow("SELECT id, name, avatar_color FROM main.teams WHERE id = ?", req.TeamID).
@@ -86,73 +86,34 @@ func (h *ShareHandler) Create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Insert/Update team_shares
+		targetID := req.TargetID
+		if req.TargetType == "drive" || targetID == "root" || targetID == "" {
+			targetID = claims.UserID
+		}
+
+		// Insert/Update team_shares as single source of truth
 		teamShareID := uuid.New().String()
 		_, err = db.DB.Exec(`
 			INSERT INTO drive.team_shares (id, team_id, target_type, target_id, shared_by_user_id, permission, created_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT(team_id, target_type, target_id)
 			DO UPDATE SET permission = excluded.permission
-		`, teamShareID, req.TeamID, req.TargetType, req.TargetID, claims.UserID, req.Permission, nowStr)
+		`, teamShareID, req.TeamID, req.TargetType, targetID, claims.UserID, req.Permission, nowStr)
 		if err != nil {
 			utils.RespondError(w, http.StatusInternalServerError, "Failed to record team share")
 			return
 		}
 
-		// Fetch all member IDs into slice first, then close rows immediately to prevent connection deadlock!
-		var memberIDs []string
-		memberRows, err := db.DB.Query(`
-			SELECT user_id FROM main.team_members WHERE team_id = ? AND user_id != ?
-		`, req.TeamID, claims.UserID)
-		if err == nil {
-			for memberRows.Next() {
-				var mUID string
-				if err := memberRows.Scan(&mUID); err == nil {
-					memberIDs = append(memberIDs, mUID)
-				}
-			}
-			if err := memberRows.Err(); err != nil {
-				_ = err
-			}
-			memberRows.Close()
-		}
-
-		// Now safely execute inserts without holding an active rows cursor
-		for _, mUID := range memberIDs {
-			if req.TargetType == "drive" {
-				// Share all root folders and files
-				_, _ = db.DB.Exec(`
-					INSERT INTO drive.shares (id, target_type, target_id, shared_by_user_id, shared_with_user_id, permission, created_at)
-					SELECT LOWER(HEX(RANDOMBLOB(16))), 'folder', id, ?, ?, ?, ?
-					FROM drive.folders WHERE owner_id = ? AND parent_id IS NULL AND is_trashed = 0
-					ON CONFLICT(target_type, target_id, shared_with_user_id) DO UPDATE SET permission = excluded.permission
-				`, claims.UserID, mUID, req.Permission, nowStr, claims.UserID)
-				_, _ = db.DB.Exec(`
-					INSERT INTO drive.shares (id, target_type, target_id, shared_by_user_id, shared_with_user_id, permission, created_at)
-					SELECT LOWER(HEX(RANDOMBLOB(16))), 'file', id, ?, ?, ?, ?
-					FROM drive.files WHERE owner_id = ? AND folder_id IS NULL AND is_trashed = 0
-					ON CONFLICT(target_type, target_id, shared_with_user_id) DO UPDATE SET permission = excluded.permission
-				`, claims.UserID, mUID, req.Permission, nowStr, claims.UserID)
-			} else {
-				sID := uuid.New().String()
-				_, _ = db.DB.Exec(`
-					INSERT INTO drive.shares (id, target_type, target_id, shared_by_user_id, shared_with_user_id, permission, created_at)
-					VALUES (?, ?, ?, ?, ?, ?, ?)
-					ON CONFLICT(target_type, target_id, shared_with_user_id) DO UPDATE SET permission = excluded.permission
-				`, sID, req.TargetType, req.TargetID, claims.UserID, mUID, req.Permission, nowStr)
-			}
-		}
-
-		db.LogActivity(claims.UserID, claims.Username, "share_team", req.TargetType, req.TargetID, team.Name, fmt.Sprintf("Shared %s with team %s", req.TargetType, team.Name))
-		events.Broadcast("team:share", "team", "share", req.TargetID, "", claims.UserID, nil)
-		events.Broadcast("share:create", "share", "create", req.TargetID, "", claims.UserID, nil)
+		db.LogActivity(claims.UserID, claims.Username, "share_team", req.TargetType, targetID, team.Name, fmt.Sprintf("Shared %s with team %s", req.TargetType, team.Name))
+		events.Broadcast("team:share", "team", "share", targetID, "", claims.UserID, nil)
+		events.Broadcast("share:create", "share", "create", targetID, "", claims.UserID, nil)
 
 		utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
 			"id":          teamShareID,
 			"team_id":     team.ID,
 			"team_name":   team.Name,
 			"target_type": req.TargetType,
-			"target_id":   req.TargetID,
+			"target_id":   targetID,
 			"permission":  req.Permission,
 			"message":     fmt.Sprintf("Successfully shared with team %s", team.Name),
 		})
@@ -186,25 +147,15 @@ func (h *ShareHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if req.TargetType == "drive" {
 		// Record drive-level share entry
 		driveShareID := uuid.New().String()
-		_, _ = db.DB.Exec(`
+		_, err := db.DB.Exec(`
 			INSERT INTO drive.shares (id, target_type, target_id, shared_by_user_id, shared_with_user_id, permission, created_at)
 			VALUES (?, 'drive', ?, ?, ?, ?, ?)
 			ON CONFLICT(target_type, target_id, shared_with_user_id) DO UPDATE SET permission = excluded.permission
 		`, driveShareID, claims.UserID, claims.UserID, targetUser.ID, req.Permission, nowStr)
-
-		// Share all current root folders and files with target user
-		_, _ = db.DB.Exec(`
-			INSERT INTO drive.shares (id, target_type, target_id, shared_by_user_id, shared_with_user_id, permission, created_at)
-			SELECT LOWER(HEX(RANDOMBLOB(16))), 'folder', id, ?, ?, ?, ?
-			FROM drive.folders WHERE owner_id = ? AND parent_id IS NULL AND is_trashed = 0
-			ON CONFLICT(target_type, target_id, shared_with_user_id) DO UPDATE SET permission = excluded.permission
-		`, claims.UserID, targetUser.ID, req.Permission, nowStr, claims.UserID)
-		_, _ = db.DB.Exec(`
-			INSERT INTO drive.shares (id, target_type, target_id, shared_by_user_id, shared_with_user_id, permission, created_at)
-			SELECT LOWER(HEX(RANDOMBLOB(16))), 'file', id, ?, ?, ?, ?
-			FROM drive.files WHERE owner_id = ? AND folder_id IS NULL AND is_trashed = 0
-			ON CONFLICT(target_type, target_id, shared_with_user_id) DO UPDATE SET permission = excluded.permission
-		`, claims.UserID, targetUser.ID, req.Permission, nowStr, claims.UserID)
+		if err != nil {
+			utils.RespondError(w, http.StatusInternalServerError, "Failed to record drive share")
+			return
+		}
 
 		db.LogActivity(claims.UserID, claims.Username, "share_drive", "drive", claims.UserID, targetUser.Name, fmt.Sprintf("Shared entire Drive with %s", targetUser.Name))
 		events.Broadcast("share:create", "share", "create", claims.UserID, "", claims.UserID, nil)
@@ -377,35 +328,57 @@ func (h *ShareHandler) GetTargetShares(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	rows, err := db.DB.Query(`
+	shares := make([]models.Share, 0)
+
+	// 1. Fetch team shares from drive.team_shares
+	tRows, err := db.DB.Query(`
+		SELECT ts.id, ts.team_id, ts.target_type, ts.target_id, ts.shared_by_user_id, ts.permission, ts.created_at,
+		       t.name, t.avatar_color,
+		       (SELECT COUNT(*) FROM main.team_members WHERE team_id = t.id) AS members_count
+		FROM drive.team_shares ts
+		JOIN main.teams t ON ts.team_id = t.id
+		WHERE ts.target_type = ? AND (ts.target_id = ? OR (? = 'drive' AND (ts.target_id = 'root' OR ts.shared_by_user_id = ?)))
+		ORDER BY ts.created_at ASC
+	`, targetType, targetID, targetType, claims.UserID)
+	if err == nil {
+		defer tRows.Close()
+		for tRows.Next() {
+			var s models.Share
+			var team models.TeamPublic
+			if err := tRows.Scan(
+				&s.ID, &team.ID, &s.TargetType, &s.TargetID, &s.SharedByUserID, &s.Permission, &s.CreatedAt,
+				&team.Name, &team.AvatarColor, &team.MembersCount,
+			); err == nil {
+				s.IsTeam = true
+				s.Team = &team
+				shares = append(shares, s)
+			}
+		}
+	}
+
+	// 2. Fetch direct user shares from drive.shares
+	uRows, err := db.DB.Query(`
 		SELECT s.id, s.target_type, s.target_id, s.shared_by_user_id, s.shared_with_user_id, s.permission, s.created_at,
 		       u.id, u.email, u.username, u.name, u.avatar_color
 		FROM drive.shares s
 		JOIN main.users u ON s.shared_with_user_id = u.id
-		WHERE s.target_type = ? AND s.target_id = ?
+		WHERE s.target_type = ? AND (s.target_id = ? OR (? = 'drive' AND s.shared_by_user_id = ?))
 		ORDER BY s.created_at ASC
-	`, targetType, targetID)
-	if err != nil {
-		utils.RespondError(w, http.StatusInternalServerError, "Database error")
-		return
-	}
-	defer rows.Close()
-
-	shares := make([]models.Share, 0)
-	for rows.Next() {
-		var s models.Share
-		var u models.UserPublic
-		if err := rows.Scan(
-			&s.ID, &s.TargetType, &s.TargetID, &s.SharedByUserID, &s.SharedWithUserID, &s.Permission, &s.CreatedAt,
-			&u.ID, &u.Email, &u.Username, &u.Name, &u.AvatarColor,
-		); err == nil {
-			s.SharedWith = &u
-			shares = append(shares, s)
+	`, targetType, targetID, targetType, claims.UserID)
+	if err == nil {
+		defer uRows.Close()
+		for uRows.Next() {
+			var s models.Share
+			var u models.UserPublic
+			if err := uRows.Scan(
+				&s.ID, &s.TargetType, &s.TargetID, &s.SharedByUserID, &s.SharedWithUserID, &s.Permission, &s.CreatedAt,
+				&u.ID, &u.Email, &u.Username, &u.Name, &u.AvatarColor,
+			); err == nil {
+				s.IsTeam = false
+				s.SharedWith = &u
+				shares = append(shares, s)
+			}
 		}
-	}
-	if err := rows.Err(); err != nil {
-		utils.RespondError(w, http.StatusInternalServerError, "Failed to read shares")
-		return
 	}
 
 	utils.RespondJSON(w, http.StatusOK, shares)
@@ -415,15 +388,56 @@ func (h *ShareHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r.Context())
 	shareID := chi.URLParam(r, "id")
 
-	// Must be creator or recipient
-	var sharedBy, sharedWith string
-	err := db.DB.QueryRow("SELECT shared_by_user_id, shared_with_user_id FROM drive.shares WHERE id = ?", shareID).Scan(&sharedBy, &sharedWith)
+	// 1. Check if shareID is in drive.team_shares
+	var teamID, targetType, targetID, sharedBy string
+	err := db.DB.QueryRow(`
+		SELECT team_id, target_type, target_id, shared_by_user_id 
+		FROM drive.team_shares WHERE id = ?
+	`, shareID).Scan(&teamID, &targetType, &targetID, &sharedBy)
+
+	if err == nil {
+		// It's a team share
+		if sharedBy != claims.UserID && claims.Role != "admin" && claims.Role != "owner" {
+			var teamRole string
+			_ = db.DB.QueryRow("SELECT role FROM main.team_members WHERE team_id = ? AND user_id = ?", teamID, claims.UserID).Scan(&teamRole)
+			if teamRole != "leader" {
+				utils.RespondError(w, http.StatusForbidden, "No permission to revoke team share")
+				return
+			}
+		}
+
+		_, err = db.DB.Exec("DELETE FROM drive.team_shares WHERE id = ?", shareID)
+		if err != nil {
+			utils.RespondError(w, http.StatusInternalServerError, "Failed to remove team share")
+			return
+		}
+
+		// Also clean up any legacy cloned shares in drive.shares for this target
+		_, _ = db.DB.Exec(`
+			DELETE FROM drive.shares 
+			WHERE shared_by_user_id = ? AND target_type = ? AND (target_id = ? OR (target_id = 'root' AND ? = 'drive'))
+		`, sharedBy, targetType, targetID, targetType)
+
+		db.LogActivity(claims.UserID, claims.Username, "revoke_team_share", targetType, targetID, teamID, "Revoked team share access")
+		events.Broadcast("team:share_remove", "team", "share_remove", shareID, "", claims.UserID, nil)
+		events.Broadcast("share:delete", "share", "delete", shareID, "", claims.UserID, nil)
+		utils.RespondSuccess(w, http.StatusOK, "Team share access revoked", nil)
+		return
+	}
+
+	// 2. Check if shareID is in drive.shares
+	var sharedWith string
+	err = db.DB.QueryRow(`
+		SELECT shared_by_user_id, shared_with_user_id, target_type, target_id 
+		FROM drive.shares WHERE id = ?
+	`, shareID).Scan(&sharedBy, &sharedWith, &targetType, &targetID)
+
 	if err != nil {
 		utils.RespondError(w, http.StatusNotFound, "Share not found")
 		return
 	}
 
-	if sharedBy != claims.UserID && sharedWith != claims.UserID {
+	if sharedBy != claims.UserID && sharedWith != claims.UserID && claims.Role != "admin" && claims.Role != "owner" {
 		utils.RespondError(w, http.StatusForbidden, "No permission to revoke share")
 		return
 	}
@@ -434,7 +448,12 @@ func (h *ShareHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db.LogActivity(claims.UserID, claims.Username, "revoke_share", "share", shareID, "", "Revoked share access")
+	// If drive-level share, also clean up any cascaded folder/file shares
+	if targetType == "drive" {
+		_, _ = db.DB.Exec("DELETE FROM drive.shares WHERE shared_by_user_id = ? AND shared_with_user_id = ?", sharedBy, sharedWith)
+	}
+
+	db.LogActivity(claims.UserID, claims.Username, "revoke_share", targetType, targetID, sharedWith, "Revoked share access")
 	events.Broadcast("share:delete", "share", "delete", shareID, "", claims.UserID, nil)
 	utils.RespondSuccess(w, http.StatusOK, "Share access revoked", nil)
 }

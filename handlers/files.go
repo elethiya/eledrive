@@ -408,7 +408,7 @@ func (h *FileHandler) Search(w http.ResponseWriter, r *http.Request) {
 		query = `
 			SELECT f.id, f.name, f.original_name, f.folder_id, f.owner_id, u.name, u.email,
 			       f.size, f.mime_type, f.extension, f.is_starred, f.is_trashed, f.created_at, f.updated_at,
-			       ((SELECT 1 FROM drive.team_shares WHERE (target_type = 'file' AND target_id = f.id) OR (target_type = 'drive' AND shared_by_user_id = f.owner_id) LIMIT 1) IS NOT NULL) AS is_team_shared,
+			       ((SELECT 1 FROM drive.team_shares WHERE (target_type = 'file' AND target_id = f.id) OR (f.folder_id IS NOT NULL AND target_type = 'folder' AND target_id = f.folder_id) OR (target_type = 'drive' AND shared_by_user_id = f.owner_id) LIMIT 1) IS NOT NULL) AS is_team_shared,
 			       ((SELECT 1 FROM drive.share_links WHERE target_type = 'file' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL) AS has_share_link
 			FROM files f
 			JOIN users u ON f.owner_id = u.id
@@ -420,7 +420,7 @@ func (h *FileHandler) Search(w http.ResponseWriter, r *http.Request) {
 		query = `
 			SELECT f.id, f.name, f.original_name, f.folder_id, f.owner_id, u.name, u.email,
 			       f.size, f.mime_type, f.extension, f.is_starred, f.is_trashed, f.created_at, f.updated_at,
-			       ((SELECT 1 FROM drive.team_shares WHERE (target_type = 'file' AND target_id = f.id) OR (target_type = 'drive' AND shared_by_user_id = f.owner_id) LIMIT 1) IS NOT NULL) AS is_team_shared,
+			       ((SELECT 1 FROM drive.team_shares WHERE (target_type = 'file' AND target_id = f.id) OR (f.folder_id IS NOT NULL AND target_type = 'folder' AND target_id = f.folder_id) OR (target_type = 'drive' AND shared_by_user_id = f.owner_id) LIMIT 1) IS NOT NULL) AS is_team_shared,
 			       ((SELECT 1 FROM drive.share_links WHERE target_type = 'file' AND target_id = f.id AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1) IS NOT NULL) AS has_share_link
 			FROM files f
 			JOIN users u ON f.owner_id = u.id
