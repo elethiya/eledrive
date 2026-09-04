@@ -3,6 +3,8 @@ import {
   Folder,
   File,
   FileText,
+  FileSpreadsheet,
+  Presentation,
   Code2,
   Image as ImageIcon,
   Film,
@@ -20,7 +22,7 @@ import {
   Users,
   Eye,
 } from 'lucide-react';
-import { formatBytes, formatDate, getFileTypeCategory } from '../utils/formatters';
+import { formatBytes, formatDate, getFileTypeCategory, detectFileCategory } from '../utils/formatters';
 import { fileAPI } from '../api/client';
 
 export default function FileCard({
@@ -37,7 +39,7 @@ export default function FileCard({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const category = !isFolder ? getFileTypeCategory(item.mime_type, item.extension) : 'folder';
+  const category = !isFolder ? detectFileCategory(item) : 'folder';
 
   const renderIcon = (sizeClass = 'w-5 h-5') => {
     if (isFolder) {
@@ -57,10 +59,15 @@ export default function FileCard({
       case 'audio':
         return <Music className={`${sizeClass} text-violet-400`} />;
       case 'document':
-      case 'pdf':
         return <FileText className={`${sizeClass} text-blue-400`} />;
+      case 'pdf':
+        return <FileText className={`${sizeClass} text-red-400`} />;
+      case 'spreadsheet':
+        return <FileSpreadsheet className={`${sizeClass} text-emerald-400`} />;
+      case 'presentation':
+        return <Presentation className={`${sizeClass} text-orange-400`} />;
       case 'code':
-        return <Code2 className={`${sizeClass} text-emerald-400`} />;
+        return <Code2 className={`${sizeClass} text-teal-400`} />;
       case 'archive':
         return <Archive className={`${sizeClass} text-amber-500`} />;
       default:

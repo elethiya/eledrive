@@ -8,6 +8,8 @@ import {
   CheckCircle,
   HardDrive,
   FileText,
+  FileSpreadsheet,
+  Presentation,
   Code2,
   Image as ImageIcon,
   Film,
@@ -16,7 +18,7 @@ import {
 } from 'lucide-react';
 import { publicShareAPI } from '../api/client';
 import { useToast } from '../context/ToastContext';
-import { formatBytes, getFileTypeCategory } from '../utils/formatters';
+import { formatBytes, getFileTypeCategory, detectFileCategory } from '../utils/formatters';
 
 export default function PublicSharePage({ token, onBackToDrive }) {
   const toast = useToast();
@@ -98,8 +100,8 @@ export default function PublicSharePage({ token, onBackToDrive }) {
     }
   };
 
-  const renderFileIcon = (mime, ext) => {
-    const cat = getFileTypeCategory(mime, ext);
+  const renderFileIcon = (mime, ext, name = '') => {
+    const cat = detectFileCategory(mime, ext, name);
     switch (cat) {
       case 'image':
         return <ImageIcon className="w-5 h-5 text-pink-400" />;
@@ -108,10 +110,15 @@ export default function PublicSharePage({ token, onBackToDrive }) {
       case 'audio':
         return <Music className="w-5 h-5 text-violet-400" />;
       case 'code':
-        return <Code2 className="w-5 h-5 text-emerald-400" />;
+        return <Code2 className="w-5 h-5 text-teal-400" />;
       case 'document':
-      case 'pdf':
         return <FileText className="w-5 h-5 text-blue-400" />;
+      case 'pdf':
+        return <FileText className="w-5 h-5 text-red-400" />;
+      case 'spreadsheet':
+        return <FileSpreadsheet className="w-5 h-5 text-emerald-400" />;
+      case 'presentation':
+        return <Presentation className="w-5 h-5 text-orange-400" />;
       case 'archive':
         return <Archive className="w-5 h-5 text-amber-500" />;
       default:

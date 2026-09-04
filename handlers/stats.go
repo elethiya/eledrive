@@ -58,17 +58,17 @@ func (h *StatsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 				mime = strings.ToLower(mime)
 				ext = strings.ToLower(ext)
 
-				if strings.HasPrefix(mime, "image/") {
+				if strings.HasPrefix(mime, "image/") || isImageExtension(ext) {
 					typeStats["images"] += sz
-				} else if strings.HasPrefix(mime, "video/") {
+				} else if strings.HasPrefix(mime, "video/") || isVideoExtension(ext) {
 					typeStats["videos"] += sz
-				} else if strings.HasPrefix(mime, "audio/") {
+				} else if strings.HasPrefix(mime, "audio/") || isAudioExtension(ext) {
 					typeStats["audio"] += sz
-				} else if strings.Contains(mime, "pdf") || strings.Contains(mime, "word") || strings.Contains(mime, "document") {
+				} else if strings.Contains(mime, "pdf") || strings.Contains(mime, "word") || strings.Contains(mime, "document") || strings.Contains(mime, "sheet") || strings.Contains(mime, "presentation") || isDocExtension(ext) {
 					typeStats["documents"] += sz
 				} else if isCodeExtension(ext) || strings.Contains(mime, "javascript") || strings.Contains(mime, "json") {
 					typeStats["code"] += sz
-				} else if strings.Contains(mime, "zip") || strings.Contains(mime, "tar") || strings.Contains(mime, "gzip") {
+				} else if strings.Contains(mime, "zip") || strings.Contains(mime, "tar") || strings.Contains(mime, "gzip") || isArchiveExtension(ext) {
 					typeStats["archives"] += sz
 				} else {
 					typeStats["other"] += sz

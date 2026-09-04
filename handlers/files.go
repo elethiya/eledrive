@@ -430,17 +430,23 @@ func (h *FileHandler) Search(w http.ResponseWriter, r *http.Request) {
 	if category != "" && category != "all" {
 		switch category {
 		case "image":
-			query += " AND f.mime_type LIKE 'image/%'"
+			query += " AND (f.mime_type LIKE 'image/%' OR f.extension IN ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.ico', '.tiff', '.avif'))"
 		case "video":
-			query += " AND f.mime_type LIKE 'video/%'"
+			query += " AND (f.mime_type LIKE 'video/%' OR f.extension IN ('.mp4', '.webm', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.m4v'))"
 		case "audio":
-			query += " AND f.mime_type LIKE 'audio/%'"
+			query += " AND (f.mime_type LIKE 'audio/%' OR f.extension IN ('.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a', '.wma', '.opus'))"
+		case "pdf":
+			query += " AND (f.mime_type LIKE '%pdf%' OR f.extension = '.pdf')"
+		case "spreadsheet":
+			query += " AND (f.mime_type LIKE '%sheet%' OR f.mime_type LIKE '%excel%' OR f.mime_type LIKE '%csv%' OR f.extension IN ('.xls', '.xlsx', '.csv', '.tsv', '.ods'))"
+		case "presentation":
+			query += " AND (f.mime_type LIKE '%presentation%' OR f.mime_type LIKE '%powerpoint%' OR f.extension IN ('.ppt', '.pptx', '.odp'))"
 		case "document":
-			query += " AND (f.mime_type LIKE '%pdf%' OR f.mime_type LIKE '%word%' OR f.mime_type LIKE '%document%' OR f.mime_type LIKE 'text/%')"
+			query += " AND (f.mime_type LIKE '%word%' OR f.mime_type LIKE '%document%' OR f.mime_type LIKE 'text/%' OR f.extension IN ('.doc', '.docx', '.odt', '.rtf', '.txt', '.pages', '.epub', '.md'))"
 		case "code":
-			query += " AND (f.mime_type LIKE '%javascript%' OR f.mime_type LIKE '%json%' OR f.extension IN ('.go', '.py', '.js', '.jsx', '.ts', '.tsx', '.html', '.css', '.sql', '.sh'))"
+			query += " AND (f.mime_type LIKE '%javascript%' OR f.mime_type LIKE '%json%' OR f.mime_type LIKE '%xml%' OR f.mime_type LIKE '%yaml%' OR f.extension IN ('.go', '.py', '.js', '.jsx', '.ts', '.tsx', '.html', '.css', '.sql', '.sh', '.json', '.xml', '.yml', '.yaml'))"
 		case "archive":
-			query += " AND (f.mime_type LIKE '%zip%' OR f.mime_type LIKE '%tar%' OR f.mime_type LIKE '%gzip%')"
+			query += " AND (f.mime_type LIKE '%zip%' OR f.mime_type LIKE '%tar%' OR f.mime_type LIKE '%gzip%' OR f.mime_type LIKE '%compressed%' OR f.mime_type LIKE '%rar%' OR f.extension IN ('.zip', '.tar', '.gz', '.7z', '.rar', '.bz2', '.xz'))"
 		}
 	}
 
@@ -539,4 +545,50 @@ func isCodeExtension(ext string) bool {
 		".md": true, ".env": true, ".dockerfile": true, ".gitignore": true,
 	}
 	return codeExts[strings.ToLower(ext)]
+}
+
+func isImageExtension(ext string) bool {
+	exts := map[string]bool{
+		".jpg": true, ".jpeg": true, ".png": true, ".gif": true,
+		".webp": true, ".svg": true, ".bmp": true, ".ico": true,
+		".tiff": true, ".tif": true, ".avif": true, ".heic": true,
+	}
+	return exts[strings.ToLower(ext)]
+}
+
+func isVideoExtension(ext string) bool {
+	exts := map[string]bool{
+		".mp4": true, ".webm": true, ".mkv": true, ".avi": true,
+		".mov": true, ".wmv": true, ".flv": true, ".m4v": true,
+		".3gp": true, ".ogv": true, ".ts": true,
+	}
+	return exts[strings.ToLower(ext)]
+}
+
+func isAudioExtension(ext string) bool {
+	exts := map[string]bool{
+		".mp3": true, ".wav": true, ".ogg": true, ".flac": true,
+		".aac": true, ".m4a": true, ".wma": true, ".opus": true,
+	}
+	return exts[strings.ToLower(ext)]
+}
+
+func isDocExtension(ext string) bool {
+	exts := map[string]bool{
+		".pdf": true, ".doc": true, ".docx": true, ".dot": true,
+		".dotx": true, ".odt": true, ".rtf": true, ".txt": true,
+		".pages": true, ".epub": true, ".xls": true, ".xlsx": true,
+		".csv": true, ".tsv": true, ".ods": true, ".ppt": true,
+		".pptx": true, ".odp": true,
+	}
+	return exts[strings.ToLower(ext)]
+}
+
+func isArchiveExtension(ext string) bool {
+	exts := map[string]bool{
+		".zip": true, ".tar": true, ".gz": true, ".tgz": true,
+		".7z": true, ".rar": true, ".bz2": true, ".xz": true,
+		".iso": true, ".dmg": true,
+	}
+	return exts[strings.ToLower(ext)]
 }

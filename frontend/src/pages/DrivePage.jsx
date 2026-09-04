@@ -17,20 +17,24 @@ import {
   X,
   Folder,
   FileText,
+  FileSpreadsheet,
+  Presentation,
   Clock,
   Sparkles,
   ChevronDown,
   Users,
   Image as ImageIcon,
   Film,
+  Music,
   Code2,
   Archive,
   Layers,
   RefreshCw,
   Search,
   Lock,
+  File,
 } from 'lucide-react';
-import { formatBytes, formatDate, getFileTypeCategory } from '../utils/formatters';
+import { formatBytes, formatDate, getFileTypeCategory, detectFileCategory, CATEGORY_CONFIG } from '../utils/formatters';
 
 export default function DrivePage({
   isSharedView = false,
@@ -216,24 +220,91 @@ export default function DrivePage({
 
   const { folder, breadcrumbs, subfolders, files } = folderData;
 
-  // Calculate Category Counts dynamically
-  const categoryCounts = useMemo(() => {
+  // Helper to render responsive Lucide icons for each category
+  const renderCategoryIcon = (catKey) => {
+    switch (catKey) {
+      case 'all':
+        return <Layers className="w-3 h-3 text-blue-400" />;
+      case 'folder':
+        return <Folder className="w-3 h-3 text-amber-400" />;
+      case 'document':
+        return <FileText className="w-3 h-3 text-blue-400" />;
+      case 'pdf':
+        return <FileText className="w-3 h-3 text-red-400" />;
+      case 'spreadsheet':
+        return <FileSpreadsheet className="w-3 h-3 text-emerald-400" />;
+      case 'presentation':
+        return <Presentation className="w-3 h-3 text-orange-400" />;
+      case 'image':
+        return <ImageIcon className="w-3 h-3 text-pink-400" />;
+      case 'video':
+        return <Film className="w-3 h-3 text-rose-400" />;
+      case 'audio':
+        return <Music className="w-3 h-3 text-violet-400" />;
+      case 'code':
+        return <Code2 className="w-3 h-3 text-teal-400" />;
+      case 'archive':
+        return <Archive className="w-3 h-3 text-amber-500" />;
+      default:
+        return <File className="w-3 h-3 text-slate-400" />;
+    }
+  };
+
+  // Automatically detect file types present in the current folder and build dynamic category counts
+  const { categoryCounts, availableCategories } = useMemo(() => {
     const counts = {
       all: (subfolders?.length || 0) + (files?.length || 0),
-      folder: subfolders?.length || 0,
-      image: 0,
-      video: 0,
-      document: 0,
-      code: 0,
-      archive: 0,
     };
+
+    if (subfolders && subfolders.length > 0) {
+      counts.folder = subfolders.length;
+    }
+
     (files || []).forEach((f) => {
-      const cat = getFileTypeCategory(f.mime_type, f.extension);
-      if (counts[cat] !== undefined) counts[cat]++;
-      else counts.document++;
+      const cat = detectFileCategory(f);
+      counts[cat] = (counts[cat] || 0) + 1;
     });
-    return counts;
+
+    const categories = ['all'];
+    if (counts.folder > 0) {
+      categories.push('folder');
+    }
+
+    const priorityOrder = [
+      'document',
+      'pdf',
+      'spreadsheet',
+      'presentation',
+      'image',
+      'video',
+      'audio',
+      'code',
+      'archive',
+      'other',
+    ];
+
+    priorityOrder.forEach((cat) => {
+      if (counts[cat] > 0) {
+        categories.push(cat);
+      }
+    });
+
+    // Capture any remaining detected categories
+    Object.keys(counts).forEach((cat) => {
+      if (!categories.includes(cat) && counts[cat] > 0) {
+        categories.push(cat);
+      }
+    });
+
+    return { categoryCounts: counts, availableCategories: categories };
   }, [subfolders, files]);
+
+  // Automatically reset category filter to 'all' if selected category is no longer present
+  useEffect(() => {
+    if (categoryFilter !== 'all' && !availableCategories.includes(categoryFilter)) {
+      setCategoryFilter('all');
+    }
+  }, [availableCategories, categoryFilter]);
 
   const filterText = (searchQuery || '').trim();
 
@@ -255,7 +326,7 @@ export default function DrivePage({
     } else if (categoryFilter !== 'all') {
       fList = [];
       fileList = fileList.filter((fl) => {
-        const cat = getFileTypeCategory(fl.mime_type, fl.extension);
+        const cat = detectFileCategory(fl);
         return cat === categoryFilter;
       });
     }
@@ -400,104 +471,36 @@ export default function DrivePage({
           </div>
         </div>
 
-        {/* Quick Category Filter Pills */}
+        {/* Quick Category Filter Pills - Dynamically detected based on current folder content */}
         {!isEmpty && (
           <div className="flex items-center gap-1.5 overflow-x-auto px-3.5 sm:px-6 pb-2 pt-0 text-xs no-scrollbar">
-            <button
-              onClick={() => setCategoryFilter('all')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors shrink-0 flex items-center gap-1.5 ${
-                categoryFilter === 'all'
-                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
-            >
-              <Layers className="w-3 h-3" />
-              <span>All ({categoryCounts.all})</span>
-            </button>
+            {availableCategories.map((catKey) => {
+              const count = categoryCounts[catKey] || 0;
+              const config = CATEGORY_CONFIG[catKey] || {
+                id: catKey,
+                label: catKey.charAt(0).toUpperCase() + catKey.slice(1),
+                activeClass: 'bg-blue-600/20 text-blue-400 border border-blue-500/30',
+                iconColor: 'text-slate-400',
+              };
+              const isActive = categoryFilter === catKey;
 
-            {categoryCounts.folder > 0 && (
-              <button
-                onClick={() => setCategoryFilter('folder')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors shrink-0 flex items-center gap-1.5 ${
-                  categoryFilter === 'folder'
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                }`}
-              >
-                <Folder className="w-3 h-3 text-amber-400" />
-                <span>Folders ({categoryCounts.folder})</span>
-              </button>
-            )}
-
-            {categoryCounts.document > 0 && (
-              <button
-                onClick={() => setCategoryFilter('document')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors shrink-0 flex items-center gap-1.5 ${
-                  categoryFilter === 'document'
-                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                }`}
-              >
-                <FileText className="w-3 h-3 text-blue-400" />
-                <span>Documents ({categoryCounts.document})</span>
-              </button>
-            )}
-
-            {categoryCounts.image > 0 && (
-              <button
-                onClick={() => setCategoryFilter('image')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors shrink-0 flex items-center gap-1.5 ${
-                  categoryFilter === 'image'
-                    ? 'bg-pink-500/20 text-pink-300 border border-pink-500/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                }`}
-              >
-                <ImageIcon className="w-3 h-3 text-pink-400" />
-                <span>Images ({categoryCounts.image})</span>
-              </button>
-            )}
-
-            {categoryCounts.video > 0 && (
-              <button
-                onClick={() => setCategoryFilter('video')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors shrink-0 flex items-center gap-1.5 ${
-                  categoryFilter === 'video'
-                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                }`}
-              >
-                <Film className="w-3 h-3 text-rose-400" />
-                <span>Videos ({categoryCounts.video})</span>
-              </button>
-            )}
-
-            {categoryCounts.code > 0 && (
-              <button
-                onClick={() => setCategoryFilter('code')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors shrink-0 flex items-center gap-1.5 ${
-                  categoryFilter === 'code'
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                }`}
-              >
-                <Code2 className="w-3 h-3 text-emerald-400" />
-                <span>Code ({categoryCounts.code})</span>
-              </button>
-            )}
-
-            {categoryCounts.archive > 0 && (
-              <button
-                onClick={() => setCategoryFilter('archive')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors shrink-0 flex items-center gap-1.5 ${
-                  categoryFilter === 'archive'
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                }`}
-              >
-                <Archive className="w-3 h-3 text-amber-500" />
-                <span>Archives ({categoryCounts.archive})</span>
-              </button>
-            )}
+              return (
+                <button
+                  key={catKey}
+                  onClick={() => setCategoryFilter(catKey)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors shrink-0 flex items-center gap-1.5 border ${
+                    isActive
+                      ? config.activeClass
+                      : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  {renderCategoryIcon(catKey)}
+                  <span>
+                    {config.label} ({count})
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

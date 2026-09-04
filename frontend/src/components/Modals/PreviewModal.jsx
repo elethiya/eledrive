@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, FileText, Code2, Eye, File, Music } from 'lucide-react';
+import { X, Download, FileText, FileSpreadsheet, Presentation, Code2, Eye, File, Music } from 'lucide-react';
 import { fileAPI } from '../../api/client';
-import { formatBytes, getFileTypeCategory } from '../../utils/formatters';
+import { formatBytes, getFileTypeCategory, detectFileCategory } from '../../utils/formatters';
 
 export default function PreviewModal({ isOpen, onClose, file }) {
   const [loading, setLoading] = useState(true);
@@ -14,7 +14,7 @@ export default function PreviewModal({ isOpen, onClose, file }) {
       setError(null);
       setPreviewData(null);
 
-      const category = getFileTypeCategory(file.mime_type, file.extension);
+      const category = detectFileCategory(file);
 
       if (category === 'code' || file.mime_type?.startsWith('text/')) {
         fileAPI
@@ -34,7 +34,7 @@ export default function PreviewModal({ isOpen, onClose, file }) {
 
   if (!isOpen || !file) return null;
 
-  const category = getFileTypeCategory(file.mime_type, file.extension);
+  const category = detectFileCategory(file);
   const downloadUrl = fileAPI.getDownloadUrl(file.id, false);
   const inlineUrl = fileAPI.getDownloadUrl(file.id, true);
   const extLabel = (file.extension || file.name.split('.').pop() || category || '').replace('.', '').toUpperCase();
@@ -47,9 +47,15 @@ export default function PreviewModal({ isOpen, onClose, file }) {
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
               {category === 'code' ? (
-                <Code2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                <Code2 className="w-4 h-4 sm:w-5 sm:h-5 text-teal-400" />
               ) : category === 'document' ? (
-                <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+                <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+              ) : category === 'pdf' ? (
+                <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" />
+              ) : category === 'spreadsheet' ? (
+                <FileSpreadsheet className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+              ) : category === 'presentation' ? (
+                <Presentation className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400" />
               ) : category === 'audio' ? (
                 <Music className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400" />
               ) : (
