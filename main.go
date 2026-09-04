@@ -24,7 +24,7 @@ import (
 )
 
 func main() {
-	// CLI helper flags for administration and set-owner.sh
+	// CLI helper flags for administration and ownership.sh
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "--hash-password":

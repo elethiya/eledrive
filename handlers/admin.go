@@ -205,7 +205,7 @@ func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	// 2. Ownership transfer protection: cannot assign 'owner' role via web API
 	if req.Role == "owner" && currentTargetRole != "owner" {
-		utils.RespondError(w, http.StatusBadRequest, "Ownership can only be transferred using the set-owner.sh script")
+		utils.RespondError(w, http.StatusBadRequest, "Ownership can only be transferred using the ownership.sh script")
 		return
 	}
 
@@ -778,6 +778,7 @@ func (h *AdminHandler) ListPasswordResets(w http.ResponseWriter, r *http.Request
 		       pr.status, pr.reason, pr.created_at, pr.resolved_at, pr.resolved_by
 		FROM main.password_resets pr
 		LEFT JOIN main.users u ON pr.user_id = u.id
+		WHERE u.role != 'owner' OR u.role IS NULL
 		ORDER BY CASE pr.status WHEN 'pending' THEN 1 ELSE 2 END, pr.created_at DESC
 		LIMIT 100
 	`)
@@ -836,6 +837,14 @@ func (h *AdminHandler) ResolvePasswordReset(w http.ResponseWriter, r *http.Reque
 	`, resetID).Scan(&userID, &userName, &userEmail, &userUsername)
 	if err != nil {
 		utils.RespondError(w, http.StatusNotFound, "Password reset request not found")
+		return
+	}
+
+	// Owner protection: admins cannot modify the workspace owner's credentials
+	var targetRole string
+	_ = db.DB.QueryRow(`SELECT role FROM main.users WHERE id = ?`, userID).Scan(&targetRole)
+	if targetRole == "owner" && claims.Role != "owner" {
+		utils.RespondError(w, http.StatusForbidden, "Admins cannot reset or modify the workspace owner's credentials")
 		return
 	}
 

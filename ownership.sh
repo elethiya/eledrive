@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# EleDrive - Workspace Ownership Manager
-# Manages the 'owner' role. Enforces the rule that exactly ONE account is Owner.
-# Supports promoting an existing account or creating a brand new Owner account.
+# EleDrive - Workspace Ownership & Credential Manager
+# Manages the 'owner' role and Owner credentials.
+# Enforces the rule that exactly ONE account is Owner.
+# Supports:
+#   - Changing the Workspace Owner password directly via server CLI
+#   - Transferring ownership to an existing account
+#   - Creating a brand new Workspace Owner account
+#   - Viewing current ownership and registered accounts
 # ==============================================================================
 
 set -euo pipefail
@@ -51,7 +56,7 @@ fi
 
 print_header() {
     echo -e "${BOLD}${BLUE}======================================================${RESET}"
-    echo -e "${BOLD}${CYAN}       EleDrive - Workspace Ownership Manager         ${RESET}"
+    echo -e "${BOLD}${CYAN}   EleDrive - Workspace Ownership & Credential CLI    ${RESET}"
     echo -e "${BOLD}${BLUE}======================================================${RESET}"
 }
 
@@ -92,6 +97,100 @@ show_current_status() {
     else
         echo -e "${YELLOW}[WARN]${RESET} No workspace Owner currently assigned in the database."
     fi
+}
+
+change_owner_password() {
+    local owner_data
+    owner_data=$(get_current_owner)
+    if [ -z "$owner_data" ]; then
+        echo -e "${RED}[ERROR]${RESET} No workspace Owner currently exists in the database. Please assign or create an Owner first."
+        return 1
+    fi
+
+    IFS="|" read -r oid oname ouser oemail ostatus <<< "$owner_data"
+    echo -e "\n${BOLD}${CYAN}[ACTION] Change Workspace Owner Password${RESET}"
+    echo -e "----------------------------------------------------------------------"
+    echo -e "${GREEN}[OWNER]${RESET} Account: ${BOLD}${oname}${RESET} (${oemail}) [@${ouser}]"
+
+    local new_pass="${1:-}"
+    if [ -z "$new_pass" ]; then
+        local pass1=""
+        local pass2=""
+        while true; do
+            read -r -s -p "New Owner Password (min 6 chars): " pass1
+            echo ""
+            if [ ${#pass1} -lt 6 ]; then
+                echo -e "${RED}[ERROR]${RESET} Password must be at least 6 characters."
+                continue
+            fi
+            read -r -s -p "Confirm New Password: " pass2
+            echo ""
+            if [ "$pass1" != "$pass2" ]; then
+                echo -e "${RED}[ERROR]${RESET} Passwords do not match. Try again."
+                continue
+            fi
+            new_pass="$pass1"
+            break
+        done
+    else
+        if [ ${#new_pass} -lt 6 ]; then
+            echo -e "${RED}[ERROR]${RESET} Password must be at least 6 characters."
+            return 1
+        fi
+    fi
+
+    ensure_binary
+    echo -e "${BLUE}[INFO]${RESET} Generating secure bcrypt password hash..."
+    local pass_hash
+    pass_hash=$("${ROOT_DIR}/eledrive-app" --hash-password "$new_pass")
+
+    sqlite3 "$DB_PATH" <<EOF
+BEGIN TRANSACTION;
+
+UPDATE users 
+SET password_hash = '${pass_hash}', updated_at = CURRENT_TIMESTAMP 
+WHERE id = '${oid}';
+
+CREATE TABLE IF NOT EXISTS password_resets (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    user_email TEXT NOT NULL,
+    user_username TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    reason TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    resolved_at DATETIME,
+    resolved_by TEXT
+);
+
+UPDATE password_resets
+SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP, resolved_by = 'ownership.sh'
+WHERE user_id = '${oid}' AND status = 'pending';
+
+INSERT INTO activity_logs (id, user_id, user_name, action, item_type, item_id, item_name, details, created_at)
+VALUES (
+    lower(hex(randomblob(16))),
+    '${oid}',
+    '${oname}',
+    'owner_password_changed',
+    'user',
+    '${oid}',
+    '${oname}',
+    'Workspace Owner password updated securely via ownership.sh CLI',
+    CURRENT_TIMESTAMP
+);
+
+COMMIT;
+EOF
+
+    echo -e "\n${BOLD}${GREEN}======================================================${RESET}"
+    echo -e "${BOLD}${GREEN}[SUCCESS] Owner Password Updated Successfully!        ${RESET}"
+    echo -e "${BOLD}${GREEN}======================================================${RESET}"
+    echo -e "${GREEN}[OWNER]${RESET} Account:   ${BOLD}${oname}${RESET} (@${ouser})"
+    echo -e "${GREEN}[OWNER]${RESET} Email:     ${oemail}"
+    echo -e "${BLUE}[INFO]${RESET} You can now log in to the web console using the updated password."
+    echo ""
 }
 
 create_new_owner() {
@@ -290,6 +389,7 @@ EOF
     echo ""
 }
 
+# Main Script Entry Point
 print_header
 show_current_status
 
@@ -312,38 +412,107 @@ if [ "$TOTAL_USERS" -eq 0 ]; then
             exit 0
         fi
     fi
+    exit 0
 fi
 
-# If argument passed
-TARGET="${1:-}"
-if [ -z "$TARGET" ]; then
+# Argument handling
+FIRST_ARG="${1:-}"
+
+# Check for password change flag
+if [[ "$FIRST_ARG" == "--password" || "$FIRST_ARG" == "-p" || "$FIRST_ARG" == "password" || "$FIRST_ARG" == "passwd" || "$FIRST_ARG" == "--passwd" || "$FIRST_ARG" == "--reset-password" ]]; then
+    change_owner_password "${2:-}"
+    exit 0
+fi
+
+# Check for list flag
+if [[ "$FIRST_ARG" == "--list" || "$FIRST_ARG" == "-l" || "$FIRST_ARG" == "list" ]]; then
     list_all_users
-    echo -e "\n${BOLD}Usage:${RESET} ./set-owner.sh <email-or-username>"
-    echo -e "\nEnter an email or username to assign as Owner (or press Ctrl+C to cancel):"
-    read -r -p "Target user: " INPUT_TARGET
-    TARGET=$(echo "$INPUT_TARGET" | xargs)
-    if [ -z "$TARGET" ]; then
-        echo -e "${YELLOW}[INFO]${RESET} Operation cancelled. No user specified."
-        exit 0
-    fi
+    exit 0
 fi
 
-TARGET_CLEAN=$(echo "$TARGET" | tr '[:upper:]' '[:lower:]')
-TARGET_ROW=$(sqlite3 "$DB_PATH" "SELECT id, name, username, email, role, status FROM users WHERE LOWER(email) = '$TARGET_CLEAN' OR LOWER(username) = '$TARGET_CLEAN' LIMIT 1;")
+# Check for create flag
+if [[ "$FIRST_ARG" == "--create" || "$FIRST_ARG" == "-c" || "$FIRST_ARG" == "create" ]]; then
+    create_new_owner "${2:-}"
+    exit 0
+fi
 
-if [ -z "$TARGET_ROW" ]; then
-    echo -e "\n${YELLOW}[INFO]${RESET} No registered user found matching: '${BOLD}${TARGET}${RESET}'"
-    echo -e "${BOLD}Would you like to create this user as the new Workspace Owner? [Y/n]${RESET}"
-    read -r -p "> " CONFIRM_CREATE
-    CONFIRM_CREATE=${CONFIRM_CREATE:-Y}
-    if [[ "$CONFIRM_CREATE" =~ ^[Yy]$ ]]; then
-        create_new_owner "$TARGET"
-    else
-        echo -e "${RED}[ERROR]${RESET} User not found. Account creation cancelled."
+# If target user passed directly as argument: ./ownership.sh <user>
+if [ -n "$FIRST_ARG" ]; then
+    TARGET_CLEAN=$(echo "$FIRST_ARG" | tr '[:upper:]' '[:lower:]')
+    TARGET_ROW=$(sqlite3 "$DB_PATH" "SELECT id, name, username, email, role, status FROM users WHERE LOWER(email) = '$TARGET_CLEAN' OR LOWER(username) = '$TARGET_CLEAN' LIMIT 1;")
+
+    if [ -z "$TARGET_ROW" ]; then
+        echo -e "\n${YELLOW}[INFO]${RESET} No registered user found matching: '${BOLD}${FIRST_ARG}${RESET}'"
+        echo -e "${BOLD}Would you like to create this user as the new Workspace Owner? [Y/n]${RESET}"
+        read -r -p "> " CONFIRM_CREATE
+        CONFIRM_CREATE=${CONFIRM_CREATE:-Y}
+        if [[ "$CONFIRM_CREATE" =~ ^[Yy]$ ]]; then
+            create_new_owner "$FIRST_ARG"
+        else
+            echo -e "${RED}[ERROR]${RESET} User not found. Account creation cancelled."
+            list_all_users
+            exit 1
+        fi
+    fi
+
+    IFS="|" read -r TID TNAME TUSER TEMAIL TROLE TSTATUS <<< "$TARGET_ROW"
+    promote_existing_user "$TID" "$TNAME" "$TUSER" "$TEMAIL" "$TROLE"
+    exit 0
+fi
+
+# Interactive Menu when run without arguments
+echo ""
+echo -e "${BOLD}Available Actions:${RESET}"
+echo -e "  ${BOLD}1)${RESET} Change Workspace Owner Password"
+echo -e "  ${BOLD}2)${RESET} Transfer Workspace Ownership to Existing Account"
+echo -e "  ${BOLD}3)${RESET} Create New Workspace Owner Account"
+echo -e "  ${BOLD}4)${RESET} List All Registered Accounts"
+echo -e "  ${BOLD}5)${RESET} Exit"
+echo ""
+read -r -p "Select action [1-5]: " MENU_CHOICE
+
+case "$MENU_CHOICE" in
+    1)
+        change_owner_password ""
+        ;;
+    2)
         list_all_users
+        echo -e "\nEnter the email or username to promote to Workspace Owner:"
+        read -r -p "Target user: " INPUT_TARGET
+        TARGET=$(echo "$INPUT_TARGET" | xargs)
+        if [ -z "$TARGET" ]; then
+            echo -e "${YELLOW}[INFO]${RESET} Operation cancelled."
+            exit 0
+        fi
+        TARGET_CLEAN=$(echo "$TARGET" | tr '[:upper:]' '[:lower:]')
+        TARGET_ROW=$(sqlite3 "$DB_PATH" "SELECT id, name, username, email, role, status FROM users WHERE LOWER(email) = '$TARGET_CLEAN' OR LOWER(username) = '$TARGET_CLEAN' LIMIT 1;")
+        if [ -z "$TARGET_ROW" ]; then
+            echo -e "\n${YELLOW}[INFO]${RESET} No registered user found matching: '${BOLD}${TARGET}${RESET}'"
+            echo -e "${BOLD}Would you like to create this user as the new Workspace Owner? [Y/n]${RESET}"
+            read -r -p "> " CONFIRM_CREATE
+            CONFIRM_CREATE=${CONFIRM_CREATE:-Y}
+            if [[ "$CONFIRM_CREATE" =~ ^[Yy]$ ]]; then
+                create_new_owner "$TARGET"
+            else
+                echo -e "${RED}[ERROR]${RESET} User not found. Operation cancelled."
+                exit 1
+            fi
+        fi
+        IFS="|" read -r TID TNAME TUSER TEMAIL TROLE TSTATUS <<< "$TARGET_ROW"
+        promote_existing_user "$TID" "$TNAME" "$TUSER" "$TEMAIL" "$TROLE"
+        ;;
+    3)
+        create_new_owner ""
+        ;;
+    4)
+        list_all_users
+        ;;
+    5)
+        echo -e "${BLUE}[INFO]${RESET} Exiting ownership manager."
+        exit 0
+        ;;
+    *)
+        echo -e "${RED}[ERROR]${RESET} Invalid option selected."
         exit 1
-    fi
-fi
-
-IFS="|" read -r TID TNAME TUSER TEMAIL TROLE TSTATUS <<< "$TARGET_ROW"
-promote_existing_user "$TID" "$TNAME" "$TUSER" "$TEMAIL" "$TROLE"
+        ;;
+esac

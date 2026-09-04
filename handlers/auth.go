@@ -376,6 +376,11 @@ func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	if user.Role == "owner" {
+		utils.RespondError(w, http.StatusForbidden, "The workspace owner account cannot be reset by administrators. Please use the server-side ownership CLI (ownership.sh) to manage owner credentials.")
+		return
+	}
+
 	// Check if already has a pending reset request
 	var existingID string
 	err = db.DB.QueryRow(`

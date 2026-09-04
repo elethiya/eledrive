@@ -184,18 +184,21 @@ EleDrive features a strict 3-tier hierarchy:
 | **`admin`** | **Operational Authority** | Accesses the Admin Console (`/admin`) to approve new users, adjust storage quotas, manage system settings, and review audit logs. **Cannot** promote/demote other admins or edit the Owner. |
 | **`member`** | **Standard Team User** | Personal cloud drive, upload folders/projects, share with teammates, download ZIP archives. |
 
-### Transferring Ownership (`set-owner.sh`)
+### Managing Workspace Ownership & Credentials (`ownership.sh`)
 
-Ownership transfers are executed via the dedicated CLI script to guarantee that **exactly one account is Owner at any time**:
+Ownership transfers and Owner credential resets are executed via the server-side CLI script to guarantee that **the Owner account cannot be compromised or reset by administrators**:
 
 ```bash
-# 1. View current owner & list registered accounts
-./set-owner.sh
+# 1. Interactive menu (change password, transfer ownership, create owner, list accounts)
+./ownership.sh
 
-# 2. Transfer ownership to a specific teammate (by username or email)
-./set-owner.sh alex@eledrive.local
+# 2. Change the Workspace Owner password directly
+./ownership.sh --password
+
+# 3. Transfer ownership to a specific teammate (by username or email)
+./ownership.sh alex@eledrive.local
 # or
-./set-owner.sh alex
+./ownership.sh alex
 ```
 *Note: When ownership is transferred, the previous Owner is automatically reassigned to Administrator, and the new Owner is marked as approved.*
 
