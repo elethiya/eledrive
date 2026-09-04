@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   FolderOpen,
   FileText,
+  HardDrive,
   ExternalLink,
   Palette,
   Edit3,
@@ -576,7 +577,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                 )}
               </button>
 
-              <div className="flex items-center gap-3 sm:gap-6 shrink-0">
+              <div className="flex items-center gap-4 sm:gap-6 shrink-0">
                 <span className="w-24 text-center">Role</span>
 
                 <button
@@ -601,7 +602,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                   )}
                 </button>
 
-                <span className="w-28 sm:w-44 text-right pr-2">Actions</span>
+                <span className="w-56 sm:w-64 text-right pr-2">Actions</span>
               </div>
             </div>
 
@@ -690,7 +691,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                     {/* Desktop/Tablet Row View (>= sm) */}
                     <div
                       onClick={() => handleOpenTeam(t.id, 'members')}
-                      className="hidden sm:flex items-center justify-between px-4 py-3 bg-slate-900/70 hover:bg-slate-850 active:bg-slate-800 rounded-xl border border-slate-800/80 hover:border-slate-700 hover:shadow-xs transition-all select-none cursor-pointer text-xs text-slate-200"
+                      className="group hidden sm:flex items-center justify-between px-4 py-3 bg-slate-900/70 hover:bg-slate-850 active:bg-slate-800 rounded-xl border border-slate-800/80 hover:border-slate-700 hover:shadow-xs transition-all select-none cursor-pointer text-xs text-slate-200"
                     >
                       {/* Team info: Avatar + Name + Description */}
                       <div className="flex items-center gap-3.5 flex-1 min-w-0 pr-4">
@@ -745,18 +746,18 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                         </span>
 
                         {/* Action Buttons */}
-                        <div className="w-28 sm:w-44 flex items-center justify-end gap-1.5">
+                        <div className="w-56 sm:w-64 flex items-center justify-end gap-1.5 shrink-0">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleOpenTeam(t.id, 'members');
                             }}
-                            className="flex items-center justify-center gap-1 p-1.5 sm:px-2 sm:py-1 rounded-lg bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-300 text-[11px] font-medium transition-colors"
+                            className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shrink-0"
                             title="View & manage members"
                           >
                             <Users className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Members</span>
+                            <span>Members</span>
                           </button>
 
                           <button
@@ -765,11 +766,11 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                               e.stopPropagation();
                               handleOpenTeam(t.id, 'shares');
                             }}
-                            className="flex items-center justify-center gap-1 p-1.5 sm:px-2 sm:py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-300 text-[11px] font-medium transition-colors"
+                            className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shrink-0"
                             title="View shared folders & files"
                           >
                             <FolderOpen className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Shares</span>
+                            <span>Shares</span>
                           </button>
 
                           <button
@@ -778,11 +779,11 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                               e.stopPropagation();
                               handleOpenTeam(t.id, 'settings');
                             }}
-                            className="flex items-center justify-center gap-1 p-1.5 sm:px-2 sm:py-1 rounded-lg bg-slate-800 hover:bg-purple-600 hover:text-white text-slate-300 text-[11px] font-medium transition-colors"
+                            className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-purple-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shrink-0"
                             title="Team settings & danger zone"
                           >
                             <Settings className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Settings</span>
+                            <span>Settings</span>
                           </button>
                         </div>
                       </div>
@@ -1396,90 +1397,113 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-855">
-                            {teamShares.map((s) => (
-                              <tr key={s.id} className="hover:bg-slate-900/50 transition-colors">
-                                <td className="py-2.5 px-3">
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
-                                      {s.target_type === 'folder' ? (
-                                        <Folder className="w-4 h-4" />
-                                      ) : (
-                                        <FileText className="w-4 h-4" />
+                            {teamShares.map((s) => {
+                              const isDrive = s.target_type === 'drive';
+                              const isFolder = s.target_type === 'folder';
+                              const displayName =
+                                s.target_name && !s.target_name.toLowerCase().startsWith('unknown')
+                                  ? s.target_name
+                                  : isDrive
+                                  ? `${s.shared_by_name || 'Owner'}'s Drive`
+                                  : isFolder
+                                  ? 'Shared Folder'
+                                  : 'Shared File';
+
+                              return (
+                                <tr key={s.id} className="hover:bg-slate-900/50 transition-colors">
+                                  <td className="py-2.5 px-3">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <div
+                                        className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 ${
+                                          isDrive
+                                            ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                                            : isFolder
+                                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                            : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                        }`}
+                                      >
+                                        {isDrive ? (
+                                          <HardDrive className="w-4 h-4" />
+                                        ) : isFolder ? (
+                                          <Folder className="w-4 h-4" />
+                                        ) : (
+                                          <FileText className="w-4 h-4" />
+                                        )}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <span className="font-semibold text-slate-100 block truncate" title={displayName}>
+                                          {displayName}
+                                        </span>
+                                        <span className="text-[10px] text-slate-500 font-mono capitalize">
+                                          {s.target_type} • {formatDate(s.created_at)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  <td className="py-2.5 px-3 whitespace-nowrap">
+                                    <span
+                                      className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                                        s.permission === 'editor'
+                                          ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                          : 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                                      }`}
+                                    >
+                                      {s.permission}
+                                    </span>
+                                  </td>
+
+                                  <td className="py-2.5 px-3 text-[11px] text-slate-400 truncate hidden sm:table-cell">
+                                    {s.shared_by_name}
+                                  </td>
+
+                                  <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      {(isFolder || isDrive) && onOpenFolder && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setActiveTeam(null);
+                                            onOpenFolder(isDrive ? '' : s.target_id);
+                                          }}
+                                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600/15 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-[11px] font-semibold transition-colors"
+                                          title={isDrive ? 'Open Drive' : 'Open folder in Drive'}
+                                        >
+                                          <ExternalLink className="w-3 h-3" />
+                                          <span>Open</span>
+                                        </button>
+                                      )}
+
+                                      {s.target_type === 'file' && onOpenPreview && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setActiveTeam(null);
+                                            onOpenPreview({ id: s.target_id, name: displayName });
+                                          }}
+                                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600/15 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-[11px] font-semibold transition-colors"
+                                          title="Preview file"
+                                        >
+                                          <ExternalLink className="w-3 h-3" />
+                                          <span>Preview</span>
+                                        </button>
+                                      )}
+
+                                      {canManage && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveShare(s.id, displayName)}
+                                          className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 border border-red-500/20 text-[11px] font-semibold transition-colors"
+                                          title="Revoke access to this resource from the team"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
                                       )}
                                     </div>
-                                    <div className="min-w-0">
-                                      <span className="font-semibold text-slate-100 block truncate">
-                                        {s.target_name || 'Shared Item'}
-                                      </span>
-                                      <span className="text-[10px] text-slate-500 font-mono capitalize">
-                                        {s.target_type} • {formatDate(s.created_at)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </td>
-
-                                <td className="py-2.5 px-3 whitespace-nowrap">
-                                  <span
-                                    className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-                                      s.permission === 'editor'
-                                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                                        : 'bg-blue-500/15 text-blue-300 border-blue-500/30'
-                                    }`}
-                                  >
-                                    {s.permission}
-                                  </span>
-                                </td>
-
-                                <td className="py-2.5 px-3 text-[11px] text-slate-400 truncate hidden sm:table-cell">
-                                  {s.shared_by_name}
-                                </td>
-
-                                <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                                  <div className="flex items-center justify-end gap-1.5">
-                                    {s.target_type === 'folder' && onOpenFolder && (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setActiveTeam(null);
-                                          onOpenFolder(s.target_id);
-                                        }}
-                                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600/15 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-[11px] font-semibold transition-colors"
-                                        title="Open folder in Drive"
-                                      >
-                                        <ExternalLink className="w-3 h-3" />
-                                        <span>Open</span>
-                                      </button>
-                                    )}
-
-                                    {s.target_type === 'file' && onOpenPreview && (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setActiveTeam(null);
-                                          onOpenPreview({ id: s.target_id, name: s.target_name });
-                                        }}
-                                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600/15 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-[11px] font-semibold transition-colors"
-                                        title="Preview file"
-                                      >
-                                        <ExternalLink className="w-3 h-3" />
-                                        <span>Preview</span>
-                                      </button>
-                                    )}
-
-                                    {canManage && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleRemoveShare(s.id, s.target_name)}
-                                        className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 border border-red-500/20 text-[11px] font-semibold transition-colors"
-                                        title="Revoke access to this resource from the team"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>

@@ -17,5 +17,17 @@ if [ ! -f "eledrive-app" ] || [ "main.go" -nt "eledrive-app" ]; then
     go build -ldflags="-s -w" -o eledrive-app .
 fi
 
-echo -e "\033[1;32m[START]\033[0m Starting EleDrive server on http://localhost:8080 ..."
+# Load environment variables from .env or .evn if present
+if [ -f ".env" ]; then
+    set -a
+    source .env
+    set +a
+elif [ -f ".evn" ]; then
+    set -a
+    source .evn
+    set +a
+fi
+
+SERVER_PORT="${PORT:-8080}"
+echo -e "\033[1;32m[START]\033[0m Starting EleDrive server on http://localhost:${SERVER_PORT} ..."
 ./eledrive-app

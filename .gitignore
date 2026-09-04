@@ -47,10 +47,13 @@ pnpm-debug.log*
 
 # Environment & Secret files
 .env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.evn
+.evn.*
 
 # IDE & Editor files
 .vscode/

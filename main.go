@@ -99,7 +99,14 @@ func main() {
 		})
 	})
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:3000", "http://localhost:8080", "*"},
+		AllowedOrigins: []string{
+			fmt.Sprintf("http://localhost:%s", cfg.Port),
+			fmt.Sprintf("http://localhost:%s", cfg.FrontendPort),
+			"http://localhost:5173",
+			"http://localhost:3000",
+			"http://localhost:8080",
+			"*",
+		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Share-Password"},
 		ExposedHeaders:   []string{"Link", "Content-Disposition", "Content-Length"},

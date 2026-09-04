@@ -569,8 +569,12 @@ func (h *TeamHandler) GetTeamShares(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.DB.Query(`
 		SELECT ts.id, ts.team_id, ts.target_type, ts.target_id, ts.permission, ts.shared_by_user_id,
 		       COALESCE(u.name, 'Unknown') as shared_by_name, ts.created_at,
-		       CASE WHEN ts.target_type = 'folder' THEN COALESCE(fo.name, 'Unknown Folder')
-		            ELSE COALESCE(fi.name, 'Unknown File') END as target_name
+		       CASE 
+		            WHEN ts.target_type = 'drive' THEN COALESCE(u.name || '''s Drive', 'My Drive')
+		            WHEN ts.target_type = 'folder' THEN COALESCE(fo.name, 'Shared Folder')
+		            WHEN ts.target_type = 'file' THEN COALESCE(fi.name, 'Shared File')
+		            ELSE 'Shared Resource'
+		       END as target_name
 		FROM drive.team_shares ts
 		LEFT JOIN main.users u ON ts.shared_by_user_id = u.id
 		LEFT JOIN drive.folders fo ON ts.target_type = 'folder' AND ts.target_id = fo.id

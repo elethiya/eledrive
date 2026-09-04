@@ -22,6 +22,19 @@ RED="\033[0;31m"
 RESET="\033[0m"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source .env or .evn if present
+if [ -f "${ROOT_DIR}/.env" ]; then
+    set -a
+    source "${ROOT_DIR}/.env"
+    set +a
+elif [ -f "${ROOT_DIR}/.evn" ]; then
+    set -a
+    source "${ROOT_DIR}/.evn"
+    set +a
+fi
+PORT="${PORT:-8080}"
+
 DB_PATH="${ROOT_DIR}/database/account.db"
 
 # Fallback to legacy path if database/account.db not yet generated
@@ -321,7 +334,7 @@ EOF
     echo -e "${GREEN}[OWNER]${RESET} Username:  @${username}"
     echo -e "${GREEN}[OWNER]${RESET} Email:     ${email}"
     echo -e "${GREEN}[OWNER]${RESET} Role:      owner [status: approved]"
-    echo -e "${BLUE}[INFO]${RESET} You can now log into http://localhost:8080 using these credentials."
+    echo -e "${BLUE}[INFO]${RESET} You can now log into http://localhost:${PORT} using these credentials."
     echo ""
     exit 0
 }
