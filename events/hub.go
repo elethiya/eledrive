@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -32,6 +33,8 @@ type Hub struct {
 	broadcast  chan []byte
 	register   chan *Client
 	unregister chan *Client
+	history    []Event
+	historyMu  sync.RWMutex
 	mu         sync.RWMutex
 }
 
@@ -43,6 +46,7 @@ func NewHub() *Hub {
 		broadcast:  make(chan []byte, 256),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
+		history:    make([]Event, 0, 100),
 	}
 	go h.run()
 	return h
@@ -87,6 +91,15 @@ func Broadcast(eventType, target, action, id, folderID, userID string, payload i
 		Timestamp: time.Now().UnixMilli(),
 		Payload:   payload,
 	}
+
+	// Keep rolling history of last 100 events for HTTP polling fallback
+	GlobalHub.historyMu.Lock()
+	GlobalHub.history = append(GlobalHub.history, evt)
+	if len(GlobalHub.history) > 100 {
+		GlobalHub.history = GlobalHub.history[len(GlobalHub.history)-100:]
+	}
+	GlobalHub.historyMu.Unlock()
+
 	data, err := json.Marshal(evt)
 	if err == nil {
 		select {
@@ -111,6 +124,12 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	userID := r.URL.Query().Get("user_id")
+	if userID == "" {
+		userID = r.URL.Query().Get("uid")
+	}
+	if userID == "" {
+		userID = r.URL.Query().Get("cid")
+	}
 
 	client := &Client{
 		ID:     fmt.Sprintf("%d", time.Now().UnixNano()),
@@ -123,8 +142,8 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.unregister <- client
 	}()
 
-	// Send initial connection event
-	fmt.Fprintf(w, "event: connected\ndata: {\"status\":\"connected\",\"time\":%d}\n\n", time.Now().UnixMilli())
+	// Send initial connection event with standard SSE retry configuration
+	fmt.Fprintf(w, "retry: 3000\nevent: connected\ndata: {\"status\":\"connected\",\"time\":%d}\n\n", time.Now().UnixMilli())
 	flusher.Flush()
 
 	ticker := time.NewTicker(20 * time.Second)
@@ -192,3 +211,42 @@ func HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		"received_at": time.Now().UnixMilli(),
 	})
 }
+
+// HandleSyncPoll provides lightweight HTTP polling fallback for adblocker-restricted browsers
+func HandleSyncPoll(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	sinceStr := r.URL.Query().Get("since")
+	var since int64
+	if sinceStr != "" {
+		if s, err := strconv.ParseInt(sinceStr, 10, 64); err == nil {
+			since = s
+		}
+	}
+
+	var newEvents []Event
+	GlobalHub.historyMu.RLock()
+	if since > 0 {
+		for _, evt := range GlobalHub.history {
+			if evt.Timestamp > since {
+				newEvents = append(newEvents, evt)
+			}
+		}
+	}
+	GlobalHub.historyMu.RUnlock()
+
+	if newEvents == nil {
+		newEvents = []Event{}
+	}
+
+	utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"status":    "ok",
+		"events":    newEvents,
+		"timestamp": time.Now().UnixMilli(),
+	})
+}
+

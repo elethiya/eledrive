@@ -109,9 +109,13 @@ func main() {
 
 	// API Routes
 	r.Route("/api", func(api chi.Router) {
-		// Real-time Event Streams & Webhooks (load everything in real time)
+		// Real-time Event Streams & Webhooks (load everything in real time with adblocker immunity & polling fallback)
 		api.Get("/realtime", events.GlobalHub.ServeHTTP)
 		api.Get("/events", events.GlobalHub.ServeHTTP)
+		api.Get("/live-sync", events.GlobalHub.ServeHTTP)
+		api.Get("/sync/stream", events.GlobalHub.ServeHTTP)
+		api.Get("/sync/poll", events.HandleSyncPoll)
+		api.Get("/live-sync/poll", events.HandleSyncPoll)
 		api.Post("/webhook", events.HandleWebhook)
 		api.Post("/webhooks/drive", events.HandleWebhook)
 

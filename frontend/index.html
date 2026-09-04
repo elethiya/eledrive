@@ -5,6 +5,20 @@
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>EleDrive - Team Drive & Project Sharing</title>
+    <script>
+      // Suppress unsupported 'longtask' entryType warnings in Firefox
+      if (typeof PerformanceObserver !== 'undefined' && PerformanceObserver.prototype && PerformanceObserver.prototype.observe) {
+        const _origObserve = PerformanceObserver.prototype.observe;
+        PerformanceObserver.prototype.observe = function (options) {
+          if (options && Array.isArray(options.entryTypes)) {
+            const valid = options.entryTypes.filter(function (t) { return t !== 'longtask'; });
+            if (valid.length === 0) return;
+            options = Object.assign({}, options, { entryTypes: valid });
+          }
+          return _origObserve.call(this, options);
+        };
+      }
+    </script>
   </head>
   <body class="bg-slate-950 text-slate-100 antialiased selection:bg-blue-600 selection:text-white">
     <div id="root"></div>
