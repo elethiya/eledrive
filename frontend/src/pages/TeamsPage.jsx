@@ -85,6 +85,8 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
   // Team Shares State
   const [teamShares, setTeamShares] = useState([]);
   const [loadingShares, setLoadingShares] = useState(false);
+  const [isRefreshingShares, setIsRefreshingShares] = useState(false);
+  const [isRefreshingTeam, setIsRefreshingTeam] = useState(false);
 
   // Settings tab form state
   const [editName, setEditName] = useState('');
@@ -96,20 +98,20 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
   const [isTransferring, setIsTransferring] = useState(false);
 
   useEffect(() => {
-    loadTeams();
+    loadTeams(true);
     loadAvailableUsers();
   }, []);
 
   // Real-time Event Subscription for teams and members
   useRealtimeEvent(['team', 'sync'], () => {
-    loadTeams();
+    loadTeams(false);
     if (activeTeam?.id) {
-      loadTeamShares(activeTeam.id);
+      loadTeamShares(activeTeam.id, false);
     }
   });
 
-  const loadTeams = async () => {
-    setLoading(true);
+  const loadTeams = async (showSpinner = false) => {
+    if (showSpinner || teams.length === 0) setLoading(true);
     try {
       const res = await teamAPI.listTeams();
       if (Array.isArray(res.data)) {
@@ -142,9 +144,10 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
     }
   };
 
-  const loadTeamShares = async (teamId) => {
+  const loadTeamShares = async (teamId, isInitial = false) => {
     if (!teamId) return;
-    setLoadingShares(true);
+    if (isInitial) setLoadingShares(true);
+    setIsRefreshingShares(true);
     try {
       const res = await teamAPI.getTeamShares(teamId);
       setTeamShares(Array.isArray(res.data) ? res.data : []);
@@ -152,7 +155,31 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
       console.error('Failed to load team shares:', err);
       setTeamShares([]);
     } finally {
-      setLoadingShares(false);
+      if (isInitial) setLoadingShares(false);
+      setTimeout(() => setIsRefreshingShares(false), 500);
+    }
+  };
+
+  const refreshActiveTeam = async () => {
+    if (!activeTeam?.id) return;
+    setIsRefreshingTeam(true);
+    try {
+      const [teamRes, sharesRes] = await Promise.all([
+        teamAPI.getTeam(activeTeam.id),
+        teamAPI.getTeamShares(activeTeam.id),
+      ]);
+      if (teamRes.data) {
+        setActiveTeam(teamRes.data);
+      }
+      if (sharesRes.data) {
+        setTeamShares(Array.isArray(sharesRes.data) ? sharesRes.data : []);
+      }
+      toast.success('Team details refreshed');
+    } catch (err) {
+      console.error('Failed to refresh active team:', err);
+      toast.error('Failed to refresh team');
+    } finally {
+      setTimeout(() => setIsRefreshingTeam(false), 500);
     }
   };
 
@@ -169,7 +196,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
         setMemberSearchQuery('');
         setMemberRoleFilter('all');
         setTransferOwnerId('');
-        loadTeamShares(teamId);
+        loadTeamShares(teamId, true);
       }
     } catch (err) {
       toast.error(err.response?.data?.error || err.message);
@@ -941,8 +968,8 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
         });
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
-            <div className="relative bg-slate-900 rounded-2xl sm:rounded-3xl max-w-2xl w-full border border-slate-800 shadow-2xl shadow-black/80 overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md select-none">
+            <div className="relative bg-slate-900 rounded-2xl sm:rounded-3xl max-w-2xl w-full border border-slate-800 shadow-2xl shadow-black/80 overflow-hidden flex flex-col h-[85vh] sm:h-[680px] max-h-[90vh]">
               {/* Ambient Top Glow */}
               <div className="absolute -top-16 -left-16 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -977,12 +1004,29 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => setActiveTeam(null)}
-                    className="p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors shrink-0"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={refreshActiveTeam}
+                      disabled={isRefreshingTeam}
+                      className="p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all group disabled:opacity-60"
+                      title="Refresh team details and members"
+                    >
+                      <RefreshCw
+                        className={`w-4 h-4 transition-transform duration-500 ${
+                          isRefreshingTeam ? 'animate-spin text-blue-400' : 'group-hover:rotate-180 text-slate-400 group-hover:text-slate-200'
+                        }`}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTeam(null)}
+                      className="p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                      title="Close"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Tab Navigation */}
@@ -1313,20 +1357,20 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                       <button
                         type="button"
                         onClick={() => loadTeamShares(activeTeam.id)}
-                        disabled={loadingShares}
+                        disabled={loadingShares || isRefreshingShares}
                         className="p-1.5 rounded-lg bg-slate-950 hover:bg-slate-850 border border-slate-800 text-slate-300 hover:text-slate-100 text-xs flex items-center gap-1 transition-all group disabled:opacity-60"
                         title="Refresh shared resources"
                       >
                         <RefreshCw
                           className={`w-3.5 h-3.5 transition-transform duration-500 ${
-                            loadingShares ? 'animate-spin text-blue-400' : 'group-hover:rotate-180 text-slate-400 group-hover:text-slate-200'
+                            isRefreshingShares ? 'animate-spin text-blue-400' : 'group-hover:rotate-180 text-slate-400 group-hover:text-slate-200'
                           }`}
                         />
                         <span className="hidden sm:inline">Refresh</span>
                       </button>
                     </div>
 
-                    {loadingShares ? (
+                    {loadingShares && teamShares.length === 0 ? (
                       <div className="h-36 flex items-center justify-center text-xs text-slate-500">
                         Loading shared workspaces...
                       </div>
