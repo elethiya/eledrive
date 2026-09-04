@@ -377,11 +377,29 @@ func migrate() error {
 
 func EnsureDefaultSettings() {
 	defaults := map[string]string{
-		"site_name":                 "EleDrive",
-		"default_quota_gb":          "10",
-		"allow_public_registration": "true",
-		"allow_public_shares":       "true",
-		"max_upload_size_mb":        "1024",
+		"site_name":                      "EleDrive",
+		"default_quota_gb":               "10",
+		"allow_public_registration":      "true",
+		"allow_public_shares":            "true",
+		"max_upload_size_mb":             "1024",
+		"require_admin_approval":         "true",
+		"allow_password_reset_requests":   "true",
+		"session_timeout_hours":          "72",
+		"enforce_strong_passwords":       "false",
+		"max_login_attempts":             "5",
+		"require_link_passwords":         "false",
+		"default_link_expiry_days":        "30",
+		"allow_team_creation":            "true",
+		"trash_retention_days":           "30",
+		"activity_log_retention_days":     "90",
+		"notify_quota_warning_percent":    "85",
+		"forensic_watermarking_enabled":  "true",
+		"steganographic_canary_enabled":  "true",
+		"log_forensic_downloads":         "true",
+		"maintenance_mode":               "false",
+		"maintenance_notice":             "Platform is currently undergoing scheduled maintenance. Please check back shortly.",
+		"allow_zip_downloads":            "true",
+		"chunk_upload_enabled":           "true",
 	}
 
 	for k, v := range defaults {

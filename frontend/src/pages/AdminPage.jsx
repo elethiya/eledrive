@@ -37,6 +37,9 @@ import {
   Mail,
   User,
   Palette,
+  Share2,
+  ChevronRight,
+  Sliders,
 } from 'lucide-react';
 import { adminAPI } from '../api/client';
 
@@ -129,7 +132,27 @@ export default function AdminPage({ onBackToDrive }) {
     allow_public_registration: true,
     allow_public_shares: true,
     max_upload_size_mb: 1024,
+    require_admin_approval: true,
+    allow_password_reset_requests: true,
+    session_timeout_hours: 72,
+    enforce_strong_passwords: false,
+    max_login_attempts: 5,
+    require_link_passwords: false,
+    default_link_expiry_days: 30,
+    allow_team_creation: true,
+    trash_retention_days: 30,
+    activity_log_retention_days: 90,
+    notify_quota_warning_percent: 85,
+    forensic_watermarking_enabled: true,
+    steganographic_canary_enabled: true,
+    log_forensic_downloads: true,
+    maintenance_mode: false,
+    maintenance_notice: 'Platform is currently undergoing scheduled maintenance. Please check back shortly.',
+    allow_zip_downloads: true,
+    chunk_upload_enabled: true,
   });
+  const [activeCategory, setActiveCategory] = useState(null);
+  const [draftSettings, setDraftSettings] = useState(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSuccess, setSettingsSuccess] = useState('');
   const [settingsError, setSettingsError] = useState('');
@@ -232,10 +255,28 @@ export default function AdminPage({ onBackToDrive }) {
       if (res.data) {
         setSettings({
           site_name: res.data.site_name || 'EleDrive',
-          default_quota_gb: res.data.default_quota_gb || 10,
+          default_quota_gb: res.data.default_quota_gb ?? 10,
           allow_public_registration: res.data.allow_public_registration ?? true,
           allow_public_shares: res.data.allow_public_shares ?? true,
-          max_upload_size_mb: res.data.max_upload_size_mb || 1024,
+          max_upload_size_mb: res.data.max_upload_size_mb ?? 1024,
+          require_admin_approval: res.data.require_admin_approval ?? true,
+          allow_password_reset_requests: res.data.allow_password_reset_requests ?? true,
+          session_timeout_hours: res.data.session_timeout_hours ?? 72,
+          enforce_strong_passwords: res.data.enforce_strong_passwords ?? false,
+          max_login_attempts: res.data.max_login_attempts ?? 5,
+          require_link_passwords: res.data.require_link_passwords ?? false,
+          default_link_expiry_days: res.data.default_link_expiry_days ?? 30,
+          allow_team_creation: res.data.allow_team_creation ?? true,
+          trash_retention_days: res.data.trash_retention_days ?? 30,
+          activity_log_retention_days: res.data.activity_log_retention_days ?? 90,
+          notify_quota_warning_percent: res.data.notify_quota_warning_percent ?? 85,
+          forensic_watermarking_enabled: res.data.forensic_watermarking_enabled ?? true,
+          steganographic_canary_enabled: res.data.steganographic_canary_enabled ?? true,
+          log_forensic_downloads: res.data.log_forensic_downloads ?? true,
+          maintenance_mode: res.data.maintenance_mode ?? false,
+          maintenance_notice: res.data.maintenance_notice || 'Platform is currently undergoing scheduled maintenance. Please check back shortly.',
+          allow_zip_downloads: res.data.allow_zip_downloads ?? true,
+          chunk_upload_enabled: res.data.chunk_upload_enabled ?? true,
         });
       }
     } catch (e) {
@@ -253,6 +294,19 @@ export default function AdminPage({ onBackToDrive }) {
       loadPasswordResets();
     }
   }, [user?.role]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && activeCategory) {
+        setActiveCategory(null);
+        setDraftSettings(null);
+        setSettingsSuccess('');
+        setSettingsError('');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeCategory]);
 
   // Check admin/owner privileges
   if (user?.role !== 'admin' && user?.role !== 'owner') {
@@ -318,17 +372,38 @@ export default function AdminPage({ onBackToDrive }) {
     }
   };
 
-  const handleSaveSettings = async (e) => {
-    e.preventDefault();
+  const openCategoryModal = (catId) => {
+    setActiveCategory(catId);
+    setDraftSettings({ ...settings });
+    setSettingsSuccess('');
+    setSettingsError('');
+  };
+
+  const closeCategoryModal = () => {
+    setActiveCategory(null);
+    setDraftSettings(null);
+    setSettingsSuccess('');
+    setSettingsError('');
+  };
+
+  const handleSaveCategorySettings = async (e) => {
+    if (e) e.preventDefault();
+    if (!draftSettings) return;
     setSavingSettings(true);
     setSettingsSuccess('');
     setSettingsError('');
     try {
-      await adminAPI.updateSettings(settings);
+      await adminAPI.updateSettings(draftSettings);
+      setSettings({ ...draftSettings });
       setSettingsSuccess('Platform settings updated successfully.');
-      setTimeout(() => setSettingsSuccess(''), 3000);
+      toast.success('Configuration saved');
+      setTimeout(() => {
+        closeCategoryModal();
+      }, 600);
     } catch (err) {
-      setSettingsError(err.response?.data?.error || err.message || 'Failed to update settings');
+      const msg = err.response?.data?.error || err.message || 'Failed to update settings';
+      setSettingsError(msg);
+      toast.error(msg);
     } finally {
       setSavingSettings(false);
     }
@@ -1519,137 +1594,1040 @@ export default function AdminPage({ onBackToDrive }) {
 
         {/* TAB 4: PLATFORM SETTINGS */}
         {activeTab === 'settings' && (
-          <div className="max-w-2xl bg-slate-900 rounded-3xl border border-slate-800 p-6 shadow-xl space-y-6">
-            <div>
-              <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-                <Settings className="w-5 h-5 text-blue-400" />
-                Global System Configuration
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Configure defaults, storage allocations, security policies and registration controls.
-              </p>
+          <div className="space-y-6">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/60 border border-slate-800/80 p-5 rounded-3xl">
+              <div>
+                <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-blue-400" />
+                  Platform System Settings
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Select any category below to configure platform quotas, security policies, data lifecycles, and operational controls in a dedicated window.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-slate-400">
+                  7 Policy Groups
+                </span>
+                {settings.maintenance_mode && (
+                  <span className="px-3 py-1 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] font-bold text-rose-400 flex items-center gap-1.5 animate-pulse">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Maintenance Active
+                  </span>
+                )}
+              </div>
             </div>
 
-            <form onSubmit={handleSaveSettings} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                    Default User Quota (GB)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="10000"
-                    value={settings.default_quota_gb}
-                    onChange={(e) =>
-                      setSettings({ ...settings, default_quota_gb: parseInt(e.target.value) || 10 })
-                    }
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                    Max File Upload Limit (MB)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="50000"
-                    value={settings.max_upload_size_mb}
-                    onChange={(e) =>
-                      setSettings({ ...settings, max_upload_size_mb: parseInt(e.target.value) || 1024 })
-                    }
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Watermark Policy Status */}
-              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
-                <h4 className="text-xs font-bold text-slate-200 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  Forensic Attribution Policies (Enforced)
-                </h4>
-                <div className="space-y-2 text-[11px] text-slate-400">
-                  <div className="flex items-center justify-between">
-                    <span>Cryptographic Secret UUID per Asset</span>
-                    <span className="text-emerald-400 font-bold font-mono">ENABLED</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Steganographic Binary Trailer Watermark</span>
-                    <span className="text-emerald-400 font-bold font-mono">ENABLED</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Folder ZIP Forensic Manifest Embedding</span>
-                    <span className="text-emerald-400 font-bold font-mono">ENABLED</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Invisible Steganographic Digital Canary (Hidden)</span>
-                    <span className="text-emerald-400 font-bold font-mono">ENABLED</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3 pt-2">
-                <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/50 border border-slate-800/80 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.allow_public_registration}
-                    onChange={(e) =>
-                      setSettings({ ...settings, allow_public_registration: e.target.checked })
-                    }
-                    className="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700 focus:ring-0"
-                  />
-                  <div>
-                    <div className="text-xs font-semibold text-slate-200">Allow Public Registration</div>
-                    <div className="text-[11px] text-slate-400">
-                      When enabled, new users can sign up (subject to admin approval).
-                    </div>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/50 border border-slate-800/80 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.allow_public_shares}
-                    onChange={(e) =>
-                      setSettings({ ...settings, allow_public_shares: e.target.checked })
-                    }
-                    className="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700 focus:ring-0"
-                  />
-                  <div>
-                    <div className="text-xs font-semibold text-slate-200">Allow Public Share Links</div>
-                    <div className="text-[11px] text-slate-400">
-                      Allow users to generate public shareable links with password and expiry controls.
-                    </div>
-                  </div>
-                </label>
-              </div>
-
-              {settingsSuccess && (
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4" />
-                  <span>{settingsSuccess}</span>
-                </div>
-              )}
-
-              {settingsError && (
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>{settingsError}</span>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={savingSettings}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50"
+            {/* Settings Categories List */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* 1. Storage & Quotas */}
+              <div
+                onClick={() => openCategoryModal('storage')}
+                className="group relative bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-blue-500/40 rounded-3xl p-5 shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between select-none"
               >
-                <Save className="w-4 h-4" />
-                <span>{savingSettings ? 'Saving Settings...' : 'Save Configuration'}</span>
-              </button>
-            </form>
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 group-hover:scale-105 transition-transform">
+                      <HardDrive className="w-6 h-6" />
+                    </div>
+                    <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-medium text-slate-300">
+                      {settings.default_quota_gb} GB • {settings.max_upload_size_mb} MB Max
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-100 group-hover:text-blue-300 transition-colors">
+                      Storage & Upload Quotas
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Baseline user drive quotas, single upload payload caps, concurrent chunked uploads, and bulk ZIP archives.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-blue-400 font-semibold group-hover:translate-x-0.5 transition-all">
+                  <span>Configure Storage</span>
+                  <ChevronRight className="w-4 h-4" />
+                </div>
+              </div>
+
+              {/* 2. Registration & Access */}
+              <div
+                onClick={() => openCategoryModal('registration')}
+                className="group relative bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-emerald-500/40 rounded-3xl p-5 shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between select-none"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 group-hover:scale-105 transition-transform">
+                      <UserCheck className="w-6 h-6" />
+                    </div>
+                    <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-medium text-slate-300">
+                      {settings.allow_public_registration ? 'Signups Open' : 'Signups Closed'}
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-100 group-hover:text-emerald-300 transition-colors">
+                      Registration & Access Control
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Public account registration portal, mandatory administrative approval workflow, and team workspace creation.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-emerald-400 font-semibold group-hover:translate-x-0.5 transition-all">
+                  <span>Configure Access</span>
+                  <ChevronRight className="w-4 h-4" />
+                </div>
+              </div>
+
+              {/* 3. Security & Sessions */}
+              <div
+                onClick={() => openCategoryModal('security')}
+                className="group relative bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-indigo-500/40 rounded-3xl p-5 shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between select-none"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 group-hover:scale-105 transition-transform">
+                      <Shield className="w-6 h-6" />
+                    </div>
+                    <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-medium text-slate-300">
+                      {settings.session_timeout_hours}h Session • {settings.max_login_attempts} Max Fails
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-100 group-hover:text-indigo-300 transition-colors">
+                      Security & Session Policies
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Session inactivity lifespans, password complexity enforcement, brute-force rate-limiting, and password recovery.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-indigo-400 font-semibold group-hover:translate-x-0.5 transition-all">
+                  <span>Configure Security</span>
+                  <ChevronRight className="w-4 h-4" />
+                </div>
+              </div>
+
+              {/* 4. Sharing & Public Links */}
+              <div
+                onClick={() => openCategoryModal('sharing')}
+                className="group relative bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-purple-500/40 rounded-3xl p-5 shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between select-none"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="p-3 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400 group-hover:scale-105 transition-transform">
+                      <Share2 className="w-6 h-6" />
+                    </div>
+                    <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-medium text-slate-300">
+                      {settings.allow_public_shares ? 'Public Links Active' : 'Links Disabled'}
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-100 group-hover:text-purple-300 transition-colors">
+                      Sharing & Public Links
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      External file and folder share links, mandatory passcode protection rules, and default link expiration durations.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-purple-400 font-semibold group-hover:translate-x-0.5 transition-all">
+                  <span>Configure Sharing</span>
+                  <ChevronRight className="w-4 h-4" />
+                </div>
+              </div>
+
+              {/* 5. Data Retention & Lifecycle */}
+              <div
+                onClick={() => openCategoryModal('retention')}
+                className="group relative bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-amber-500/40 rounded-3xl p-5 shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between select-none"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 group-hover:scale-105 transition-transform">
+                      <Archive className="w-6 h-6" />
+                    </div>
+                    <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-medium text-slate-300">
+                      Trash: {settings.trash_retention_days ? `${settings.trash_retention_days}d` : 'Indefinite'}
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-100 group-hover:text-amber-300 transition-colors">
+                      Data Retention & Lifecycle
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Automated purge schedules for soft-deleted trash bin items and security audit log retention periods.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-amber-400 font-semibold group-hover:translate-x-0.5 transition-all">
+                  <span>Configure Retention</span>
+                  <ChevronRight className="w-4 h-4" />
+                </div>
+              </div>
+
+              {/* 6. Forensic Attribution */}
+              <div
+                onClick={() => openCategoryModal('forensics')}
+                className="group relative bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-teal-500/40 rounded-3xl p-5 shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between select-none"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="p-3 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-teal-400 group-hover:scale-105 transition-transform">
+                      <Fingerprint className="w-6 h-6" />
+                    </div>
+                    <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-medium text-emerald-400">
+                      {settings.forensic_watermarking_enabled ? 'Watermarks Active' : 'Off'}
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-100 group-hover:text-teal-300 transition-colors">
+                      Forensic Attribution & Security
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Steganographic binary trailers, cryptographic UUID injection, forensic ZIP manifests, and download tracking.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-teal-400 font-semibold group-hover:translate-x-0.5 transition-all">
+                  <span>Configure Forensics</span>
+                  <ChevronRight className="w-4 h-4" />
+                </div>
+              </div>
+
+              {/* 7. System Operations & Maintenance */}
+              <div
+                onClick={() => openCategoryModal('maintenance')}
+                className={`group relative bg-slate-900/80 hover:bg-slate-900 border rounded-3xl p-5 shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between select-none md:col-span-2 ${
+                  settings.maintenance_mode
+                    ? 'border-rose-500/40 bg-rose-950/10 hover:border-rose-500/60'
+                    : 'border-slate-800/80 hover:border-rose-500/40'
+                }`}
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 group-hover:scale-105 transition-transform">
+                      <Sliders className="w-6 h-6" />
+                    </div>
+                    <span
+                      className={`px-2.5 py-1 rounded-lg border text-[11px] font-mono font-medium ${
+                        settings.maintenance_mode
+                          ? 'bg-rose-500/20 border-rose-500/30 text-rose-300 animate-pulse'
+                          : 'bg-slate-950 border-slate-800 text-slate-300'
+                      }`}
+                    >
+                      {settings.maintenance_mode ? 'MAINTENANCE MODE ACTIVE' : 'Status: Operational'}
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-100 group-hover:text-rose-300 transition-colors">
+                      System Operations & Maintenance
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Emergency platform maintenance mode, lockout barriers for non-admin sessions, and global broadcast notices.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-rose-400 font-semibold group-hover:translate-x-0.5 transition-all">
+                  <span>Configure Maintenance</span>
+                  <ChevronRight className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+
+            {/* FLOATING WINDOW CONFIGURATION MODAL */}
+            {activeCategory && draftSettings && (
+              <div
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) closeCategoryModal();
+                }}
+                className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150"
+              >
+                <div className="relative bg-slate-900 rounded-3xl max-w-xl w-full max-h-[90vh] border border-slate-800 shadow-2xl shadow-black/80 flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 text-slate-100">
+                  {/* Ambient Glow */}
+                  <div className="absolute -top-16 -right-16 w-44 h-44 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                  {/* Modal Header */}
+                  <div className="h-16 px-6 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/95 backdrop-blur-sm relative z-10">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 shrink-0">
+                        {activeCategory === 'storage' && <HardDrive className="w-5 h-5" />}
+                        {activeCategory === 'registration' && <UserCheck className="w-5 h-5" />}
+                        {activeCategory === 'security' && <Shield className="w-5 h-5" />}
+                        {activeCategory === 'sharing' && <Share2 className="w-5 h-5" />}
+                        {activeCategory === 'retention' && <Archive className="w-5 h-5" />}
+                        {activeCategory === 'forensics' && <Fingerprint className="w-5 h-5" />}
+                        {activeCategory === 'maintenance' && <Sliders className="w-5 h-5" />}
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-base font-bold text-slate-100 truncate">
+                          {activeCategory === 'storage' && 'Storage & Upload Quotas'}
+                          {activeCategory === 'registration' && 'Registration & Access Control'}
+                          {activeCategory === 'security' && 'Security & Session Policies'}
+                          {activeCategory === 'sharing' && 'Sharing & Public Links'}
+                          {activeCategory === 'retention' && 'Data Retention & Lifecycle'}
+                          {activeCategory === 'forensics' && 'Forensic Attribution & Security'}
+                          {activeCategory === 'maintenance' && 'System Operations & Maintenance'}
+                        </h3>
+                        <p className="text-[11px] text-slate-400 truncate">
+                          Configure platform behavioral rules and system thresholds
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closeCategoryModal}
+                      className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors shrink-0"
+                      title="Close (Esc)"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Modal Body / Form */}
+                  <form onSubmit={handleSaveCategorySettings} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                    <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 custom-scrollbar">
+
+                      {/* 1. STORAGE CONTROLS */}
+                      {activeCategory === 'storage' && (
+                        <div className="space-y-4">
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-xs font-semibold text-slate-200">
+                                Default User Quota (GB)
+                              </label>
+                              <span className="text-[11px] font-mono text-blue-400 font-bold">
+                                {draftSettings.default_quota_gb} GB
+                              </span>
+                            </div>
+                            <input
+                              type="number"
+                              min="1"
+                              max="10000"
+                              value={draftSettings.default_quota_gb}
+                              onChange={(e) =>
+                                setDraftSettings({
+                                  ...draftSettings,
+                                  default_quota_gb: parseInt(e.target.value) || 1,
+                                })
+                              }
+                              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-blue-500 font-mono"
+                            />
+                            <div className="flex items-center gap-1.5 mt-2">
+                              <span className="text-[10px] text-slate-500 font-medium mr-1">Presets:</span>
+                              {[5, 10, 25, 50, 100, 250].map((preset) => (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  onClick={() => setDraftSettings({ ...draftSettings, default_quota_gb: preset })}
+                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-mono transition-all ${
+                                    draftSettings.default_quota_gb === preset
+                                      ? 'bg-blue-600 text-white font-bold'
+                                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                                  }`}
+                                >
+                                  {preset}G
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-1.5">
+                              Baseline storage capacity assigned to each newly registered account.
+                            </p>
+                          </div>
+
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-xs font-semibold text-slate-200">
+                                Maximum Upload File Size (MB)
+                              </label>
+                              <span className="text-[11px] font-mono text-blue-400 font-bold">
+                                {draftSettings.max_upload_size_mb} MB
+                              </span>
+                            </div>
+                            <input
+                              type="number"
+                              min="1"
+                              max="50000"
+                              value={draftSettings.max_upload_size_mb}
+                              onChange={(e) =>
+                                setDraftSettings({
+                                  ...draftSettings,
+                                  max_upload_size_mb: parseInt(e.target.value) || 10,
+                                })
+                              }
+                              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-blue-500 font-mono"
+                            />
+                            <div className="flex items-center gap-1.5 mt-2">
+                              <span className="text-[10px] text-slate-500 font-medium mr-1">Presets:</span>
+                              {[256, 512, 1024, 2048, 5120].map((preset) => (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  onClick={() => setDraftSettings({ ...draftSettings, max_upload_size_mb: preset })}
+                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-mono transition-all ${
+                                    draftSettings.max_upload_size_mb === preset
+                                      ? 'bg-blue-600 text-white font-bold'
+                                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                                  }`}
+                                >
+                                  {preset >= 1024 ? `${preset / 1024}GB` : `${preset}MB`}
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-1.5">
+                              Ceiling limit for any single file upload request.
+                            </p>
+                          </div>
+
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-xs font-semibold text-slate-200">
+                                Quota Warning Threshold (%)
+                              </label>
+                              <span className="text-[11px] font-mono text-amber-400 font-bold">
+                                {draftSettings.notify_quota_warning_percent}%
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="range"
+                                min="50"
+                                max="98"
+                                step="1"
+                                value={draftSettings.notify_quota_warning_percent}
+                                onChange={(e) =>
+                                  setDraftSettings({
+                                    ...draftSettings,
+                                    notify_quota_warning_percent: parseInt(e.target.value) || 85,
+                                  })
+                                }
+                                className="flex-1 accent-blue-500 cursor-pointer"
+                              />
+                              <span className="text-xs font-mono text-slate-300 w-12 text-right">
+                                {draftSettings.notify_quota_warning_percent}%
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-1">
+                              Warns users with an alert indicator when their used capacity exceeds this percentage.
+                            </p>
+                          </div>
+
+                          <div className="pt-2 space-y-3">
+                            <label className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700/80 transition-colors cursor-pointer select-none">
+                              <div className="pr-4">
+                                <div className="text-xs font-semibold text-slate-200">
+                                  Enable Chunked Multi-Part Uploads
+                                </div>
+                                <div className="text-[11px] text-slate-400 mt-0.5">
+                                  Streams large files in resilient concurrent blocks with network resume support.
+                                </div>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={draftSettings.chunk_upload_enabled}
+                                onChange={(e) =>
+                                  setDraftSettings({ ...draftSettings, chunk_upload_enabled: e.target.checked })
+                                }
+                                className="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700 focus:ring-0 shrink-0 cursor-pointer"
+                              />
+                            </label>
+
+                            <label className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700/80 transition-colors cursor-pointer select-none">
+                              <div className="pr-4">
+                                <div className="text-xs font-semibold text-slate-200">
+                                  Allow ZIP Bulk Downloads
+                                </div>
+                                <div className="text-[11px] text-slate-400 mt-0.5">
+                                  Allows users to package entire folders or multi-file selections into compressed archives.
+                                </div>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={draftSettings.allow_zip_downloads}
+                                onChange={(e) =>
+                                  setDraftSettings({ ...draftSettings, allow_zip_downloads: e.target.checked })
+                                }
+                                className="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700 focus:ring-0 shrink-0 cursor-pointer"
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 2. REGISTRATION CONTROLS */}
+                      {activeCategory === 'registration' && (
+                        <div className="space-y-3">
+                          <label className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700/80 transition-colors cursor-pointer select-none">
+                            <div className="pr-4">
+                              <div className="text-xs font-semibold text-slate-200">
+                                Allow Public Account Registration
+                              </div>
+                              <div className="text-[11px] text-slate-400 mt-0.5">
+                                Displays the account signup portal on the login screen. When disabled, only administrators can invite users.
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={draftSettings.allow_public_registration}
+                              onChange={(e) =>
+                                setDraftSettings({
+                                  ...draftSettings,
+                                  allow_public_registration: e.target.checked,
+                                })
+                              }
+                              className="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700 focus:ring-0 shrink-0 cursor-pointer"
+                            />
+                          </label>
+
+                          <label className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700/80 transition-colors cursor-pointer select-none">
+                            <div className="pr-4">
+                              <div className="text-xs font-semibold text-slate-200">
+                                Require Admin Approval for New Signups
+                              </div>
+                              <div className="text-[11px] text-slate-400 mt-0.5">
+                                Newly registered accounts are placed in a pending verification queue until explicitly approved by an administrator.
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={draftSettings.require_admin_approval}
+                              onChange={(e) =>
+                                setDraftSettings({
+                                  ...draftSettings,
+                                  require_admin_approval: e.target.checked,
+                                })
+                              }
+                              className="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700 focus:ring-0 shrink-0 cursor-pointer"
+                            />
+                          </label>
+
+                          <label className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700/80 transition-colors cursor-pointer select-none">
+                            <div className="pr-4">
+                              <div className="text-xs font-semibold text-slate-200">
+                                Allow Users to Create Teams
+                              </div>
+                              <div className="text-[11px] text-slate-400 mt-0.5">
+                                Permits regular users to establish new team workspaces and invite organizational members.
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={draftSettings.allow_team_creation}
+                              onChange={(e) =>
+                                setDraftSettings({ ...draftSettings, allow_team_creation: e.target.checked })
+                              }
+                              className="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700 focus:ring-0 shrink-0 cursor-pointer"
+                            />
+                          </label>
+                        </div>
+                      )}
+
+                      {/* 3. SECURITY & SESSIONS */}
+                      {activeCategory === 'security' && (
+                        <div className="space-y-4">
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-xs font-semibold text-slate-200">
+                                Session Inactivity Timeout (Hours)
+                              </label>
+                              <span className="text-[11px] font-mono text-indigo-400 font-bold">
+                                {draftSettings.session_timeout_hours} Hours
+                              </span>
+                            </div>
+                            <input
+                              type="number"
+                              min="1"
+                              max="720"
+                              value={draftSettings.session_timeout_hours}
+                              onChange={(e) =>
+                                setDraftSettings({
+                                  ...draftSettings,
+                                  session_timeout_hours: parseInt(e.target.value) || 24,
+                                })
+                              }
+                              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-indigo-500 font-mono"
+                            />
+                            <div className="flex items-center gap-1.5 mt-2">
+                              <span className="text-[10px] text-slate-500 font-medium mr-1">Presets:</span>
+                              {[12, 24, 48, 72, 168].map((preset) => (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  onClick={() => setDraftSettings({ ...draftSettings, session_timeout_hours: preset })}
+                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-mono transition-all ${
+                                    draftSettings.session_timeout_hours === preset
+                                      ? 'bg-indigo-600 text-white font-bold'
+                                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                                  }`}
+                                >
+                                  {preset >= 24 ? `${preset / 24}d` : `${preset}h`}
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-1.5">
+                              Time before idle browser tokens automatically expire and require re-authentication.
+                            </p>
+                          </div>
+
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-xs font-semibold text-slate-200">
+                                Max Consecutive Failed Login Attempts
+                              </label>
+                              <span className="text-[11px] font-mono text-indigo-400 font-bold">
+                                {draftSettings.max_login_attempts} Attempts
+                              </span>
+                            </div>
+                            <input
+                              type="number"
+                              min="3"
+                              max="20"
+                              value={draftSettings.max_login_attempts}
+                              onChange={(e) =>
+                                setDraftSettings({
+                                  ...draftSettings,
+                                  max_login_attempts: parseInt(e.target.value) || 5,
+                                })
+                              }
+                              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-indigo-500 font-mono"
+                            />
+                            <div className="flex items-center gap-1.5 mt-2">
+                              <span className="text-[10px] text-slate-500 font-medium mr-1">Presets:</span>
+                              {[3, 5, 10].map((preset) => (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  onClick={() => setDraftSettings({ ...draftSettings, max_login_attempts: preset })}
+                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-mono transition-all ${
+                                    draftSettings.max_login_attempts === preset
+                                      ? 'bg-indigo-600 text-white font-bold'
+                                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                                  }`}
+                                >
+                                  {preset}
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-1.5">
+                              Threshold before IP rate-limiting lockout is applied against brute-force attacks.
+                            </p>
+                          </div>
+
+                          <div className="pt-2 space-y-3">
+                            <label className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700/80 transition-colors cursor-pointer select-none">
+                              <div className="pr-4">
+                                <div className="text-xs font-semibold text-slate-200">
+                                  Enforce Strong Password Complexity
+                                </div>
+                                <div className="text-[11px] text-slate-400 mt-0.5">
+                                  Requires new passwords to contain at least 8 characters including uppercase, lowercase, numbers, and symbols.
+                                </div>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={draftSettings.enforce_strong_passwords}
+                                onChange={(e) =>
+                                  setDraftSettings({
+                                    ...draftSettings,
+                                    enforce_strong_passwords: e.target.checked,
+                                  })
+                                }
+                                className="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700 focus:ring-0 shrink-0 cursor-pointer"
+                              />
+                            </label>
+
+                            <label className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700/80 transition-colors cursor-pointer select-none">
+                              <div className="pr-4">
+                                <div className="text-xs font-semibold text-slate-200">
+                                  Allow Password Reset Requests
+                                </div>
+                                <div className="text-[11px] text-slate-400 mt-0.5">
+                                  Enables locked or forgotten users to dispatch admin reset requests from the login screen.
+                                </div>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={draftSettings.allow_password_reset_requests}
+                                onChange={(e) =>
+                                  setDraftSettings({
+                                    ...draftSettings,
+                                    allow_password_reset_requests: e.target.checked,
+                                  })
+                                }
+                                className="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700 focus:ring-0 shrink-0 cursor-pointer"
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 4. SHARING & PUBLIC LINKS */}
+                      {activeCategory === 'sharing' && (
+                        <div className="space-y-4">
+                          <label className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700/80 transition-colors cursor-pointer select-none">
+                            <div className="pr-4">
+                              <div className="text-xs font-semibold text-slate-200">
+                                Allow External Public Share Links
+                              </div>
+                              <div className="text-[11px] text-slate-400 mt-0.5">
+                                Permits users to generate public shareable links accessible without an EleDrive account.
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={draftSettings.allow_public_shares}
+                              onChange={(e) =>
+                                setDraftSettings({ ...draftSettings, allow_public_shares: e.target.checked })
+                              }
+                              className="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700 focus:ring-0 shrink-0 cursor-pointer"
+                            />
+                          </label>
+
+                          <label className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700/80 transition-colors cursor-pointer select-none">
+                            <div className="pr-4">
+                              <div className="text-xs font-semibold text-slate-200">
+                                Require Passwords on Public Links
+                              </div>
+                              <div className="text-[11px] text-slate-400 mt-0.5">
+                                Mandates that creators must set a security passcode on all newly created public links.
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={draftSettings.require_link_passwords}
+                              onChange={(e) =>
+                                setDraftSettings({ ...draftSettings, require_link_passwords: e.target.checked })
+                              }
+                              className="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700 focus:ring-0 shrink-0 cursor-pointer"
+                            />
+                          </label>
+
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-xs font-semibold text-slate-200">
+                                Default Link Expiration Period (Days)
+                              </label>
+                              <span className="text-[11px] font-mono text-purple-400 font-bold">
+                                {draftSettings.default_link_expiry_days > 0
+                                  ? `${draftSettings.default_link_expiry_days} Days`
+                                  : 'Never'}
+                              </span>
+                            </div>
+                            <input
+                              type="number"
+                              min="0"
+                              max="365"
+                              value={draftSettings.default_link_expiry_days}
+                              onChange={(e) =>
+                                setDraftSettings({
+                                  ...draftSettings,
+                                  default_link_expiry_days: parseInt(e.target.value) || 0,
+                                })
+                              }
+                              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-purple-500 font-mono"
+                            />
+                            <div className="flex items-center gap-1.5 mt-2">
+                              <span className="text-[10px] text-slate-500 font-medium mr-1">Presets:</span>
+                              {[7, 14, 30, 90, 0].map((preset) => (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  onClick={() => setDraftSettings({ ...draftSettings, default_link_expiry_days: preset })}
+                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-mono transition-all ${
+                                    draftSettings.default_link_expiry_days === preset
+                                      ? 'bg-purple-600 text-white font-bold'
+                                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                                  }`}
+                                >
+                                  {preset === 0 ? 'Never' : `${preset}d`}
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-1.5">
+                              Default lifespan pre-selected when generating new public links (0 for indefinite).
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 5. DATA RETENTION & LIFECYCLE */}
+                      {activeCategory === 'retention' && (
+                        <div className="space-y-4">
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-xs font-semibold text-slate-200">
+                                Trash Bin Auto-Purge Window (Days)
+                              </label>
+                              <span className="text-[11px] font-mono text-amber-400 font-bold">
+                                {draftSettings.trash_retention_days > 0
+                                  ? `${draftSettings.trash_retention_days} Days`
+                                  : 'Never (Indefinite)'}
+                              </span>
+                            </div>
+                            <input
+                              type="number"
+                              min="0"
+                              max="365"
+                              value={draftSettings.trash_retention_days}
+                              onChange={(e) =>
+                                setDraftSettings({
+                                  ...draftSettings,
+                                  trash_retention_days: parseInt(e.target.value) || 0,
+                                })
+                              }
+                              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-amber-500 font-mono"
+                            />
+                            <div className="flex items-center gap-1.5 mt-2">
+                              <span className="text-[10px] text-slate-500 font-medium mr-1">Presets:</span>
+                              {[7, 14, 30, 60, 90, 0].map((preset) => (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  onClick={() => setDraftSettings({ ...draftSettings, trash_retention_days: preset })}
+                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-mono transition-all ${
+                                    draftSettings.trash_retention_days === preset
+                                      ? 'bg-amber-600 text-white font-bold'
+                                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                                  }`}
+                                >
+                                  {preset === 0 ? 'Indefinite' : `${preset}d`}
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-1.5">
+                              Days before soft-deleted files in user trash bins are permanently wiped (0 to retain indefinitely).
+                            </p>
+                          </div>
+
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-xs font-semibold text-slate-200">
+                                Activity & Security Log Retention (Days)
+                              </label>
+                              <span className="text-[11px] font-mono text-amber-400 font-bold">
+                                {draftSettings.activity_log_retention_days} Days
+                              </span>
+                            </div>
+                            <input
+                              type="number"
+                              min="7"
+                              max="1825"
+                              value={draftSettings.activity_log_retention_days}
+                              onChange={(e) =>
+                                setDraftSettings({
+                                  ...draftSettings,
+                                  activity_log_retention_days: parseInt(e.target.value) || 30,
+                                })
+                              }
+                              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-amber-500 font-mono"
+                            />
+                            <div className="flex items-center gap-1.5 mt-2">
+                              <span className="text-[10px] text-slate-500 font-medium mr-1">Presets:</span>
+                              {[30, 60, 90, 180, 365].map((preset) => (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  onClick={() => setDraftSettings({ ...draftSettings, activity_log_retention_days: preset })}
+                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-mono transition-all ${
+                                    draftSettings.activity_log_retention_days === preset
+                                      ? 'bg-amber-600 text-white font-bold'
+                                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                                  }`}
+                                >
+                                  {preset}d
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-1.5">
+                              Lifespan for system activity events, audit logs, and security tracking entries.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 6. FORENSIC ATTRIBUTION & SECURITY */}
+                      {activeCategory === 'forensics' && (
+                        <div className="space-y-4">
+                          <label className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700/80 transition-colors cursor-pointer select-none">
+                            <div className="pr-4">
+                              <div className="text-xs font-semibold text-slate-200">
+                                Steganographic Binary Trailer Watermarking
+                              </div>
+                              <div className="text-[11px] text-slate-400 mt-0.5">
+                                Injects non-destructive cryptographic origin signatures and user tokens into downloaded binary files.
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={draftSettings.forensic_watermarking_enabled}
+                              onChange={(e) =>
+                                setDraftSettings({
+                                  ...draftSettings,
+                                  forensic_watermarking_enabled: e.target.checked,
+                                })
+                              }
+                              className="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700 focus:ring-0 shrink-0 cursor-pointer"
+                            />
+                          </label>
+
+                          <label className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700/80 transition-colors cursor-pointer select-none">
+                            <div className="pr-4">
+                              <div className="text-xs font-semibold text-slate-200">
+                                Invisible Steganographic Digital Canary
+                              </div>
+                              <div className="text-[11px] text-slate-400 mt-0.5">
+                                Injects covert forensic payloads into exported archives and downloads for forensic leak detection.
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={draftSettings.steganographic_canary_enabled}
+                              onChange={(e) =>
+                                setDraftSettings({
+                                  ...draftSettings,
+                                  steganographic_canary_enabled: e.target.checked,
+                                })
+                              }
+                              className="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700 focus:ring-0 shrink-0 cursor-pointer"
+                            />
+                          </label>
+
+                          <label className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700/80 transition-colors cursor-pointer select-none">
+                            <div className="pr-4">
+                              <div className="text-xs font-semibold text-slate-200">
+                                Log Detailed Download Signatures
+                              </div>
+                              <div className="text-[11px] text-slate-400 mt-0.5">
+                                Captures IP address, cryptographic hash, user ID, and timestamp in the security audit ledger on every download.
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={draftSettings.log_forensic_downloads}
+                              onChange={(e) =>
+                                setDraftSettings({
+                                  ...draftSettings,
+                                  log_forensic_downloads: e.target.checked,
+                                })
+                              }
+                              className="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700 focus:ring-0 shrink-0 cursor-pointer"
+                            />
+                          </label>
+
+                          <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+                            <h4 className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                              Active Attribution Safeguards
+                            </h4>
+                            <div className="space-y-1.5 text-[11px] text-slate-400">
+                              <div className="flex items-center justify-between">
+                                <span>Cryptographic UUID per Asset</span>
+                                <span className="text-emerald-400 font-bold font-mono">ACTIVE</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span>Folder ZIP Forensic Manifest</span>
+                                <span className="text-emerald-400 font-bold font-mono">ACTIVE</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span>SHA-256 Checksum Verification</span>
+                                <span className="text-emerald-400 font-bold font-mono">ACTIVE</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 7. SYSTEM OPERATIONS & MAINTENANCE */}
+                      {activeCategory === 'maintenance' && (
+                        <div className="space-y-4">
+                          <label
+                            className={`flex items-center justify-between p-4 rounded-2xl border transition-colors cursor-pointer select-none ${
+                              draftSettings.maintenance_mode
+                                ? 'bg-rose-950/20 border-rose-500/40'
+                                : 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700/80'
+                            }`}
+                          >
+                            <div className="pr-4">
+                              <div className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                                <span>Enable Maintenance Mode</span>
+                                {draftSettings.maintenance_mode && (
+                                  <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-mono text-[10px] uppercase font-bold">
+                                    Active Lockout
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-400 mt-1">
+                                Restricts normal user access and displays the maintenance notice across all client pages. Administrators retain full access.
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={draftSettings.maintenance_mode}
+                              onChange={(e) =>
+                                setDraftSettings({ ...draftSettings, maintenance_mode: e.target.checked })
+                              }
+                              className="w-5 h-5 rounded text-rose-600 bg-slate-900 border-slate-700 focus:ring-0 shrink-0 cursor-pointer"
+                            />
+                          </label>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-200 mb-1.5">
+                              Maintenance Broadcast Notice
+                            </label>
+                            <textarea
+                              rows={4}
+                              value={draftSettings.maintenance_notice}
+                              onChange={(e) =>
+                                setDraftSettings({ ...draftSettings, maintenance_notice: e.target.value })
+                              }
+                              placeholder="Describe scheduled maintenance window or reason..."
+                              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-hidden focus:border-rose-500 resize-none font-sans"
+                            />
+                            <p className="text-[11px] text-slate-400 mt-1">
+                              Custom broadcast banner displayed to users when maintenance mode is active.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Status alerts */}
+                      {settingsSuccess && (
+                        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 shrink-0" />
+                          <span>{settingsSuccess}</span>
+                        </div>
+                      )}
+
+                      {settingsError && (
+                        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          <span>{settingsError}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Modal Footer */}
+                    <div className="p-4 sm:p-5 border-t border-slate-800 flex items-center justify-end gap-3 bg-slate-900/95 shrink-0">
+                      <button
+                        type="button"
+                        onClick={closeCategoryModal}
+                        className="px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-xs font-semibold text-slate-300 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={savingSettings}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/25 transition-all disabled:opacity-50 cursor-pointer"
+                      >
+                        <Save className="w-4 h-4" />
+                        <span>{savingSettings ? 'Saving Changes...' : 'Save Configuration'}</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

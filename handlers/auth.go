@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -84,9 +85,9 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if public registration is enabled in system settings
-	var allowReg bool
-	err = db.DB.QueryRow("SELECT allow_public_registration FROM system_settings WHERE id = 'default'").Scan(&allowReg)
-	if err == nil && !allowReg {
+	var allowRegStr string
+	err = db.DB.QueryRow("SELECT value FROM main.system_settings WHERE key = 'allow_public_registration'").Scan(&allowRegStr)
+	if err == nil && (allowRegStr == "false" || allowRegStr == "0") {
 		utils.RespondError(w, http.StatusForbidden, "Public user registration is currently disabled by administrator")
 		return
 	}
@@ -108,7 +109,23 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	role := "member"
 	status := "pending"
-	quotaLimit := int64(10 * 1024 * 1024 * 1024) // 10 GB
+
+	// Resolve settings for default quota and approval requirement
+	quotaGB := int64(10)
+	var quotaStr string
+	if err := db.DB.QueryRow("SELECT value FROM main.system_settings WHERE key = 'default_quota_gb'").Scan(&quotaStr); err == nil {
+		if qVal, err := strconv.ParseInt(quotaStr, 10, 64); err == nil && qVal > 0 {
+			quotaGB = qVal
+		}
+	}
+	quotaLimit := quotaGB * 1024 * 1024 * 1024
+
+	var requireApprovalStr string
+	if err := db.DB.QueryRow("SELECT value FROM main.system_settings WHERE key = 'require_admin_approval'").Scan(&requireApprovalStr); err == nil {
+		if requireApprovalStr == "false" || requireApprovalStr == "0" {
+			status = "approved"
+		}
+	}
 
 	if totalUsers == 0 {
 		role = "owner"
@@ -344,6 +361,15 @@ func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Reques
 	if identifier == "" {
 		utils.RespondError(w, http.StatusBadRequest, "Email or username is required")
 		return
+	}
+
+	// Check if password reset requests are allowed by system configuration
+	var allowResetStr string
+	if err := db.DB.QueryRow("SELECT value FROM main.system_settings WHERE key = 'allow_password_reset_requests'").Scan(&allowResetStr); err == nil {
+		if allowResetStr == "false" || allowResetStr == "0" {
+			utils.RespondError(w, http.StatusForbidden, "Password reset requests are currently disabled by administrator")
+			return
+		}
 	}
 
 	// Ensure table exists safely

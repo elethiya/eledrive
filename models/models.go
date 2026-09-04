@@ -129,11 +129,29 @@ type DriveStats struct {
 }
 
 type SystemSettings struct {
-	SiteName                string `json:"site_name"`
-	DefaultQuotaGB          int64  `json:"default_quota_gb"`
-	AllowPublicRegistration bool   `json:"allow_public_registration"`
-	AllowPublicShares       bool   `json:"allow_public_shares"`
-	MaxUploadSizeMB         int64  `json:"max_upload_size_mb"`
+	SiteName                    string `json:"site_name"`
+	DefaultQuotaGB              int64  `json:"default_quota_gb"`
+	AllowPublicRegistration     bool   `json:"allow_public_registration"`
+	AllowPublicShares           bool   `json:"allow_public_shares"`
+	MaxUploadSizeMB             int64  `json:"max_upload_size_mb"`
+	RequireAdminApproval        bool   `json:"require_admin_approval"`
+	AllowPasswordResetRequests  bool   `json:"allow_password_reset_requests"`
+	SessionTimeoutHours         int    `json:"session_timeout_hours"`
+	EnforceStrongPasswords      bool   `json:"enforce_strong_passwords"`
+	MaxLoginAttempts            int    `json:"max_login_attempts"`
+	RequireLinkPasswords        bool   `json:"require_link_passwords"`
+	DefaultLinkExpiryDays       int    `json:"default_link_expiry_days"`
+	AllowTeamCreation           bool   `json:"allow_team_creation"`
+	TrashRetentionDays          int    `json:"trash_retention_days"`
+	ActivityLogRetentionDays    int    `json:"activity_log_retention_days"`
+	NotifyQuotaWarningPercent   int    `json:"notify_quota_warning_percent"`
+	ForensicWatermarkingEnabled bool   `json:"forensic_watermarking_enabled"`
+	SteganographicCanaryEnabled bool   `json:"steganographic_canary_enabled"`
+	LogForensicDownloads        bool   `json:"log_forensic_downloads"`
+	MaintenanceMode             bool   `json:"maintenance_mode"`
+	MaintenanceNotice           string `json:"maintenance_notice"`
+	AllowZipDownloads           bool   `json:"allow_zip_downloads"`
+	ChunkUploadEnabled          bool   `json:"chunk_upload_enabled"`
 }
 
 type AdminStats struct {

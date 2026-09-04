@@ -396,11 +396,29 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *AdminHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	settings := models.SystemSettings{
-		SiteName:                "EleDrive",
-		DefaultQuotaGB:          10,
-		AllowPublicRegistration: true,
-		AllowPublicShares:       true,
-		MaxUploadSizeMB:         1024,
+		SiteName:                    "EleDrive",
+		DefaultQuotaGB:              10,
+		AllowPublicRegistration:     true,
+		AllowPublicShares:           true,
+		MaxUploadSizeMB:             1024,
+		RequireAdminApproval:        true,
+		AllowPasswordResetRequests:  true,
+		SessionTimeoutHours:         72,
+		EnforceStrongPasswords:      false,
+		MaxLoginAttempts:            5,
+		RequireLinkPasswords:        false,
+		DefaultLinkExpiryDays:       30,
+		AllowTeamCreation:           true,
+		TrashRetentionDays:          30,
+		ActivityLogRetentionDays:    90,
+		NotifyQuotaWarningPercent:   85,
+		ForensicWatermarkingEnabled: true,
+		SteganographicCanaryEnabled: true,
+		LogForensicDownloads:        true,
+		MaintenanceMode:             false,
+		MaintenanceNotice:           "Platform is currently undergoing scheduled maintenance. Please check back shortly.",
+		AllowZipDownloads:           true,
+		ChunkUploadEnabled:          true,
 	}
 
 	rows, err := db.DB.Query("SELECT key, value FROM system_settings")
@@ -424,6 +442,54 @@ func (h *AdminHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 					if val, err := strconv.ParseInt(v, 10, 64); err == nil {
 						settings.MaxUploadSizeMB = val
 					}
+				case "require_admin_approval":
+					settings.RequireAdminApproval = (v == "true" || v == "1")
+				case "allow_password_reset_requests":
+					settings.AllowPasswordResetRequests = (v == "true" || v == "1")
+				case "session_timeout_hours":
+					if val, err := strconv.Atoi(v); err == nil {
+						settings.SessionTimeoutHours = val
+					}
+				case "enforce_strong_passwords":
+					settings.EnforceStrongPasswords = (v == "true" || v == "1")
+				case "max_login_attempts":
+					if val, err := strconv.Atoi(v); err == nil {
+						settings.MaxLoginAttempts = val
+					}
+				case "require_link_passwords":
+					settings.RequireLinkPasswords = (v == "true" || v == "1")
+				case "default_link_expiry_days":
+					if val, err := strconv.Atoi(v); err == nil {
+						settings.DefaultLinkExpiryDays = val
+					}
+				case "allow_team_creation":
+					settings.AllowTeamCreation = (v == "true" || v == "1")
+				case "trash_retention_days":
+					if val, err := strconv.Atoi(v); err == nil {
+						settings.TrashRetentionDays = val
+					}
+				case "activity_log_retention_days":
+					if val, err := strconv.Atoi(v); err == nil {
+						settings.ActivityLogRetentionDays = val
+					}
+				case "notify_quota_warning_percent":
+					if val, err := strconv.Atoi(v); err == nil {
+						settings.NotifyQuotaWarningPercent = val
+					}
+				case "forensic_watermarking_enabled":
+					settings.ForensicWatermarkingEnabled = (v == "true" || v == "1")
+				case "steganographic_canary_enabled":
+					settings.SteganographicCanaryEnabled = (v == "true" || v == "1")
+				case "log_forensic_downloads":
+					settings.LogForensicDownloads = (v == "true" || v == "1")
+				case "maintenance_mode":
+					settings.MaintenanceMode = (v == "true" || v == "1")
+				case "maintenance_notice":
+					settings.MaintenanceNotice = v
+				case "allow_zip_downloads":
+					settings.AllowZipDownloads = (v == "true" || v == "1")
+				case "chunk_upload_enabled":
+					settings.ChunkUploadEnabled = (v == "true" || v == "1")
 				}
 			}
 		}
@@ -443,22 +509,47 @@ func (h *AdminHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.SiteName == "" {
-		req.SiteName = "EleDrive"
-	}
+	req.SiteName = "EleDrive"
 	if req.DefaultQuotaGB <= 0 {
 		req.DefaultQuotaGB = 10
 	}
 	if req.MaxUploadSizeMB <= 0 {
 		req.MaxUploadSizeMB = 1024
 	}
+	if req.SessionTimeoutHours <= 0 {
+		req.SessionTimeoutHours = 72
+	}
+	if req.NotifyQuotaWarningPercent <= 0 || req.NotifyQuotaWarningPercent > 100 {
+		req.NotifyQuotaWarningPercent = 85
+	}
+	if req.MaintenanceNotice == "" {
+		req.MaintenanceNotice = "Platform is currently undergoing scheduled maintenance. Please check back shortly."
+	}
 
 	pairs := map[string]string{
-		"site_name":                 "EleDrive",
-		"default_quota_gb":          strconv.FormatInt(req.DefaultQuotaGB, 10),
-		"allow_public_registration": strconv.FormatBool(req.AllowPublicRegistration),
-		"allow_public_shares":       strconv.FormatBool(req.AllowPublicShares),
-		"max_upload_size_mb":        strconv.FormatInt(req.MaxUploadSizeMB, 10),
+		"site_name":                      "EleDrive",
+		"default_quota_gb":               strconv.FormatInt(req.DefaultQuotaGB, 10),
+		"allow_public_registration":      strconv.FormatBool(req.AllowPublicRegistration),
+		"allow_public_shares":            strconv.FormatBool(req.AllowPublicShares),
+		"max_upload_size_mb":             strconv.FormatInt(req.MaxUploadSizeMB, 10),
+		"require_admin_approval":         strconv.FormatBool(req.RequireAdminApproval),
+		"allow_password_reset_requests":   strconv.FormatBool(req.AllowPasswordResetRequests),
+		"session_timeout_hours":          strconv.Itoa(req.SessionTimeoutHours),
+		"enforce_strong_passwords":       strconv.FormatBool(req.EnforceStrongPasswords),
+		"max_login_attempts":             strconv.Itoa(req.MaxLoginAttempts),
+		"require_link_passwords":         strconv.FormatBool(req.RequireLinkPasswords),
+		"default_link_expiry_days":        strconv.Itoa(req.DefaultLinkExpiryDays),
+		"allow_team_creation":            strconv.FormatBool(req.AllowTeamCreation),
+		"trash_retention_days":           strconv.Itoa(req.TrashRetentionDays),
+		"activity_log_retention_days":     strconv.Itoa(req.ActivityLogRetentionDays),
+		"notify_quota_warning_percent":    strconv.Itoa(req.NotifyQuotaWarningPercent),
+		"forensic_watermarking_enabled":  strconv.FormatBool(req.ForensicWatermarkingEnabled),
+		"steganographic_canary_enabled":  strconv.FormatBool(req.SteganographicCanaryEnabled),
+		"log_forensic_downloads":         strconv.FormatBool(req.LogForensicDownloads),
+		"maintenance_mode":               strconv.FormatBool(req.MaintenanceMode),
+		"maintenance_notice":             req.MaintenanceNotice,
+		"allow_zip_downloads":            strconv.FormatBool(req.AllowZipDownloads),
+		"chunk_upload_enabled":           strconv.FormatBool(req.ChunkUploadEnabled),
 	}
 
 	for k, v := range pairs {
@@ -469,7 +560,7 @@ func (h *AdminHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		`, k, v)
 	}
 
-	db.LogActivity(claims.UserID, claims.Username, "settings_update", "system", "settings", req.SiteName, "Updated global system settings")
+	db.LogActivity(claims.UserID, claims.Username, "settings_update", "system", "settings", "Platform Settings", "Updated global platform settings")
 
 	utils.RespondSuccess(w, http.StatusOK, "Settings updated successfully", req)
 }
