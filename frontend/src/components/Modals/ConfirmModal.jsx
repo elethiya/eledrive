@@ -11,6 +11,7 @@ export default function ConfirmModal({
   icon,
   itemHighlight,
   subMessage,
+  showCloseButton = true,
   onConfirm,
   onClose,
 }) {
@@ -37,29 +38,29 @@ export default function ConfirmModal({
       case 'warning':
         return {
           glow: 'bg-amber-500/10',
-          badgeBg: 'bg-amber-500/15 border border-amber-500/30 text-amber-400 shadow-lg shadow-amber-500/10',
-          defaultIcon: <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6" />,
+          badgeBg: 'bg-amber-500/10 border border-amber-500/30 text-amber-400 shadow-md shadow-amber-500/10',
+          defaultIcon: <AlertTriangle className="w-7 h-7" strokeWidth={1.8} />,
           button:
-            'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20 border border-amber-400/40',
+            'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-bold shadow-lg shadow-amber-500/25 border border-amber-400/40',
         };
       case 'info':
       case 'team':
       case 'share':
         return {
           glow: 'bg-blue-500/10',
-          badgeBg: 'bg-blue-500/15 border border-blue-500/30 text-blue-400 shadow-lg shadow-blue-500/10',
-          defaultIcon: variant === 'team' || variant === 'share' ? <Users className="w-5 h-5 sm:w-6 sm:h-6" /> : <Info className="w-5 h-5 sm:w-6 sm:h-6" />,
+          badgeBg: 'bg-blue-500/10 border border-blue-500/30 text-blue-400 shadow-md shadow-blue-500/10',
+          defaultIcon: variant === 'team' || variant === 'share' ? <Users className="w-7 h-7" strokeWidth={1.8} /> : <Info className="w-7 h-7" strokeWidth={1.8} />,
           button:
-            'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold shadow-lg shadow-blue-600/25 border border-blue-500/30',
+            'bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold shadow-lg shadow-blue-600/30 border border-blue-500/30',
         };
       case 'danger':
       default:
         return {
           glow: 'bg-rose-500/10',
-          badgeBg: 'bg-rose-500/15 border border-rose-500/30 text-rose-400 shadow-lg shadow-rose-500/10',
-          defaultIcon: <Trash2 className="w-5 h-5 sm:w-6 sm:h-6" />,
+          badgeBg: 'bg-[#24121b] border border-rose-500/30 text-rose-400 shadow-md shadow-rose-950/40',
+          defaultIcon: <Trash2 className="w-7 h-7 text-rose-400" strokeWidth={1.8} />,
           button:
-            'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-semibold shadow-lg shadow-rose-600/30 border border-rose-500/30',
+            'bg-[#df2137] hover:bg-[#c91d31] active:bg-[#b01729] text-white font-semibold shadow-lg shadow-red-600/35 border border-red-500/20',
         };
     }
   };
@@ -72,7 +73,7 @@ export default function ConfirmModal({
       onClick={onClose}
     >
       <div
-        className="relative bg-slate-900 border border-slate-800/90 rounded-3xl max-w-sm sm:max-w-md w-full p-5 sm:p-6 shadow-2xl shadow-black/90 animate-in zoom-in-95 duration-150 overflow-hidden text-slate-100"
+        className="relative bg-[#0f1422] border border-slate-800/90 rounded-3xl max-w-[460px] w-full p-6 shadow-2xl shadow-black/90 animate-in zoom-in-95 duration-150 overflow-hidden text-slate-100"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Ambient Top Glow */}
@@ -80,25 +81,29 @@ export default function ConfirmModal({
           className={`absolute -top-16 -left-16 w-44 h-44 rounded-full blur-3xl pointer-events-none ${styles.glow}`}
         />
 
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
-          title="Close dialog"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        {/* Top-Right Close button as in image/1.png */}
+        {showCloseButton && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-5 right-5 p-1 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            title="Close dialog"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
 
         {/* Icon & Title */}
-        <div className="flex items-start gap-3.5 mb-2">
-          <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-md ${styles.badgeBg}`}>
+        <div className="flex items-start gap-4 mb-1">
+          {/* Rounded squircle icon badge */}
+          <div className={`w-16 h-16 rounded-[22px] flex items-center justify-center shrink-0 ${styles.badgeBg}`}>
             {icon || styles.defaultIcon}
           </div>
-          <div className="pt-0.5 pr-6 min-w-0">
-            <h3 className="text-base sm:text-lg font-bold text-slate-100 tracking-tight leading-snug">
+          <div className="pt-1 pr-6 min-w-0 flex-1">
+            <h3 className="text-[17px] font-bold text-white tracking-tight leading-snug">
               {title}
             </h3>
-            <p className="text-xs sm:text-sm text-slate-300 mt-1 leading-relaxed">
+            <p className="text-[13px] text-slate-300/90 mt-1 leading-relaxed">
               {message}
             </p>
           </div>
@@ -141,17 +146,20 @@ export default function ConfirmModal({
 
         {/* Optional secondary note */}
         {subMessage && (
-          <p className="text-[11px] text-slate-400 mt-2.5 leading-relaxed">
+          <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
             {subMessage}
           </p>
         )}
 
-        {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-2.5 mt-6 pt-4 border-t border-slate-800/80">
+        {/* Divider line as in image/1.png */}
+        <div className="border-t border-slate-800/80 my-5" />
+
+        {/* Action Buttons: Centered with exact button shapes and gap as in image/1.png */}
+        <div className="flex items-center justify-center gap-8">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 sm:flex-none px-4 py-2.5 text-xs font-semibold text-slate-300 hover:text-slate-100 bg-slate-800 hover:bg-slate-750 active:bg-slate-700 border border-slate-700 rounded-xl transition-all shadow-xs cursor-pointer"
+            className="px-7 py-2 text-xs sm:text-sm font-semibold text-slate-300 hover:text-white bg-[#1e293b] hover:bg-slate-700/80 active:bg-slate-800 border border-slate-700/70 rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 min-w-[96px]"
           >
             {cancelText}
           </button>
@@ -159,7 +167,7 @@ export default function ConfirmModal({
             type="button"
             onClick={onConfirm}
             autoFocus
-            className={`flex-1 sm:flex-none px-5 py-2.5 text-xs rounded-xl transition-all transform active:scale-95 cursor-pointer ${styles.button}`}
+            className={`px-7 py-2 text-xs sm:text-sm rounded-xl transition-all transform active:scale-95 cursor-pointer min-w-[130px] ${styles.button}`}
           >
             {confirmText}
           </button>
