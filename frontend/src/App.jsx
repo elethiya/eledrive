@@ -393,7 +393,15 @@ function AppContent() {
                 />
               )}
 
-              {currentView === 'teams' && <TeamsPage />}
+              {currentView === 'teams' && (
+                <TeamsPage
+                  onOpenFolder={(folderId) => {
+                    setCurrentView('drive');
+                    setCurrentFolderId(folderId);
+                  }}
+                  onOpenPreview={(file) => setPreviewModalFile(file)}
+                />
+              )}
 
               {currentView === 'shared' && (
                 <SharedWithMePage

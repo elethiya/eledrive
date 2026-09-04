@@ -4,6 +4,7 @@ import {
   Plus,
   Crown,
   Shield,
+  ShieldCheck,
   Trash2,
   UserPlus,
   UserMinus,
@@ -17,6 +18,19 @@ import {
   Settings,
   Mail,
   MoreVertical,
+  Copy,
+  CheckCircle2,
+  FolderOpen,
+  FileText,
+  ExternalLink,
+  Palette,
+  Edit3,
+  Share2,
+  UserCheck,
+  AlertTriangle,
+  Lock,
+  ArrowRightLeft,
+  Info,
 } from 'lucide-react';
 import { teamAPI } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -35,7 +49,7 @@ const TEAM_COLORS = [
   '#6366f1', // indigo
 ];
 
-export default function TeamsPage() {
+export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
   const { user } = useAuth();
   const confirm = useConfirm();
   const toast = useToast();
@@ -57,10 +71,29 @@ export default function TeamsPage() {
 
   // Manage / Details Modal
   const [activeTeam, setActiveTeam] = useState(null);
+  const [activeTab, setActiveTab] = useState('members'); // 'members' | 'shares' | 'settings'
   const [loadingTeamDetails, setLoadingTeamDetails] = useState(false);
   const [addMemberQuery, setAddMemberQuery] = useState('');
+  const [newMemberRole, setNewMemberRole] = useState('member'); // 'member' | 'leader'
   const [availableUsers, setAvailableUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Members filter inside active team
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [memberRoleFilter, setMemberRoleFilter] = useState('all'); // 'all' | 'leaders' | 'members'
+
+  // Team Shares State
+  const [teamShares, setTeamShares] = useState([]);
+  const [loadingShares, setLoadingShares] = useState(false);
+
+  // Settings tab form state
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editColor, setEditColor] = useState(TEAM_COLORS[0]);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [copiedTeamId, setCopiedTeamId] = useState(false);
+  const [transferOwnerId, setTransferOwnerId] = useState('');
+  const [isTransferring, setIsTransferring] = useState(false);
 
   useEffect(() => {
     loadTeams();
@@ -70,6 +103,9 @@ export default function TeamsPage() {
   // Real-time Event Subscription for teams and members
   useRealtimeEvent(['team', 'sync'], () => {
     loadTeams();
+    if (activeTeam?.id) {
+      loadTeamShares(activeTeam.id);
+    }
   });
 
   const loadTeams = async () => {
@@ -106,12 +142,34 @@ export default function TeamsPage() {
     }
   };
 
-  const handleOpenTeam = async (teamId) => {
+  const loadTeamShares = async (teamId) => {
+    if (!teamId) return;
+    setLoadingShares(true);
+    try {
+      const res = await teamAPI.getTeamShares(teamId);
+      setTeamShares(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error('Failed to load team shares:', err);
+      setTeamShares([]);
+    } finally {
+      setLoadingShares(false);
+    }
+  };
+
+  const handleOpenTeam = async (teamId, defaultTab = 'members') => {
     setLoadingTeamDetails(true);
     try {
       const res = await teamAPI.getTeam(teamId);
       if (res.data) {
         setActiveTeam(res.data);
+        setEditName(res.data.name || '');
+        setEditDesc(res.data.description || '');
+        setEditColor(res.data.avatar_color || TEAM_COLORS[0]);
+        setActiveTab(defaultTab);
+        setMemberSearchQuery('');
+        setMemberRoleFilter('all');
+        setTransferOwnerId('');
+        loadTeamShares(teamId);
       }
     } catch (err) {
       toast.error(err.response?.data?.error || err.message);
@@ -164,33 +222,159 @@ export default function TeamsPage() {
   const handleAddMemberToActiveTeam = async (userId) => {
     if (!activeTeam) return;
     try {
-      await teamAPI.addMember(activeTeam.id, { user_id: userId, role: 'member' });
-      handleOpenTeam(activeTeam.id);
+      await teamAPI.addMember(activeTeam.id, { user_id: userId, role: newMemberRole });
+      setAddMemberQuery('');
+      const res = await teamAPI.getTeam(activeTeam.id);
+      if (res.data) setActiveTeam(res.data);
       loadTeams();
-      toast.success('Member added to team!');
+      toast.success(`Member added as ${newMemberRole}!`);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to add member');
     }
   };
 
-  const handleRemoveMember = async (userId) => {
+  const handleToggleMemberRole = async (targetUserId, currentRole) => {
     if (!activeTeam) return;
+    const newRole = currentRole === 'leader' ? 'member' : 'leader';
+    const actionLabel = newRole === 'leader' ? 'Promote to Leader' : 'Demote to Member';
+
     const ok = await confirm({
-      title: 'Remove Team Member',
-      message: 'Are you sure you want to remove this member from the team? They will lose access to all shared team folders.',
-      confirmText: 'Remove Member',
+      title: `${actionLabel}?`,
+      message: `Are you sure you want to change this member's role to ${newRole.toUpperCase()}? ${
+        newRole === 'leader'
+          ? 'They will gain privileges to manage members, team shares, and team settings.'
+          : 'They will lose team administrative privileges.'
+      }`,
+      confirmText: actionLabel,
+      variant: newRole === 'leader' ? 'info' : 'warning',
+    });
+    if (!ok) return;
+
+    try {
+      await teamAPI.updateMemberRole(activeTeam.id, targetUserId, { role: newRole });
+      toast.success(`Member role updated to ${newRole}`);
+      const res = await teamAPI.getTeam(activeTeam.id);
+      if (res.data) setActiveTeam(res.data);
+      loadTeams();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update member role');
+    }
+  };
+
+  const handleRemoveMember = async (userId, memberName = 'this member') => {
+    if (!activeTeam) return;
+    const isSelf = userId === user?.id;
+    const ok = await confirm({
+      title: isSelf ? 'Leave Team Workspace' : 'Remove Team Member',
+      message: isSelf
+        ? 'Are you sure you want to leave this team? You will immediately lose access to all shared team folders and documents.'
+        : `Are you sure you want to remove ${memberName} from the team? They will lose access to all shared team resources.`,
+      confirmText: isSelf ? 'Leave Team' : 'Remove Member',
       variant: 'warning',
     });
     if (!ok) return;
 
     try {
       await teamAPI.removeMember(activeTeam.id, userId);
-      handleOpenTeam(activeTeam.id);
+      if (isSelf) {
+        setActiveTeam(null);
+        toast.success('You have left the team');
+      } else {
+        const res = await teamAPI.getTeam(activeTeam.id);
+        if (res.data) setActiveTeam(res.data);
+        toast.success(`${memberName} removed from team`);
+      }
       loadTeams();
-      toast.success('Member removed from team');
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to remove member');
     }
+  };
+
+  const handleSaveSettings = async (e) => {
+    if (e) e.preventDefault();
+    if (!activeTeam) return;
+    if (!editName.trim()) {
+      toast.error('Team name cannot be empty');
+      return;
+    }
+
+    setIsSavingSettings(true);
+    try {
+      await teamAPI.updateTeam(activeTeam.id, {
+        name: editName.trim(),
+        description: editDesc.trim(),
+        avatar_color: editColor,
+      });
+      toast.success('Team settings updated successfully');
+      const res = await teamAPI.getTeam(activeTeam.id);
+      if (res.data) setActiveTeam(res.data);
+      loadTeams();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update team settings');
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  const handleTransferOwnership = async () => {
+    if (!activeTeam || !transferOwnerId) return;
+    const targetMember = activeTeam.members?.find((m) => m.user_id === transferOwnerId);
+    const targetName = targetMember ? targetMember.name : 'the selected member';
+
+    const ok = await confirm({
+      title: 'Transfer Team Ownership',
+      message: `Are you sure you want to transfer primary ownership of "${activeTeam.name}" to ${targetName}? This action is irreversible.`,
+      confirmText: 'Transfer Ownership',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    setIsTransferring(true);
+    try {
+      await teamAPI.transferOwnership(activeTeam.id, { new_owner_id: transferOwnerId });
+      toast.success(`Team ownership successfully transferred to ${targetName}`);
+      setTransferOwnerId('');
+      const res = await teamAPI.getTeam(activeTeam.id);
+      if (res.data) setActiveTeam(res.data);
+      loadTeams();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to transfer ownership');
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
+  const handleRemoveShare = async (shareId, targetName) => {
+    if (!activeTeam) return;
+    const ok = await confirm({
+      title: 'Revoke Shared Resource',
+      message: `Revoke "${targetName || 'this resource'}" from ${activeTeam.name}? Team members will immediately lose team-based access to it.`,
+      confirmText: 'Revoke Access',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    try {
+      await teamAPI.removeTeamShare(activeTeam.id, shareId);
+      toast.success('Resource revoked from team');
+      loadTeamShares(activeTeam.id);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to revoke resource');
+    }
+  };
+
+  const handleCopyTeamId = (id) => {
+    if (!id) return;
+    navigator.clipboard
+      .writeText(id)
+      .then(() => {
+        setCopiedTeamId(true);
+        toast.success('Team ID copied to clipboard');
+        setTimeout(() => setCopiedTeamId(false), 2000);
+      })
+      .catch(() => {
+        toast.info(`Team ID: ${id}`);
+      });
   };
 
   const handleDeleteTeam = async (teamId) => {
@@ -387,7 +571,7 @@ export default function TeamsPage() {
                   )}
                 </button>
 
-                <span className="w-16 sm:w-20 text-right pr-2 hidden sm:inline">Actions</span>
+                <span className="w-28 sm:w-44 text-right pr-2 hidden sm:inline">Actions</span>
               </div>
             </div>
 
@@ -398,7 +582,7 @@ export default function TeamsPage() {
                 return (
                   <div
                     key={t.id}
-                    onClick={() => handleOpenTeam(t.id)}
+                    onClick={() => handleOpenTeam(t.id, 'members')}
                     className="group flex items-center justify-between px-4 py-3 bg-slate-900/70 hover:bg-slate-850 active:bg-slate-800 rounded-xl border border-slate-800/80 hover:border-slate-700 hover:shadow-xs transition-all select-none cursor-pointer text-xs text-slate-200"
                   >
                     {/* Team info: Avatar + Name + Description */}
@@ -453,19 +637,45 @@ export default function TeamsPage() {
                         {formatDate(t.created_at)}
                       </span>
 
-                      {/* Action Button */}
-                      <div className="w-16 sm:w-20 text-right flex justify-end">
+                      {/* Action Buttons */}
+                      <div className="w-28 sm:w-44 flex items-center justify-end gap-1.5">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleOpenTeam(t.id);
+                            handleOpenTeam(t.id, 'members');
                           }}
-                          className="flex items-center justify-center gap-1.5 p-1.5 sm:px-3 sm:py-1 rounded-lg bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shadow-xs"
-                          title="Manage team"
+                          className="flex items-center justify-center gap-1 p-1.5 sm:px-2 sm:py-1 rounded-lg bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-300 text-[11px] font-medium transition-colors"
+                          title="View & manage members"
+                        >
+                          <Users className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Members</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenTeam(t.id, 'shares');
+                          }}
+                          className="flex items-center justify-center gap-1 p-1.5 sm:px-2 sm:py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-300 text-[11px] font-medium transition-colors"
+                          title="View shared folders & files"
+                        >
+                          <FolderOpen className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Shares</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenTeam(t.id, 'settings');
+                          }}
+                          className="flex items-center justify-center gap-1 p-1.5 sm:px-2 sm:py-1 rounded-lg bg-slate-800 hover:bg-purple-600 hover:text-white text-slate-300 text-[11px] font-medium transition-colors"
+                          title="Team settings & danger zone"
                         >
                           <Settings className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Manage</span>
+                          <span className="hidden sm:inline">Settings</span>
                         </button>
                       </div>
                     </div>
@@ -627,217 +837,749 @@ export default function TeamsPage() {
       )}
 
       {/* Team Details / Manage Modal */}
-      {activeTeam && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
-          <div className="relative bg-slate-900 rounded-3xl max-w-xl w-full border border-slate-800 shadow-2xl shadow-black/80 overflow-hidden flex flex-col max-h-[90vh]">
-            {/* Ambient Top Glow */}
-            <div className="absolute -top-16 -left-16 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+      {activeTeam && (() => {
+        const isOwner = activeTeam.created_by_user_id === user?.id || user?.role === 'admin' || user?.role === 'owner';
+        const isLeader = activeTeam.user_role === 'leader' || isOwner;
+        const canManage = isLeader || isOwner;
 
-            {/* Modal Header */}
-            <div className="p-4 sm:p-6 border-b border-slate-800 bg-slate-950/60 flex items-start justify-between gap-4 relative z-10 shrink-0">
-              <div className="flex items-center gap-3.5">
-                <div
-                  className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center font-bold text-white text-lg sm:text-xl shadow-lg shrink-0 ring-1 ring-white/10"
-                  style={{ backgroundColor: activeTeam.avatar_color || '#3b82f6' }}
-                >
-                  {activeTeam.name.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm sm:text-base font-bold text-slate-100">{activeTeam.name}</h2>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                      {activeTeam.members?.length || 0} Members
-                    </span>
+        const filteredMembers = (activeTeam.members || []).filter((m) => {
+          const matchQuery =
+            !memberSearchQuery ||
+            m.name.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+            (m.username && m.username.toLowerCase().includes(memberSearchQuery.toLowerCase())) ||
+            m.email.toLowerCase().includes(memberSearchQuery.toLowerCase());
+          if (!matchQuery) return false;
+
+          if (memberRoleFilter === 'leaders') {
+            return m.role === 'leader' || m.user_id === activeTeam.created_by_user_id;
+          }
+          if (memberRoleFilter === 'members') {
+            return m.role === 'member' && m.user_id !== activeTeam.created_by_user_id;
+          }
+          return true;
+        });
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
+            <div className="relative bg-slate-900 rounded-3xl max-w-2xl w-full border border-slate-800 shadow-2xl shadow-black/80 overflow-hidden flex flex-col max-h-[90vh]">
+              {/* Ambient Top Glow */}
+              <div className="absolute -top-16 -left-16 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+              {/* Modal Header */}
+              <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-950/60 relative z-10 shrink-0">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div
+                      className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-white text-lg sm:text-xl shadow-lg shrink-0 ring-1 ring-white/10"
+                      style={{ backgroundColor: activeTeam.avatar_color || '#3b82f6' }}
+                    >
+                      {activeTeam.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-base sm:text-lg font-bold text-slate-100">{activeTeam.name}</h2>
+                        <span
+                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                            isOwner
+                              ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                              : isLeader
+                              ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                              : 'bg-slate-800 text-slate-400 border-slate-700'
+                          }`}
+                        >
+                          {isOwner ? 'Owner' : isLeader ? 'Leader' : 'Member'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">
+                        {activeTeam.description || 'No description set for this team workspace.'}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">
-                    {activeTeam.description || 'No description set'}
-                  </p>
+
+                  <button
+                    onClick={() => setActiveTeam(null)}
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors shrink-0"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Tab Navigation */}
+                <div className="flex items-center gap-1.5 mt-4 pt-3 border-t border-slate-800/80">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('members')}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                      activeTab === 'members'
+                        ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-xs'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Members & Roles</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
+                      {activeTeam.members?.length || 0}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('shares')}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                      activeTab === 'shares'
+                        ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 shadow-xs'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
+                    }`}
+                  >
+                    <FolderOpen className="w-3.5 h-3.5" />
+                    <span>Shared Workspaces</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
+                      {teamShares.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('settings')}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                      activeTab === 'settings'
+                        ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30 shadow-xs'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
+                    }`}
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    <span>Team Settings</span>
+                  </button>
                 </div>
               </div>
 
-              <button
-                onClick={() => setActiveTeam(null)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+              {/* Modal Body */}
+              <div className="p-4 sm:p-5 overflow-y-auto space-y-5 relative z-10 flex-1">
+                {/* TAB 1: MEMBERS & ROLES */}
+                {activeTab === 'members' && (
+                  <div className="space-y-4">
+                    {/* Add Member Section */}
+                    {canManage && (
+                      <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                            <UserPlus className="w-4 h-4 text-emerald-400" />
+                            <span>Add Teammate</span>
+                          </h4>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] text-slate-400 font-medium">Assign Role:</span>
+                            <select
+                              value={newMemberRole}
+                              onChange={(e) => setNewMemberRole(e.target.value)}
+                              className="px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-hidden focus:border-blue-500"
+                            >
+                              <option value="member">Member</option>
+                              <option value="leader">Leader</option>
+                            </select>
+                          </div>
+                        </div>
 
-            {/* Modal Body */}
-            <div className="p-4 sm:p-6 overflow-y-auto space-y-5 sm:space-y-6 relative z-10">
-              {/* Add Member Section */}
-              {(activeTeam.user_role === 'leader' || activeTeam.created_by_user_id === user?.id || user?.role === 'admin' || user?.role === 'owner') && (
-                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                  <h4 className="text-xs font-bold text-slate-300 flex items-center gap-2">
-                    <UserPlus className="w-4 h-4 text-emerald-400" />
-                    <span>Add Member to Team</span>
-                  </h4>
+                        <div className="relative">
+                          <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
+                          <input
+                            type="text"
+                            placeholder="Search teammates by name, username, or email..."
+                            value={addMemberQuery}
+                            onChange={(e) => setAddMemberQuery(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-hidden focus:border-blue-500"
+                          />
+                        </div>
 
-                  <div className="space-y-2">
-                    <div className="relative">
-                      <Search className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
-                      <input
-                        type="text"
-                        placeholder="Search available teammates by name or email..."
-                        value={addMemberQuery}
-                        onChange={(e) => setAddMemberQuery(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-hidden focus:border-blue-500"
-                      />
+                        {/* Dropdown list of available users matching query */}
+                        {addMemberQuery.trim() && (
+                          <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-850 divide-y divide-slate-850 bg-slate-900/60 p-1">
+                            {availableUsers
+                              .filter(
+                                (au) =>
+                                  !activeTeam.members?.some((m) => m.user_id === au.id) &&
+                                  (au.name.toLowerCase().includes(addMemberQuery.toLowerCase()) ||
+                                    au.email.toLowerCase().includes(addMemberQuery.toLowerCase()) ||
+                                    (au.username && au.username.toLowerCase().includes(addMemberQuery.toLowerCase())))
+                              )
+                              .slice(0, 6)
+                              .map((au) => (
+                                <div
+                                  key={au.id}
+                                  className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-800/60 transition-colors"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div
+                                      className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                                      style={{ backgroundColor: au.avatar_color || '#3b82f6' }}
+                                    >
+                                      {au.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <span className="text-xs font-medium text-slate-200 block truncate">{au.name}</span>
+                                      <span className="text-[10px] text-slate-400 font-mono block truncate">
+                                        @{au.username} • {au.email}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddMemberToActiveTeam(au.id)}
+                                    className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[11px] font-semibold shrink-0"
+                                  >
+                                    Add as {newMemberRole}
+                                  </button>
+                                </div>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Member Filters & Search */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                      <div className="relative flex-1">
+                        <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500" />
+                        <input
+                          type="text"
+                          placeholder="Filter team members..."
+                          value={memberSearchQuery}
+                          onChange={(e) => setMemberSearchQuery(e.target.value)}
+                          className="w-full pl-8 pr-7 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-hidden focus:border-blue-500"
+                        />
+                        {memberSearchQuery && (
+                          <button
+                            onClick={() => setMemberSearchQuery('')}
+                            className="absolute right-2 top-2 text-slate-500 hover:text-slate-300"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                        {['all', 'leaders', 'members'].map((rf) => (
+                          <button
+                            key={rf}
+                            type="button"
+                            onClick={() => setMemberRoleFilter(rf)}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold capitalize transition-colors ${
+                              memberRoleFilter === rf
+                                ? 'bg-blue-600 text-white shadow-xs'
+                                : 'text-slate-400 hover:text-slate-200'
+                            }`}
+                          >
+                            {rf}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
-                    {/* Filtered available users list */}
-                    <div className="max-h-32 overflow-y-auto rounded-xl divide-y divide-slate-850">
-                      {availableUsers
-                        .filter(
-                          (au) =>
-                            !activeTeam.members?.some((m) => m.user_id === au.id) &&
-                            (au.name.toLowerCase().includes(addMemberQuery.toLowerCase()) ||
-                              au.email.toLowerCase().includes(addMemberQuery.toLowerCase()) ||
-                              (au.username && au.username.toLowerCase().includes(addMemberQuery.toLowerCase())))
-                        )
-                        .slice(0, 5)
-                        .map((au) => (
-                          <div
-                            key={au.id}
-                            className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 transition-colors"
-                          >
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
-                                style={{ backgroundColor: au.avatar_color || '#3b82f6' }}
-                              >
-                                {au.name.charAt(0).toUpperCase()}
-                              </div>
-                              <div>
-                                <span className="text-xs font-medium text-slate-200 block">{au.name}</span>
-                                <span className="text-[10px] text-slate-400 font-mono block">@{au.username} • {au.email}</span>
-                              </div>
-                            </div>
+                    {/* Members List Table */}
+                    <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950">
+                      <table className="w-full text-left text-xs text-slate-300">
+                        <thead className="bg-slate-900 text-slate-400 font-semibold border-b border-slate-800">
+                          <tr>
+                            <th className="py-2.5 px-3">Member</th>
+                            <th className="py-2.5 px-3">Role</th>
+                            <th className="py-2.5 px-3 hidden sm:table-cell">Joined</th>
+                            <th className="py-2.5 px-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-855">
+                          {filteredMembers.length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="py-6 text-center text-slate-500 text-xs">
+                                No members found matching your search.
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredMembers.map((m) => {
+                              const isMemberOwner = m.user_id === activeTeam.created_by_user_id;
+                              const isMemberLeader = m.role === 'leader';
+                              const isSelf = m.user_id === user?.id;
 
-                            <button
-                              type="button"
-                              onClick={() => handleAddMemberToActiveTeam(au.id)}
-                              className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[11px] font-semibold"
-                            >
-                              Add
-                            </button>
-                          </div>
-                        ))}
+                              return (
+                                <tr key={m.id} className="hover:bg-slate-900/50 transition-colors">
+                                  <td className="py-2.5 px-3">
+                                    <div className="flex items-center gap-2.5">
+                                      <div
+                                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-xs"
+                                        style={{ backgroundColor: m.avatar_color || '#3b82f6' }}
+                                      >
+                                        {m.name.charAt(0).toUpperCase()}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <div className="font-semibold text-slate-100 flex items-center gap-1.5 truncate">
+                                          <span>{m.name}</span>
+                                          {isSelf && (
+                                            <span className="text-[10px] text-blue-400 font-normal font-mono">(You)</span>
+                                          )}
+                                        </div>
+                                        <div className="text-[10px] text-slate-400 font-mono truncate">
+                                          {m.username ? `@${m.username} • ${m.email}` : m.email}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  <td className="py-2.5 px-3 whitespace-nowrap">
+                                    {isMemberOwner ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-amber-500/15 text-amber-300 border-amber-500/30">
+                                        <Crown className="w-3 h-3 text-amber-400" />
+                                        Owner
+                                      </span>
+                                    ) : isMemberLeader ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-blue-500/15 text-blue-300 border-blue-500/30">
+                                        <ShieldCheck className="w-3 h-3 text-blue-400" />
+                                        Leader
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-slate-800 text-slate-400 border-slate-700">
+                                        Member
+                                      </span>
+                                    )}
+                                  </td>
+
+                                  <td className="py-2.5 px-3 text-[11px] text-slate-500 font-mono whitespace-nowrap hidden sm:table-cell">
+                                    {formatDate(m.joined_at)}
+                                  </td>
+
+                                  <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      {/* Role toggle button (Promote/Demote) */}
+                                      {canManage && !isMemberOwner && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleToggleMemberRole(m.user_id, m.role)}
+                                          className={`p-1.5 rounded-lg border text-[10px] font-semibold transition-colors flex items-center gap-1 ${
+                                            isMemberLeader
+                                              ? 'bg-slate-850 hover:bg-slate-800 text-slate-300 border-slate-700'
+                                              : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/20'
+                                          }`}
+                                          title={isMemberLeader ? 'Demote to regular Member' : 'Promote to Team Leader'}
+                                        >
+                                          {isMemberLeader ? (
+                                            <>
+                                              <Shield className="w-3 h-3" />
+                                              <span className="hidden md:inline">Demote</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Crown className="w-3 h-3" />
+                                              <span className="hidden md:inline">Promote</span>
+                                            </>
+                                          )}
+                                        </button>
+                                      )}
+
+                                      {/* Remove or Leave button */}
+                                      {isSelf ? (
+                                        !isMemberOwner && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveMember(m.user_id, m.name)}
+                                            className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 border border-red-500/20 text-[10px] font-semibold transition-colors flex items-center gap-1"
+                                            title="Leave this team"
+                                          >
+                                            <UserMinus className="w-3 h-3" />
+                                            <span className="hidden md:inline">Leave</span>
+                                          </button>
+                                        )
+                                      ) : (
+                                        canManage &&
+                                        !isMemberOwner && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveMember(m.user_id, m.name)}
+                                            className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 border border-red-500/20 text-[10px] font-semibold transition-colors flex items-center gap-1"
+                                            title="Remove member from team"
+                                          >
+                                            <Trash2 className="w-3 h-3" />
+                                            <span className="hidden md:inline">Remove</span>
+                                          </button>
+                                        )
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Members Table */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                  Team Members ({activeTeam.members?.length || 0})
-                </h4>
+                {/* TAB 2: SHARED WORKSPACES / RESOURCES */}
+                {activeTab === 'shares' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                          <FolderOpen className="w-4 h-4 text-emerald-400" />
+                          <span>Resources Shared with {activeTeam.name}</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Folders and files accessible to all members of this team.
+                        </p>
+                      </div>
 
-                <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950">
-                  <table className="w-full text-left text-xs text-slate-300">
-                    <thead className="bg-slate-900 text-slate-400 font-semibold border-b border-slate-800">
-                      <tr>
-                        <th className="py-2.5 px-3">Member</th>
-                        <th className="py-2.5 px-3">Role</th>
-                        <th className="py-2.5 px-3">Joined</th>
-                        <th className="py-2.5 px-3 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-850">
-                      {activeTeam.members?.map((m) => {
-                        const isMemberLeader = m.role === 'leader';
-                        return (
-                          <tr key={m.id} className="hover:bg-slate-900/50">
-                            <td className="py-3 px-3">
-                              <div className="flex items-center gap-2.5">
-                                <div
-                                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                                  style={{ backgroundColor: m.avatar_color || '#3b82f6' }}
-                                >
-                                  {m.name.charAt(0).toUpperCase()}
-                                </div>
-                                <div>
-                                  <div className="font-semibold text-slate-100 flex items-center gap-1.5">
-                                    <span>{m.name}</span>
-                                    {isMemberLeader && (
-                                      <Crown className="w-3.5 h-3.5 text-amber-400" />
+                      <button
+                        type="button"
+                        onClick={() => loadTeamShares(activeTeam.id)}
+                        disabled={loadingShares}
+                        className="p-1.5 rounded-lg bg-slate-950 hover:bg-slate-850 border border-slate-800 text-slate-300 hover:text-slate-100 text-xs flex items-center gap-1 transition-colors"
+                        title="Refresh shared resources"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${loadingShares ? 'animate-spin text-blue-400' : ''}`} />
+                        <span className="hidden sm:inline">Refresh</span>
+                      </button>
+                    </div>
+
+                    {loadingShares ? (
+                      <div className="h-36 flex items-center justify-center text-xs text-slate-500">
+                        Loading shared workspaces...
+                      </div>
+                    ) : teamShares.length === 0 ? (
+                      <div className="p-8 rounded-2xl border border-slate-800 bg-slate-950 text-center space-y-2">
+                        <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+                          <FolderOpen className="w-6 h-6" />
+                        </div>
+                        <h5 className="text-xs font-bold text-slate-200">No shared resources yet</h5>
+                        <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                          To share a folder or file with this entire team, navigate to the <span className="text-blue-400 font-semibold">Drive</span> page, click "Share", choose the <span className="text-blue-400 font-semibold">Team tab</span>, and select <span className="text-slate-200 font-medium">"{activeTeam.name}"</span>.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950">
+                        <table className="w-full text-left text-xs text-slate-300">
+                          <thead className="bg-slate-900 text-slate-400 font-semibold border-b border-slate-800">
+                            <tr>
+                              <th className="py-2.5 px-3">Resource</th>
+                              <th className="py-2.5 px-3">Permission</th>
+                              <th className="py-2.5 px-3 hidden sm:table-cell">Shared By</th>
+                              <th className="py-2.5 px-3 text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-855">
+                            {teamShares.map((s) => (
+                              <tr key={s.id} className="hover:bg-slate-900/50 transition-colors">
+                                <td className="py-2.5 px-3">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
+                                      {s.target_type === 'folder' ? (
+                                        <Folder className="w-4 h-4" />
+                                      ) : (
+                                        <FileText className="w-4 h-4" />
+                                      )}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <span className="font-semibold text-slate-100 block truncate">
+                                        {s.target_name || 'Shared Item'}
+                                      </span>
+                                      <span className="text-[10px] text-slate-500 font-mono capitalize">
+                                        {s.target_type} • {formatDate(s.created_at)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </td>
+
+                                <td className="py-2.5 px-3 whitespace-nowrap">
+                                  <span
+                                    className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                                      s.permission === 'editor'
+                                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                        : 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                                    }`}
+                                  >
+                                    {s.permission}
+                                  </span>
+                                </td>
+
+                                <td className="py-2.5 px-3 text-[11px] text-slate-400 truncate hidden sm:table-cell">
+                                  {s.shared_by_name}
+                                </td>
+
+                                <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    {s.target_type === 'folder' && onOpenFolder && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setActiveTeam(null);
+                                          onOpenFolder(s.target_id);
+                                        }}
+                                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600/15 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-[11px] font-semibold transition-colors"
+                                        title="Open folder in Drive"
+                                      >
+                                        <ExternalLink className="w-3 h-3" />
+                                        <span>Open</span>
+                                      </button>
+                                    )}
+
+                                    {s.target_type === 'file' && onOpenPreview && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setActiveTeam(null);
+                                          onOpenPreview({ id: s.target_id, name: s.target_name });
+                                        }}
+                                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600/15 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-[11px] font-semibold transition-colors"
+                                        title="Preview file"
+                                      >
+                                        <ExternalLink className="w-3 h-3" />
+                                        <span>Preview</span>
+                                      </button>
+                                    )}
+
+                                    {canManage && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveShare(s.id, s.target_name)}
+                                        className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 border border-red-500/20 text-[11px] font-semibold transition-colors"
+                                        title="Revoke access to this resource from the team"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
                                     )}
                                   </div>
-                                  <div className="text-[10px] text-slate-400 font-mono">
-                                    {m.username ? `@${m.username} • ${m.email}` : m.email}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-3 px-3">
-                              <span
-                                className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-                                  isMemberLeader
-                                    ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                                    : 'bg-slate-800 text-slate-400 border-slate-700'
-                                }`}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 3: TEAM SETTINGS & DANGER ZONE */}
+                {activeTab === 'settings' && (
+                  <div className="space-y-6">
+                    {/* General Settings */}
+                    <form onSubmit={handleSaveSettings} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                          <Edit3 className="w-4 h-4 text-purple-400" />
+                          <span>General Team Settings</span>
+                        </h4>
+                        {!canManage && (
+                          <span className="text-[10px] text-slate-500 flex items-center gap-1 font-mono">
+                            <Lock className="w-3 h-3" /> Read-only (Leaders only)
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                            Team Name *
+                          </label>
+                          <input
+                            type="text"
+                            value={editName}
+                            disabled={!canManage || isSavingSettings}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-hidden focus:border-blue-500 disabled:opacity-50"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                            Team Description
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={editDesc}
+                            disabled={!canManage || isSavingSettings}
+                            onChange={(e) => setEditDesc(e.target.value)}
+                            placeholder="What does this team do?"
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-hidden focus:border-blue-500 disabled:opacity-50 resize-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-2">
+                            Color Theme
+                          </label>
+                          <div className="flex items-center gap-2.5">
+                            {TEAM_COLORS.map((c) => (
+                              <button
+                                key={c}
+                                type="button"
+                                disabled={!canManage || isSavingSettings}
+                                onClick={() => setEditColor(c)}
+                                className={`w-7 h-7 rounded-full flex items-center justify-center transition-transform ${
+                                  editColor === c
+                                    ? 'scale-125 ring-2 ring-white ring-offset-2 ring-offset-slate-900'
+                                    : 'hover:scale-110'
+                                } disabled:opacity-50`}
+                                style={{ backgroundColor: c }}
                               >
-                                {m.role}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 text-[11px] text-slate-500">
-                              {formatDate(m.joined_at)}
-                            </td>
-                            <td className="py-3 px-3 text-right">
-                              {m.user_id !== user?.id &&
-                                (activeTeam.user_role === 'leader' ||
-                                  activeTeam.created_by_user_id === user?.id ||
-                                  user?.role === 'admin' ||
-                                  user?.role === 'owner') && (
-                                  <button
-                                    onClick={() => handleRemoveMember(m.user_id)}
-                                    className="p-1 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"
-                                    title="Remove member"
-                                  >
-                                    <UserMinus className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                                {editColor === c && <Check className="w-3.5 h-3.5 text-white" />}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {canManage && (
+                        <div className="flex justify-end pt-2">
+                          <button
+                            type="submit"
+                            disabled={isSavingSettings}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 disabled:opacity-50 transition-all"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>{isSavingSettings ? 'Saving Changes...' : 'Save Team Changes'}</span>
+                          </button>
+                        </div>
+                      )}
+                    </form>
+
+                    {/* Team ID & Metadata Section */}
+                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                      <h4 className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                        <Info className="w-4 h-4 text-blue-400" />
+                        <span>Team Identification & Details</span>
+                      </h4>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div className="p-2.5 bg-slate-900/70 rounded-xl border border-slate-850">
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold mb-1">
+                            Team ID
+                          </span>
+                          <div className="flex items-center justify-between gap-2 font-mono text-[11px] text-slate-200">
+                            <span className="truncate">{activeTeam.id}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyTeamId(activeTeam.id)}
+                              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors shrink-0"
+                              title="Copy Team ID"
+                            >
+                              {copiedTeamId ? (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="p-2.5 bg-slate-900/70 rounded-xl border border-slate-850">
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold mb-1">
+                            Created On
+                          </span>
+                          <div className="font-mono text-[11px] text-slate-200">
+                            {formatDate(activeTeam.created_at)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Ownership Transfer (Owners / Admins only) */}
+                    {isOwner && (
+                      <div className="p-4 rounded-2xl bg-slate-950 border border-amber-500/20 space-y-3">
+                        <h4 className="text-xs font-bold text-amber-300 flex items-center gap-2">
+                          <ArrowRightLeft className="w-4 h-4 text-amber-400" />
+                          <span>Transfer Team Ownership</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                          Transfer primary ownership to another member in this team. The new owner will have full control including the ability to delete the team workspace.
+                        </p>
+
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                          <select
+                            value={transferOwnerId}
+                            onChange={(e) => setTransferOwnerId(e.target.value)}
+                            className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-hidden focus:border-amber-500"
+                          >
+                            <option value="">Select a member to transfer ownership...</option>
+                            {(activeTeam.members || [])
+                              .filter((m) => m.user_id !== activeTeam.created_by_user_id)
+                              .map((m) => (
+                                <option key={m.id} value={m.user_id}>
+                                  {m.name} ({m.email})
+                                </option>
+                              ))}
+                          </select>
+
+                          <button
+                            type="button"
+                            disabled={!transferOwnerId || isTransferring}
+                            onClick={handleTransferOwnership}
+                            className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors shadow-xs shrink-0"
+                          >
+                            {isTransferring ? 'Transferring...' : 'Transfer Ownership'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Danger Zone */}
+                    <div className="p-4 rounded-2xl bg-red-950/20 border border-red-500/30 space-y-3">
+                      <h4 className="text-xs font-bold text-red-400 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-red-400" />
+                        <span>Danger Zone</span>
+                      </h4>
+
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                        <div>
+                          <div className="text-xs font-semibold text-slate-200">
+                            {isOwner ? 'Delete this Team Workspace' : 'Leave this Team Workspace'}
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            {isOwner
+                              ? 'Permanently delete this team and remove all member associations and shared folders.'
+                              : 'Revoke your own membership. You will lose access to team folders.'}
+                          </p>
+                        </div>
+
+                        {isOwner ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTeam(activeTeam.id)}
+                            className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-md shadow-red-600/20 transition-colors shrink-0"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete Team</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMember(user?.id)}
+                            className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-600/20 hover:bg-red-600/40 text-red-300 border border-red-500/30 text-xs font-bold transition-colors shrink-0"
+                          >
+                            <UserMinus className="w-3.5 h-3.5" />
+                            <span>Leave Team</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-slate-950 flex items-center justify-between relative z-10 shrink-0">
+                <div className="text-[11px] text-slate-500 font-mono hidden sm:block">
+                  Workspace: <span className="text-slate-400 font-semibold">{activeTeam.name}</span>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTeam(null)}
+                  className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors ml-auto"
+                >
+                  Close
+                </button>
               </div>
             </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-800 bg-slate-950 flex items-center justify-between">
-              {(activeTeam.created_by_user_id === user?.id || user?.role === 'admin' || user?.role === 'owner') ? (
-                <button
-                  onClick={() => handleDeleteTeam(activeTeam.id)}
-                  className="flex items-center gap-1.5 text-red-400 hover:text-red-300 text-xs font-semibold px-3 py-1.5 rounded-xl hover:bg-red-500/10 transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Delete Team</span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => handleRemoveMember(user?.id)}
-                  className="flex items-center gap-1.5 text-red-400 hover:text-red-300 text-xs font-semibold px-3 py-1.5 rounded-xl hover:bg-red-500/10 transition-colors"
-                >
-                  <UserMinus className="w-3.5 h-3.5" />
-                  <span>Leave Team</span>
-                </button>
-              )}
-
-              <button
-                onClick={() => setActiveTeam(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold"
-              >
-                Done
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

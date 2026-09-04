@@ -253,10 +253,36 @@ type CreateTeamRequest struct {
 	AvatarColor string `json:"avatar_color"`
 }
 
+type UpdateTeamRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	AvatarColor string `json:"avatar_color"`
+}
+
 type AddTeamMemberRequest struct {
 	UserID    string `json:"user_id"`
 	UserEmail string `json:"user_email"`
 	Role      string `json:"role"` // "member" or "leader"
+}
+
+type UpdateMemberRoleRequest struct {
+	Role string `json:"role"` // "member" or "leader"
+}
+
+type TransferOwnershipRequest struct {
+	NewOwnerID string `json:"new_owner_id"`
+}
+
+type TeamShareInfo struct {
+	ID           string    `json:"id"`
+	TeamID       string    `json:"team_id"`
+	TargetType   string    `json:"target_type"` // "folder" or "file"
+	TargetID     string    `json:"target_id"`
+	TargetName   string    `json:"target_name"`
+	Permission   string    `json:"permission"` // "viewer" or "editor"
+	SharedByID   string    `json:"shared_by_id"`
+	SharedByName string    `json:"shared_by_name"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type PasswordResetRequest struct {

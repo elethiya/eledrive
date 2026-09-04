@@ -271,7 +271,7 @@ export default function Sidebar({
           <div className="flex items-center justify-between mb-2 text-slate-300">
             <div className="flex items-center gap-2">
               <Cloud className="w-4 h-4 text-blue-400" />
-              <span className="text-xs font-semibold">Team Storage</span>
+              <span className="text-xs font-semibold">My Drive</span>
             </div>
             <div className="flex items-center gap-1.5 text-[10px] font-mono">
               <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />

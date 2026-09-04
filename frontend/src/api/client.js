@@ -149,8 +149,13 @@ export const teamAPI = {
   listTeams: () => api.get('/teams'),
   createTeam: (data) => api.post('/teams', data),
   getTeam: (id) => api.get(`/teams/${id}`),
+  updateTeam: (id, data) => api.put(`/teams/${id}`, data),
   addMember: (teamId, data) => api.post(`/teams/${teamId}/members`, data),
+  updateMemberRole: (teamId, userId, data) => api.put(`/teams/${teamId}/members/${userId}/role`, data),
   removeMember: (teamId, userId) => api.delete(`/teams/${teamId}/members/${userId}`),
+  transferOwnership: (teamId, data) => api.post(`/teams/${teamId}/transfer-ownership`, data),
+  getTeamShares: (teamId) => api.get(`/teams/${teamId}/shares`),
+  removeTeamShare: (teamId, shareId) => api.delete(`/teams/${teamId}/shares/${shareId}`),
   deleteTeam: (id) => api.delete(`/teams/${id}`),
   getAvailableUsers: () => api.get('/team-members/available'),
 };

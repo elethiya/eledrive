@@ -191,8 +191,13 @@ func main() {
 			auth.Get("/teams", teamHandler.ListTeams)
 			auth.Post("/teams", teamHandler.CreateTeam)
 			auth.Get("/teams/{id}", teamHandler.GetTeam)
+			auth.Put("/teams/{id}", teamHandler.UpdateTeam)
 			auth.Post("/teams/{id}/members", teamHandler.AddMember)
+			auth.Put("/teams/{id}/members/{userId}/role", teamHandler.UpdateMemberRole)
 			auth.Delete("/teams/{id}/members/{userId}", teamHandler.RemoveMember)
+			auth.Post("/teams/{id}/transfer-ownership", teamHandler.TransferOwnership)
+			auth.Get("/teams/{id}/shares", teamHandler.GetTeamShares)
+			auth.Delete("/teams/{id}/shares/{shareId}", teamHandler.RemoveTeamShare)
 			auth.Delete("/teams/{id}", teamHandler.DeleteTeam)
 			auth.Get("/team-members/available", teamHandler.GetAvailableUsers)
 

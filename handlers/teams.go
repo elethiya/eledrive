@@ -380,3 +380,248 @@ func (h *TeamHandler) GetAvailableUsers(w http.ResponseWriter, r *http.Request) 
 
 	utils.RespondJSON(w, http.StatusOK, users)
 }
+
+// UpdateTeam updates team settings: name, description, and avatar color
+func (h *TeamHandler) UpdateTeam(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+	teamID := chi.URLParam(r, "id")
+
+	var creatorID string
+	var callerRole string
+	_ = db.DB.QueryRow("SELECT created_by_user_id FROM main.teams WHERE id = ?", teamID).Scan(&creatorID)
+	_ = db.DB.QueryRow("SELECT role FROM main.team_members WHERE team_id = ? AND user_id = ?", teamID, claims.UserID).Scan(&callerRole)
+
+	if creatorID != claims.UserID && callerRole != "leader" && claims.Role != "admin" && claims.Role != "owner" {
+		utils.RespondError(w, http.StatusForbidden, "Only team leaders or workspace admins can update team settings")
+		return
+	}
+
+	var req models.UpdateTeamRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		utils.RespondError(w, http.StatusBadRequest, "Team name cannot be empty")
+		return
+	}
+
+	color := strings.TrimSpace(req.AvatarColor)
+	if color == "" {
+		color = "#3b82f6"
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	_, err := db.DB.Exec(`
+		UPDATE main.teams
+		SET name = ?, description = ?, avatar_color = ?, updated_at = ?
+		WHERE id = ?
+	`, name, req.Description, color, now, teamID)
+
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to update team settings")
+		return
+	}
+
+	db.LogActivity(claims.UserID, claims.Username, "update_team", "team", teamID, name, fmt.Sprintf("Updated team '%s' settings", name))
+	events.Broadcast("team:update", "team", "update", teamID, "", claims.UserID, map[string]interface{}{
+		"id":           teamID,
+		"name":         name,
+		"description":  req.Description,
+		"avatar_color": color,
+	})
+
+	utils.RespondSuccess(w, http.StatusOK, "Team settings updated successfully", map[string]interface{}{
+		"id":           teamID,
+		"name":         name,
+		"description":  req.Description,
+		"avatar_color": color,
+	})
+}
+
+// UpdateMemberRole updates a member's role between leader and member
+func (h *TeamHandler) UpdateMemberRole(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+	teamID := chi.URLParam(r, "id")
+	targetUserID := chi.URLParam(r, "userId")
+
+	var creatorID string
+	var callerRole string
+	_ = db.DB.QueryRow("SELECT created_by_user_id FROM main.teams WHERE id = ?", teamID).Scan(&creatorID)
+	_ = db.DB.QueryRow("SELECT role FROM main.team_members WHERE team_id = ? AND user_id = ?", teamID, claims.UserID).Scan(&callerRole)
+
+	if creatorID != claims.UserID && callerRole != "leader" && claims.Role != "admin" && claims.Role != "owner" {
+		utils.RespondError(w, http.StatusForbidden, "Only team leaders or workspace admins can modify member roles")
+		return
+	}
+
+	var req models.UpdateMemberRoleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	role := strings.ToLower(strings.TrimSpace(req.Role))
+	if role != "leader" && role != "member" {
+		utils.RespondError(w, http.StatusBadRequest, "Role must be 'leader' or 'member'")
+		return
+	}
+
+	if targetUserID == creatorID && role != "leader" && claims.Role != "admin" && claims.Role != "owner" {
+		utils.RespondError(w, http.StatusForbidden, "The team creator cannot be demoted from leader")
+		return
+	}
+
+	_, err := db.DB.Exec("UPDATE main.team_members SET role = ? WHERE team_id = ? AND user_id = ?", role, teamID, targetUserID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to update member role")
+		return
+	}
+
+	_, _ = db.DB.Exec("UPDATE main.teams SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", teamID)
+	events.Broadcast("team:role_update", "team", "role_update", teamID, "", claims.UserID, map[string]interface{}{
+		"user_id": targetUserID,
+		"role":    role,
+	})
+
+	utils.RespondSuccess(w, http.StatusOK, fmt.Sprintf("Member role updated to %s", role), map[string]interface{}{
+		"user_id": targetUserID,
+		"role":    role,
+	})
+}
+
+// TransferOwnership transfers team creator/ownership to another member
+func (h *TeamHandler) TransferOwnership(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+	teamID := chi.URLParam(r, "id")
+
+	var creatorID string
+	err := db.DB.QueryRow("SELECT created_by_user_id FROM main.teams WHERE id = ?", teamID).Scan(&creatorID)
+	if err != nil {
+		utils.RespondError(w, http.StatusNotFound, "Team not found")
+		return
+	}
+
+	if creatorID != claims.UserID && claims.Role != "admin" && claims.Role != "owner" {
+		utils.RespondError(w, http.StatusForbidden, "Only the team owner or workspace admin can transfer ownership")
+		return
+	}
+
+	var req models.TransferOwnershipRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	newOwnerID := strings.TrimSpace(req.NewOwnerID)
+	if newOwnerID == "" || newOwnerID == creatorID {
+		utils.RespondError(w, http.StatusBadRequest, "Invalid new owner ID")
+		return
+	}
+
+	var isMember int
+	_ = db.DB.QueryRow("SELECT COUNT(*) FROM main.team_members WHERE team_id = ? AND user_id = ?", teamID, newOwnerID).Scan(&isMember)
+	if isMember == 0 {
+		utils.RespondError(w, http.StatusBadRequest, "New owner must already be a member of the team")
+		return
+	}
+
+	tx, err := db.DB.Begin()
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Transaction failed")
+		return
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec("UPDATE main.teams SET created_by_user_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", newOwnerID, teamID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to transfer team ownership")
+		return
+	}
+
+	_, _ = tx.Exec("UPDATE main.team_members SET role = 'leader' WHERE team_id = ? AND user_id = ?", teamID, newOwnerID)
+
+	if err := tx.Commit(); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to commit ownership transfer")
+		return
+	}
+
+	events.Broadcast("team:transfer", "team", "transfer", teamID, "", claims.UserID, map[string]interface{}{
+		"new_owner_id": newOwnerID,
+	})
+	utils.RespondSuccess(w, http.StatusOK, "Team ownership transferred successfully", nil)
+}
+
+// GetTeamShares lists all folders and files shared with this team
+func (h *TeamHandler) GetTeamShares(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+	teamID := chi.URLParam(r, "id")
+
+	var count int
+	_ = db.DB.QueryRow("SELECT COUNT(*) FROM main.team_members WHERE team_id = ? AND user_id = ?", teamID, claims.UserID).Scan(&count)
+	if count == 0 && claims.Role != "admin" && claims.Role != "owner" {
+		utils.RespondError(w, http.StatusForbidden, "You are not a member of this team")
+		return
+	}
+
+	rows, err := db.DB.Query(`
+		SELECT ts.id, ts.team_id, ts.target_type, ts.target_id, ts.permission, ts.shared_by_user_id,
+		       COALESCE(u.name, 'Unknown') as shared_by_name, ts.created_at,
+		       CASE WHEN ts.target_type = 'folder' THEN COALESCE(fo.name, 'Unknown Folder')
+		            ELSE COALESCE(fi.name, 'Unknown File') END as target_name
+		FROM drive.team_shares ts
+		LEFT JOIN main.users u ON ts.shared_by_user_id = u.id
+		LEFT JOIN drive.folders fo ON ts.target_type = 'folder' AND ts.target_id = fo.id
+		LEFT JOIN drive.files fi ON ts.target_type = 'file' AND ts.target_id = fi.id
+		WHERE ts.team_id = ?
+		ORDER BY ts.created_at DESC
+	`, teamID)
+
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to fetch team shares")
+		return
+	}
+	defer rows.Close()
+
+	shares := make([]models.TeamShareInfo, 0)
+	for rows.Next() {
+		var s models.TeamShareInfo
+		if err := rows.Scan(&s.ID, &s.TeamID, &s.TargetType, &s.TargetID, &s.Permission, &s.SharedByID, &s.SharedByName, &s.CreatedAt, &s.TargetName); err == nil {
+			shares = append(shares, s)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to parse team shares")
+		return
+	}
+
+	utils.RespondJSON(w, http.StatusOK, shares)
+}
+
+// RemoveTeamShare revokes a shared resource from the team
+func (h *TeamHandler) RemoveTeamShare(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+	teamID := chi.URLParam(r, "id")
+	shareID := chi.URLParam(r, "shareId")
+
+	var creatorID string
+	var callerRole string
+	_ = db.DB.QueryRow("SELECT created_by_user_id FROM main.teams WHERE id = ?", teamID).Scan(&creatorID)
+	_ = db.DB.QueryRow("SELECT role FROM main.team_members WHERE team_id = ? AND user_id = ?", teamID, claims.UserID).Scan(&callerRole)
+
+	if creatorID != claims.UserID && callerRole != "leader" && claims.Role != "admin" && claims.Role != "owner" {
+		utils.RespondError(w, http.StatusForbidden, "Only team leaders or workspace admins can remove shared items")
+		return
+	}
+
+	_, err := db.DB.Exec("DELETE FROM drive.team_shares WHERE id = ? AND team_id = ?", shareID, teamID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to remove team share")
+		return
+	}
+
+	events.Broadcast("team:share_remove", "team", "share_remove", teamID, "", claims.UserID, map[string]interface{}{"share_id": shareID})
+	utils.RespondSuccess(w, http.StatusOK, "Shared resource removed from team", nil)
+}
