@@ -50,6 +50,7 @@ export default function DrivePage({
   onUploadFiles,
   onOpenNewFolder,
   onNavigateView,
+  onDownload,
 }) {
   const [folderData, setFolderData] = useState({
     folder: null,
@@ -122,13 +123,16 @@ export default function DrivePage({
   };
 
   const handleDownload = (item) => {
-    if (item.mime_type === undefined) {
-      // Download folder ZIP
-      window.location.href = folderAPI.getDownloadZipUrl(item.id);
-    } else {
-      // Download single file
-      window.location.href = fileAPI.getDownloadUrl(item.id);
+    const isFolder = item.mime_type === undefined;
+    if (onDownload) {
+      onDownload(item, isFolder);
+      return;
     }
+    window.dispatchEvent(
+      new CustomEvent('eledrive:download', {
+        detail: { item, isFolder },
+      })
+    );
   };
 
   const handleToggleStar = async (item) => {

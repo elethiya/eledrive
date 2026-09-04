@@ -146,7 +146,9 @@ export default function AdminPage({ onBackToDrive }) {
   const [teamRequests, setTeamRequests] = useState([]);
   const [loadingTeamRequests, setLoadingTeamRequests] = useState(false);
   const [showTeamRequestsModal, setShowTeamRequestsModal] = useState(false);
-  const [teamRequestFilter, setTeamRequestFilter] = useState('pending'); // 'pending' | 'all' | 'approved' | 'rejected'
+  const [teamRequestFilter, setTeamRequestFilter] = useState('all'); // 'all' | 'pending' | 'approved' | 'rejected'
+  const [teamSearch, setTeamSearch] = useState('');
+  const [isRefreshingTeamRequests, setIsRefreshingTeamRequests] = useState(false);
   const [rejectingRequest, setRejectingRequest] = useState(null);
   const [rejectAdminNote, setRejectAdminNote] = useState('');
   const [processingTeamRequestId, setProcessingTeamRequestId] = useState(null);
@@ -607,9 +609,24 @@ export default function AdminPage({ onBackToDrive }) {
   );
 
   const pendingTeamRequests = teamRequests.filter((tr) => tr.status === 'pending');
-  const filteredTeamRequests = teamRequests.filter(
-    (tr) => teamRequestFilter === 'all' || tr.status === teamRequestFilter
-  );
+  const approvedTeamRequests = teamRequests.filter((tr) => tr.status === 'approved');
+  const rejectedTeamRequests = teamRequests.filter((tr) => tr.status === 'rejected');
+
+  const filteredTeamRequests = teamRequests.filter((tr) => {
+    const q = teamSearch.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      (tr.name && tr.name.toLowerCase().includes(q)) ||
+      (tr.description && tr.description.toLowerCase().includes(q)) ||
+      (tr.user_name && tr.user_name.toLowerCase().includes(q)) ||
+      (tr.user_username && tr.user_username.toLowerCase().includes(q)) ||
+      (tr.user_email && tr.user_email.toLowerCase().includes(q));
+
+    const matchesStatus =
+      teamRequestFilter === 'all' || tr.status === teamRequestFilter;
+
+    return matchesSearch && matchesStatus;
+  });
 
   const isOwner = user?.role === 'owner';
 
@@ -831,14 +848,18 @@ export default function AdminPage({ onBackToDrive }) {
 
           <button
             type="button"
-            onClick={() => setShowTeamRequestsModal(true)}
-            className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 text-slate-400 hover:bg-slate-900 hover:text-slate-200"
-            title="Review user team creation requests"
+            onClick={() => setActiveTab('proposals')}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
+              activeTab === 'proposals'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+            }`}
+            title="Review and manage team creation proposals"
           >
             <Users className="w-4 h-4 text-blue-400" />
             <span>Team Proposals</span>
             {pendingTeamRequests.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-blue-500 text-white font-black text-[10px]">
+              <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 font-black text-[10px]">
                 {pendingTeamRequests.length}
               </span>
             )}
@@ -869,7 +890,7 @@ export default function AdminPage({ onBackToDrive }) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowTeamRequestsModal(true)}
+                  onClick={() => setActiveTab('proposals')}
                   className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 shadow-md shadow-blue-600/20"
                 >
                   <Users className="w-3.5 h-3.5" />
@@ -967,13 +988,13 @@ export default function AdminPage({ onBackToDrive }) {
 
                 <button
                   type="button"
-                  onClick={() => setShowTeamRequestsModal(true)}
+                  onClick={() => setActiveTab('proposals')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 flex items-center gap-1.5 border ml-1 ${
                     pendingTeamRequests.length > 0
                       ? 'bg-blue-500/15 text-blue-300 border-blue-500/40 hover:bg-blue-500/25 shadow-xs'
                       : 'text-slate-400 border-slate-800 hover:bg-slate-800'
                   }`}
-                  title="View team creation proposals"
+                  title="View and manage team creation proposals"
                 >
                   <Users className="w-3.5 h-3.5 text-blue-400" />
                   <span>Team Proposals</span>
@@ -1226,7 +1247,356 @@ export default function AdminPage({ onBackToDrive }) {
           </div>
         )}
 
-        {/* TAB 2: FORENSIC LEAK TRACKER & WATERMARK DETECTIVE */}
+        {/* TAB 2: TEAM CREATION PROPOSALS (Matching User Management page layout) */}
+        {activeTab === 'proposals' && (
+          <div className="space-y-4">
+            {/* Summary Stat Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Proposals</span>
+                  <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center">
+                    <Users className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-2xl font-black text-slate-100">{teamRequests.length}</span>
+                  <span className="text-xs text-slate-400">submitted</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Pending Review</span>
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
+                    <Clock className="w-4 h-4 animate-pulse" />
+                  </div>
+                </div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-2xl font-black text-amber-400">{pendingTeamRequests.length}</span>
+                  <span className="text-xs text-slate-400">awaiting</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Approved Teams</span>
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-2xl font-black text-emerald-400">{approvedTeamRequests.length}</span>
+                  <span className="text-xs text-slate-400">created</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Rejected</span>
+                  <div className="w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center">
+                    <XCircle className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-2xl font-black text-red-400">{rejectedTeamRequests.length}</span>
+                  <span className="text-xs text-slate-400">declined</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Search & Status Filters (identical to Users Management) */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900 p-3 rounded-2xl border border-slate-800">
+              <div className="relative w-full sm:w-80">
+                <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Search team name, requester, username, email..."
+                  value={teamSearch}
+                  onChange={(e) => setTeamSearch(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-hidden focus:border-blue-500"
+                />
+                {teamSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setTeamSearch('')}
+                    className="absolute right-2.5 top-2 text-slate-500 hover:text-slate-300 p-0.5"
+                    title="Clear search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto no-scrollbar py-0.5">
+                {[
+                  { id: 'all', label: `All (${teamRequests.length})` },
+                  { id: 'pending', label: `Pending (${pendingTeamRequests.length})` },
+                  { id: 'approved', label: `Approved (${approvedTeamRequests.length})` },
+                  { id: 'rejected', label: `Rejected (${rejectedTeamRequests.length})` },
+                ].map(({ id, label }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setTeamRequestFilter(id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all shrink-0 ${
+                      teamRequestFilter === id
+                        ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                        : 'text-slate-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsRefreshingTeamRequests(true);
+                    try {
+                      await loadTeamRequests();
+                    } finally {
+                      setTimeout(() => setIsRefreshingTeamRequests(false), 600);
+                    }
+                  }}
+                  disabled={isRefreshingTeamRequests}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-slate-100 border border-slate-800 hover:bg-slate-800 transition-all shrink-0 flex items-center gap-1.5 group disabled:opacity-60 shadow-xs ml-1"
+                  title="Refresh team proposals"
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 transition-transform duration-500 ${
+                      isRefreshingTeamRequests
+                        ? 'animate-spin text-blue-400'
+                        : 'group-hover:rotate-180 text-slate-400 group-hover:text-slate-200'
+                    }`}
+                  />
+                  <span className="hidden sm:inline">Refresh</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Proposals Table */}
+            <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-800">
+                    <tr>
+                      <th className="py-3.5 px-4">Team Workspace</th>
+                      <th className="py-3.5 px-4">Requester</th>
+                      <th className="py-3.5 px-4">Requested Teammates</th>
+                      <th className="py-3.5 px-4">Status</th>
+                      <th className="py-3.5 px-4">Submitted</th>
+                      <th className="py-3.5 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {loadingTeamRequests ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-slate-500">
+                          Loading team proposals...
+                        </td>
+                      </tr>
+                    ) : filteredTeamRequests.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-slate-500">
+                          No team creation proposals found matching "{teamRequestFilter}" filter.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredTeamRequests.map((req) => {
+                        const isRejectingThis = rejectingRequest?.id === req.id;
+                        const isProcessing = processingTeamRequestId === req.id;
+
+                        return (
+                          <React.Fragment key={req.id}>
+                            <tr className="hover:bg-slate-850/50 transition-colors">
+                              {/* Team Workspace */}
+                              <td className="py-3.5 px-4">
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-sm shrink-0 ring-2 ring-slate-800 shadow-xs"
+                                    style={{ backgroundColor: req.avatar_color || '#3b82f6' }}
+                                  >
+                                    {req.name.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div className="truncate max-w-[220px]">
+                                    <div className="font-semibold text-slate-100 truncate">{req.name}</div>
+                                    {req.description ? (
+                                      <div className="text-[11px] text-slate-400 truncate" title={req.description}>
+                                        {req.description}
+                                      </div>
+                                    ) : (
+                                      <div className="text-[11px] text-slate-500 italic">No description</div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Requester */}
+                              <td className="py-3.5 px-4">
+                                <div className="truncate max-w-[200px]">
+                                  <div className="font-semibold text-slate-200 truncate">{req.user_name}</div>
+                                  <div className="text-[11px] text-slate-400 truncate">
+                                    @{req.user_username} • {req.user_email}
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Teammates */}
+                              <td className="py-3.5 px-4">
+                                {req.initial_members && req.initial_members.length > 0 ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[11px] font-medium">
+                                    <Users className="w-3 h-3 text-blue-400 shrink-0" />
+                                    <span>{req.initial_members.length} members</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-500 text-[11px] italic">Only requester</span>
+                                )}
+                              </td>
+
+                              {/* Status */}
+                              <td className="py-3.5 px-4">
+                                <div className="flex flex-col items-start gap-0.5">
+                                  {req.status === 'pending' ? (
+                                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-amber-500/10 text-amber-400 border-amber-500/30">
+                                      <Clock className="w-2.5 h-2.5 animate-pulse" />
+                                      Pending
+                                    </span>
+                                  ) : req.status === 'approved' ? (
+                                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                                      <CheckCircle2 className="w-2.5 h-2.5" />
+                                      Approved
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-red-500/10 text-red-400 border-red-500/30">
+                                      <XCircle className="w-2.5 h-2.5" />
+                                      Rejected
+                                    </span>
+                                  )}
+                                  {req.reviewed_by && (
+                                    <span className="text-[10px] text-slate-500">
+                                      by {req.reviewed_by}
+                                    </span>
+                                  )}
+                                  {req.admin_note && req.status === 'rejected' && (
+                                    <span className="text-[10px] text-red-300/80 italic max-w-[180px] truncate" title={req.admin_note}>
+                                      "{req.admin_note}"
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Submitted */}
+                              <td className="py-3.5 px-4 text-slate-400">
+                                <span title={req.created_at ? new Date(req.created_at).toLocaleString() : ''}>
+                                  {formatDate(req.created_at)}
+                                </span>
+                              </td>
+
+                              {/* Actions */}
+                              <td className="py-3.5 px-4 text-right">
+                                {req.status === 'pending' ? (
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                      type="button"
+                                      disabled={isProcessing}
+                                      onClick={() => {
+                                        setRejectingRequest(req);
+                                        setRejectAdminNote('');
+                                      }}
+                                      className="px-2.5 py-1.5 bg-slate-900 hover:bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1"
+                                      title="Reject team creation proposal"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                      <span>Reject</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={isProcessing}
+                                      onClick={() => handleApproveTeamRequest(req.id, req.name)}
+                                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1 disabled:opacity-50"
+                                      title="Authorize proposal and create team"
+                                    >
+                                      <Check className="w-3.5 h-3.5" />
+                                      <span>{isProcessing ? 'Approving...' : 'Approve'}</span>
+                                    </button>
+                                  </div>
+                                ) : req.status === 'approved' ? (
+                                  <div className="flex items-center justify-end gap-1 text-[11px] text-emerald-400 font-semibold font-mono">
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>Team Created</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-end gap-1 text-[11px] text-red-400/90 font-medium">
+                                    <X className="w-3.5 h-3.5" />
+                                    <span>Proposal Declined</span>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+
+                            {/* Inline Rejection Reason Form */}
+                            {isRejectingThis && (
+                              <tr className="bg-slate-950/80">
+                                <td colSpan={6} className="p-4">
+                                  <div className="p-4 rounded-xl bg-slate-900 border border-red-500/30 space-y-3 max-w-2xl mx-auto shadow-xl animate-in fade-in duration-150">
+                                    <div className="flex items-center justify-between">
+                                      <h5 className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
+                                        <XCircle className="w-4 h-4 text-red-400" />
+                                        <span>Reject Proposal for "{req.name}"</span>
+                                      </h5>
+                                      <span className="text-[11px] text-slate-400">Requester: @{req.user_username}</span>
+                                    </div>
+                                    <div>
+                                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                                        Reason / Feedback for Requester (Optional):
+                                      </label>
+                                      <textarea
+                                        rows={2}
+                                        value={rejectAdminNote}
+                                        onChange={(e) => setRejectAdminNote(e.target.value)}
+                                        placeholder="Enter feedback or explanation why this team proposal was not authorized..."
+                                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-hidden focus:border-red-500 resize-none"
+                                        autoFocus
+                                      />
+                                    </div>
+                                    <div className="flex items-center justify-end gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setRejectingRequest(null);
+                                          setRejectAdminNote('');
+                                        }}
+                                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-xl transition-colors"
+                                      >
+                                        Cancel
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={isProcessing}
+                                        onClick={handleRejectTeamRequest}
+                                        className="px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                        <span>{isProcessing ? 'Rejecting...' : 'Confirm Rejection'}</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: FORENSIC LEAK TRACKER & WATERMARK DETECTIVE */}
         {activeTab === 'security' && (
           <div className="space-y-4 sm:space-y-6 min-w-0">
             {/* Explainer Hero Card */}

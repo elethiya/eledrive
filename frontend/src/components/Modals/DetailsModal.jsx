@@ -7,11 +7,11 @@ export default function DetailsModal({ isOpen, onClose, item, isFolder }) {
   if (!isOpen || !item) return null;
 
   const handleDownload = () => {
-    if (isFolder) {
-      window.location.href = folderAPI.getDownloadZipUrl(item.id);
-    } else {
-      window.location.href = fileAPI.getDownloadUrl(item.id);
-    }
+    window.dispatchEvent(
+      new CustomEvent('eledrive:download', {
+        detail: { item, isFolder },
+      })
+    );
   };
 
   return (

@@ -28,7 +28,7 @@ import UploadModal from './components/Modals/UploadModal';
 
 import { Search, X, Wrench, AlertTriangle, RefreshCw } from 'lucide-react';
 import FileCard from './components/FileCard';
-import { folderAPI, fileAPI, systemAPI } from './api/client';
+import { folderAPI, fileAPI, systemAPI, downloadWithProgress } from './api/client';
 
 const VALID_VIEWS = ['drive', 'teams', 'shared', 'recent', 'starred', 'trash', 'profile', 'admin'];
 
@@ -163,8 +163,9 @@ function AppContent() {
   const [detailsModalItem, setDetailsModalItem] = useState(null);
   const [isDetailsFolder, setIsDetailsFolder] = useState(false);
 
-  // Upload status tracker
+  // Upload and Download transfer status trackers
   const [uploadStatus, setUploadStatus] = useState(null);
+  const [downloadStatus, setDownloadStatus] = useState(null);
 
   // Sync browser URL & localStorage whenever currentView or currentFolderId changes
   useEffect(() => {
@@ -218,6 +219,233 @@ function AppContent() {
       setCurrentView('drive');
     }
   }, [user, currentView]);
+
+  // Handle Search
+  const handleSearch = async (overrideQuery) => {
+    const q = overrideQuery !== undefined ? overrideQuery : searchQuery;
+    if (!q.trim()) {
+      setSearchResults(null);
+      return;
+    }
+    try {
+      const res = await fileAPI.search(q, searchType);
+      const data = res?.data !== undefined ? res.data : res;
+      if (data) {
+        const files = Array.isArray(data) ? data : (data.files || []);
+        const folders = Array.isArray(data) ? [] : (data.folders || []);
+        setSearchResults({ files, folders });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Upload Files or Folders/Projects with real-time network speed and file size tracking
+  const handleUploadFiles = async (filesList) => {
+    if (!filesList || filesList.length === 0) return;
+
+    let totalUploadBytes = 0;
+    for (let i = 0; i < filesList.length; i++) {
+      totalUploadBytes += filesList[i].size || 0;
+    }
+
+    setUploadStatus({
+      isUploading: true,
+      progress: 0,
+      totalFiles: filesList.length,
+      loadedBytes: 0,
+      totalBytes: totalUploadBytes,
+      speed: 0,
+      success: false,
+      error: null,
+    });
+
+    const formData = new FormData();
+    if (currentFolderId) {
+      formData.append('folder_id', currentFolderId);
+    }
+
+    filesList.forEach((file) => {
+      formData.append('files', file);
+      if (file.webkitRelativePath) {
+        formData.append('paths', file.webkitRelativePath);
+      }
+    });
+
+    let lastTime = Date.now();
+    let lastLoaded = 0;
+    let currentSpeed = 0;
+
+    try {
+      await fileAPI.uploadFiles(formData, (percent, stats) => {
+        const now = Date.now();
+        const timeDelta = (now - lastTime) / 1000;
+        const loaded = stats?.loaded ?? Math.round((totalUploadBytes * percent) / 100);
+        const total = stats?.total ?? totalUploadBytes;
+
+        if (timeDelta >= 0.25) {
+          currentSpeed = (loaded - lastLoaded) / timeDelta;
+          lastLoaded = loaded;
+          lastTime = now;
+        }
+
+        setUploadStatus((prev) =>
+          prev
+            ? {
+                ...prev,
+                progress: percent,
+                loadedBytes: loaded,
+                totalBytes: total,
+                speed: currentSpeed,
+              }
+            : null
+        );
+      });
+
+      setUploadStatus((prev) =>
+        prev
+          ? {
+              ...prev,
+              isUploading: false,
+              progress: 100,
+              loadedBytes: totalUploadBytes,
+              totalBytes: totalUploadBytes,
+              speed: 0,
+              success: true,
+            }
+          : null
+      );
+
+      refreshUser();
+      const temp = currentFolderId;
+      setCurrentFolderId('__temp');
+      setTimeout(() => setCurrentFolderId(temp), 50);
+
+      setTimeout(() => {
+        setUploadStatus(null);
+      }, 4000);
+    } catch (err) {
+      setUploadStatus((prev) =>
+        prev
+          ? {
+              ...prev,
+              isUploading: false,
+              error: err.message,
+            }
+          : null
+      );
+    }
+  };
+
+  // Tracked Download with real-time network speed & file size progress
+  const handleDownload = async (item, isFolder = false) => {
+    if (!item) return;
+
+    const itemName = isFolder ? `${item.name || 'folder'}.zip` : item.name;
+    const url = isFolder
+      ? folderAPI.getDownloadZipUrl(item.id)
+      : fileAPI.getDownloadUrl(item.id);
+    const expectedSize = isFolder ? 0 : item.size || 0;
+
+    setDownloadStatus({
+      isDownloading: true,
+      name: itemName,
+      progress: 0,
+      loadedBytes: 0,
+      totalBytes: expectedSize,
+      speed: 0,
+      success: false,
+      error: null,
+    });
+
+    try {
+      await downloadWithProgress({
+        url,
+        filename: itemName,
+        expectedSize,
+        onProgress: ({ loadedBytes, totalBytes, percent, speed }) => {
+          setDownloadStatus((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  progress: percent,
+                  loadedBytes,
+                  totalBytes,
+                  speed,
+                }
+              : null
+          );
+        },
+      });
+
+      setDownloadStatus((prev) =>
+        prev
+          ? {
+              ...prev,
+              isDownloading: false,
+              progress: 100,
+              loadedBytes: prev.totalBytes || prev.loadedBytes,
+              speed: 0,
+              success: true,
+            }
+          : null
+      );
+
+      setTimeout(() => {
+        setDownloadStatus(null);
+      }, 3500);
+    } catch (err) {
+      console.warn('Tracked download fallback to direct download:', err);
+      window.location.href = url;
+      setDownloadStatus(null);
+    }
+  };
+
+  // Listen for download events dispatched across components
+  useEffect(() => {
+    const handleDownloadEvent = (e) => {
+      if (e.detail && e.detail.item) {
+        handleDownload(e.detail.item, !!e.detail.isFolder);
+      }
+    };
+    window.addEventListener('eledrive:download', handleDownloadEvent);
+    return () => {
+      window.removeEventListener('eledrive:download', handleDownloadEvent);
+    };
+  }, []);
+
+  // Create New Folder
+  const handleCreateFolder = async (name, color) => {
+    await folderAPI.createFolder(name, currentFolderId || null, color);
+    refreshUser();
+    const temp = currentFolderId;
+    setCurrentFolderId('__temp');
+    setTimeout(() => setCurrentFolderId(temp), 50);
+  };
+
+  // Rename
+  const handleRename = async (item, newName) => {
+    if (isRenameFolder) {
+      await folderAPI.updateFolder(item.id, { name: newName });
+    } else {
+      await fileAPI.renameFile(item.id, newName);
+    }
+    const temp = currentFolderId;
+    setCurrentFolderId('__temp');
+    setTimeout(() => setCurrentFolderId(temp), 50);
+  };
+
+  // Move
+  const handleMove = async (item, targetParentId) => {
+    if (isMoveFolder) {
+      await folderAPI.moveFolder(item.id, targetParentId);
+    } else {
+      await fileAPI.moveFile(item.id, targetParentId);
+    }
+    const temp = currentFolderId;
+    setCurrentFolderId('__temp');
+    setTimeout(() => setCurrentFolderId(temp), 50);
+  };
 
   // Check if current URL is a public share link
   const path = window.location.pathname;
@@ -291,120 +519,6 @@ function AppContent() {
       </div>
     );
   }
-
-  // Handle Search
-  const handleSearch = async (overrideQuery) => {
-    const q = overrideQuery !== undefined ? overrideQuery : searchQuery;
-    if (!q.trim()) {
-      setSearchResults(null);
-      return;
-    }
-    try {
-      const res = await fileAPI.search(q, searchType);
-      const data = res?.data !== undefined ? res.data : res;
-      if (data) {
-        const files = Array.isArray(data) ? data : (data.files || []);
-        const folders = Array.isArray(data) ? [] : (data.folders || []);
-        setSearchResults({ files, folders });
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  // Upload Files or Folders/Projects
-  const handleUploadFiles = async (filesList) => {
-    if (!filesList || filesList.length === 0) return;
-
-    setUploadStatus({
-      isUploading: true,
-      progress: 0,
-      totalFiles: filesList.length,
-      success: false,
-      error: null,
-    });
-
-    const formData = new FormData();
-    if (currentFolderId) {
-      formData.append('folder_id', currentFolderId);
-    }
-
-    filesList.forEach((file) => {
-      formData.append('files', file);
-      if (file.webkitRelativePath) {
-        formData.append('paths', file.webkitRelativePath);
-      }
-    });
-
-    try {
-      await fileAPI.uploadFiles(formData, (percent) => {
-        setUploadStatus((prev) => (prev ? { ...prev, progress: percent } : null));
-      });
-
-      setUploadStatus((prev) =>
-        prev
-          ? {
-              ...prev,
-              isUploading: false,
-              progress: 100,
-              success: true,
-            }
-          : null
-      );
-
-      refreshUser();
-      const temp = currentFolderId;
-      setCurrentFolderId('__temp');
-      setTimeout(() => setCurrentFolderId(temp), 50);
-
-      setTimeout(() => {
-        setUploadStatus(null);
-      }, 4000);
-    } catch (err) {
-      setUploadStatus((prev) =>
-        prev
-          ? {
-              ...prev,
-              isUploading: false,
-              error: err.message,
-            }
-          : null
-      );
-    }
-  };
-
-  // Create New Folder
-  const handleCreateFolder = async (name, color) => {
-    await folderAPI.createFolder(name, currentFolderId || null, color);
-    refreshUser();
-    const temp = currentFolderId;
-    setCurrentFolderId('__temp');
-    setTimeout(() => setCurrentFolderId(temp), 50);
-  };
-
-  // Rename
-  const handleRename = async (item, newName) => {
-    if (isRenameFolder) {
-      await folderAPI.updateFolder(item.id, { name: newName });
-    } else {
-      await fileAPI.renameFile(item.id, newName);
-    }
-    const temp = currentFolderId;
-    setCurrentFolderId('__temp');
-    setTimeout(() => setCurrentFolderId(temp), 50);
-  };
-
-  // Move
-  const handleMove = async (item, targetParentId) => {
-    if (isMoveFolder) {
-      await folderAPI.moveFolder(item.id, targetParentId);
-    } else {
-      await fileAPI.moveFile(item.id, targetParentId);
-    }
-    const temp = currentFolderId;
-    setCurrentFolderId('__temp');
-    setTimeout(() => setCurrentFolderId(temp), 50);
-  };
 
   // Separate Standalone Admin Panel
   if (currentView === 'admin') {
@@ -546,7 +660,7 @@ function AppContent() {
                                   setSearchQuery('');
                                 }}
                                 onDownload={(f) => {
-                                  window.location.href = folderAPI.getDownloadZipUrl(f.id);
+                                  handleDownload(f, true);
                                 }}
                                 onShare={(f) => {
                                   setShareModalItem(f);
@@ -589,7 +703,7 @@ function AppContent() {
                                 isFolder={false}
                                 onOpen={(file) => setPreviewModalFile(file)}
                                 onDownload={(file) => {
-                                  window.location.href = fileAPI.getDownloadUrl(file.id);
+                                  handleDownload(file, false);
                                 }}
                                 onShare={(file) => {
                                   setShareModalItem(file);
@@ -648,6 +762,7 @@ function AppContent() {
                   onUploadFiles={handleUploadFiles}
                   onOpenNewFolder={() => setNewFolderOpen(true)}
                   onNavigateView={(view) => setCurrentView(view)}
+                  onDownload={handleDownload}
                 />
               )}
 
@@ -684,6 +799,7 @@ function AppContent() {
                       setDetailsModalItem(item);
                       setIsDetailsFolder(isFolder);
                     }}
+                    onDownload={handleDownload}
                   />
                 ) : (
                   <DrivePage
@@ -722,6 +838,7 @@ function AppContent() {
                         setCurrentFolderId('');
                       }
                     }}
+                    onDownload={handleDownload}
                   />
                 )
               )}
@@ -745,6 +862,7 @@ function AppContent() {
                     setDetailsModalItem(item);
                     setIsDetailsFolder(isFolder);
                   }}
+                  onDownload={handleDownload}
                 />
               )}
 
@@ -771,6 +889,7 @@ function AppContent() {
                     setDetailsModalItem(item);
                     setIsDetailsFolder(isFolder);
                   }}
+                  onDownload={handleDownload}
                 />
               )}
 
@@ -825,7 +944,13 @@ function AppContent() {
 
       <UploadModal
         uploadStatus={uploadStatus}
-        onClose={() => setUploadStatus(null)}
+        downloadStatus={downloadStatus}
+        onClose={() => {
+          setUploadStatus(null);
+          setDownloadStatus(null);
+        }}
+        onCloseUpload={() => setUploadStatus(null)}
+        onCloseDownload={() => setDownloadStatus(null)}
       />
     </div>
   );

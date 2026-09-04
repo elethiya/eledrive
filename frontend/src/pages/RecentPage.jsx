@@ -10,6 +10,7 @@ export default function RecentPage({
   onOpenRename,
   onOpenMove,
   onOpenDetails,
+  onDownload,
 }) {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +29,9 @@ export default function RecentPage({
     setLoading(true);
     try {
       const res = await statsAPI.getRecent();
-      if (res.data) setFiles(res.data);
+      if (res.data) {
+        setFiles(Array.isArray(res.data) ? res.data : res.data.files || []);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -37,7 +40,15 @@ export default function RecentPage({
   };
 
   const handleDownload = (item) => {
-    window.location.href = fileAPI.getDownloadUrl(item.id);
+    if (onDownload) {
+      onDownload(item, false);
+      return;
+    }
+    window.dispatchEvent(
+      new CustomEvent('eledrive:download', {
+        detail: { item, isFolder: false },
+      })
+    );
   };
 
   return (

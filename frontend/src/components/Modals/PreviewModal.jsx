@@ -71,15 +71,21 @@ export default function PreviewModal({ isOpen, onClose, file }) {
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <a
-              href={downloadUrl}
-              download={file.name}
-              className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-xs transition-all"
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent('eledrive:download', {
+                    detail: { item: file, isFolder: false },
+                  })
+                );
+              }}
+              className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
               title="Download file"
             >
               <Download className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
               <span className="hidden sm:inline">Download</span>
-            </a>
+            </button>
             <button
               onClick={onClose}
               className="p-2 text-slate-400 hover:text-slate-100 rounded-xl hover:bg-slate-800 transition-colors"

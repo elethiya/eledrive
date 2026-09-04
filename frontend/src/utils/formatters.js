@@ -7,6 +7,11 @@ export function formatBytes(bytes, decimals = 1) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
+export function formatSpeed(bytesPerSec) {
+  if (!bytesPerSec || bytesPerSec <= 0) return '0 B/s';
+  return `${formatBytes(bytesPerSec)}/s`;
+}
+
 export function formatDate(dateString) {
   if (!dateString) return '';
   const date = new Date(dateString);

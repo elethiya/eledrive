@@ -1102,9 +1102,9 @@ func (h *AdminHandler) ResolvePasswordReset(w http.ResponseWriter, r *http.Reque
 
 // ListTeamRequests returns team creation requests for admin review
 func (h *AdminHandler) ListTeamRequests(w http.ResponseWriter, r *http.Request) {
-	statusFilter := r.URL.Query().Get("status")
+	statusFilter := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("status")))
 	if statusFilter == "" {
-		statusFilter = "pending"
+		statusFilter = "all"
 	}
 
 	query := `
@@ -1112,11 +1112,11 @@ func (h *AdminHandler) ListTeamRequests(w http.ResponseWriter, r *http.Request) 
 		FROM main.team_requests
 	`
 	var args []interface{}
-	if statusFilter != "all" {
+	if statusFilter != "all" && statusFilter != "" {
 		query += " WHERE status = ?"
 		args = append(args, statusFilter)
 	}
-	query += " ORDER BY CASE status WHEN 'pending' THEN 1 ELSE 2 END, created_at DESC LIMIT 100"
+	query += " ORDER BY CASE status WHEN 'pending' THEN 1 WHEN 'approved' THEN 2 ELSE 3 END, created_at DESC LIMIT 200"
 
 	rows, err := db.DB.Query(query, args...)
 	if err != nil {

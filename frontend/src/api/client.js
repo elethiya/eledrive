@@ -67,8 +67,11 @@ export const fileAPI = {
     api.post('/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: (e) => {
-        if (onProgress && e.total) {
-          onProgress(Math.round((e.loaded * 100) / e.total));
+        if (onProgress) {
+          const total = e.total || 0;
+          const loaded = e.loaded || 0;
+          const percent = total > 0 ? Math.min(100, Math.round((loaded * 100) / total)) : 0;
+          onProgress(percent, { loaded, total });
         }
       },
     }),
@@ -152,7 +155,7 @@ export const adminAPI = {
   getSecurityStats: () => api.get('/admin/security/stats'),
   listPasswordResets: () => api.get('/admin/password-resets'),
   resolvePasswordReset: (id, data) => api.post(`/admin/password-resets/${id}/resolve`, data),
-  listTeamRequests: (status) => api.get('/admin/team-requests', { params: { status } }),
+  listTeamRequests: (status = 'all') => api.get('/admin/team-requests', { params: { status } }),
   approveTeamRequest: (id) => api.post(`/admin/team-requests/${id}/approve`),
   rejectTeamRequest: (id, data) => api.post(`/admin/team-requests/${id}/reject`, data),
 };
@@ -178,4 +181,69 @@ export const webhookAPI = {
   trigger: (data) => api.post('/webhook', data),
 };
 
+/**
+ * Downloads a file from a URL with full real-time progress and speed tracking.
+ */
+export async function downloadWithProgress({ url, filename, expectedSize, onProgress }) {
+  let lastTime = Date.now();
+  let lastLoaded = 0;
+  let currentSpeed = 0;
+
+  const token = localStorage.getItem('eledrive_token');
+  const headers = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, { headers });
+  if (!response.ok) {
+    throw new Error(`Download failed with status ${response.status}`);
+  }
+
+  const contentLengthHeader = response.headers.get('content-length');
+  const totalBytes = contentLengthHeader ? parseInt(contentLengthHeader, 10) : (expectedSize || 0);
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let loadedBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    chunks.push(value);
+    loadedBytes += value.length;
+
+    const now = Date.now();
+    const timeDelta = (now - lastTime) / 1000;
+    if (timeDelta >= 0.2) {
+      currentSpeed = (loadedBytes - lastLoaded) / timeDelta;
+      lastLoaded = loadedBytes;
+      lastTime = now;
+    }
+
+    const percent = totalBytes > 0 ? Math.min(100, Math.round((loadedBytes * 100) / totalBytes)) : 0;
+    if (onProgress) {
+      onProgress({
+        loadedBytes,
+        totalBytes,
+        percent,
+        speed: currentSpeed,
+      });
+    }
+  }
+
+  // Construct blob and trigger browser save
+  const blob = new Blob(chunks);
+  const blobUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.setAttribute('download', filename || 'download');
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode.removeChild(link);
+  setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2500);
+}
+
 export default api;
+

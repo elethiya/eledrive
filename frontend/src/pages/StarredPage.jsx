@@ -11,6 +11,7 @@ export default function StarredPage({
   onOpenRename,
   onOpenMove,
   onOpenDetails,
+  onDownload,
 }) {
   const [data, setData] = useState({ folders: [], files: [] });
   const [loading, setLoading] = useState(true);
@@ -51,11 +52,16 @@ export default function StarredPage({
   };
 
   const handleDownload = (item) => {
-    if (item.mime_type === undefined) {
-      window.location.href = folderAPI.getDownloadZipUrl(item.id);
-    } else {
-      window.location.href = fileAPI.getDownloadUrl(item.id);
+    const isFolder = item.mime_type === undefined;
+    if (onDownload) {
+      onDownload(item, isFolder);
+      return;
     }
+    window.dispatchEvent(
+      new CustomEvent('eledrive:download', {
+        detail: { item, isFolder },
+      })
+    );
   };
 
   const isEmpty = data.folders.length === 0 && data.files.length === 0;
