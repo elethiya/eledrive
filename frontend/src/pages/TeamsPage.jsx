@@ -561,12 +561,12 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
             </button>
           </div>
         ) : (
-          <div className="space-y-3">
-            {/* Table Header (Visible on sm: and up) */}
-            <div className="hidden sm:flex items-center justify-between px-4 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800/80 select-none bg-slate-900/30 rounded-xl">
+          <div className="space-y-3 min-w-0">
+            {/* Table Header (Visible on lg: and up) */}
+            <div className="hidden lg:flex items-center justify-between px-4 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800/80 select-none bg-slate-900/30 rounded-xl">
               <button
                 onClick={() => handleHeaderSort('name')}
-                className="flex items-center gap-1.5 hover:text-slate-200 transition-colors flex-1 text-left font-bold"
+                className="flex items-center gap-1.5 hover:text-slate-200 transition-colors flex-1 min-w-0 text-left font-bold"
                 title="Sort by Team Name"
               >
                 <span>Team Name</span>
@@ -577,12 +577,12 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                 )}
               </button>
 
-              <div className="flex items-center gap-4 sm:gap-6 shrink-0">
-                <span className="w-24 text-center">Role</span>
+              <div className="flex items-center gap-3 lg:gap-4 xl:gap-6 shrink-0">
+                <span className="w-20 xl:w-24 text-center">Role</span>
 
                 <button
                   onClick={() => handleHeaderSort('members')}
-                  className="w-16 sm:w-24 text-center hover:text-slate-200 transition-colors font-bold flex items-center justify-center gap-1"
+                  className="w-16 xl:w-20 text-center hover:text-slate-200 transition-colors font-bold flex items-center justify-center gap-1"
                   title="Sort by Members"
                 >
                   <span>Members</span>
@@ -593,7 +593,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
 
                 <button
                   onClick={() => handleHeaderSort('created_at')}
-                  className="w-28 text-right hidden md:inline hover:text-slate-200 transition-colors font-bold"
+                  className="w-24 xl:w-28 text-right hidden xl:inline hover:text-slate-200 transition-colors font-bold"
                   title="Sort by Created Date"
                 >
                   <span>Created</span>
@@ -602,21 +602,21 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                   )}
                 </button>
 
-                <span className="w-56 sm:w-64 text-right pr-2">Actions</span>
+                <span className="w-28 xl:w-64 text-right pr-2">Actions</span>
               </div>
             </div>
 
-            {/* List Rows */}
-            <div className="space-y-2 sm:space-y-1.5">
+            {/* Responsive Card Grid for Mobile & Tablet (< lg) */}
+            <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3">
               {sortedTeams.map((t) => {
                 const isLeader = t.user_role === 'leader' || t.created_by_user_id === user?.id;
                 return (
-                  <React.Fragment key={t.id}>
-                    {/* Mobile-Optimized Card View (< sm) */}
-                    <div
-                      onClick={() => handleOpenTeam(t.id, 'members')}
-                      className="sm:hidden p-3.5 bg-slate-900/80 hover:bg-slate-850 active:bg-slate-800 rounded-2xl border border-slate-800/80 shadow-xs transition-all cursor-pointer space-y-2.5 select-none"
-                    >
+                  <div
+                    key={t.id}
+                    onClick={() => handleOpenTeam(t.id, 'members')}
+                    className="p-3.5 sm:p-4 bg-slate-900/80 hover:bg-slate-850 active:bg-slate-800 rounded-2xl border border-slate-800/80 shadow-xs transition-all cursor-pointer flex flex-col justify-between select-none group space-y-3"
+                  >
+                    <div className="space-y-2">
                       <div className="flex items-start justify-between gap-2.5">
                         <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           <div
@@ -627,7 +627,9 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-bold text-slate-100 truncate text-xs">{t.name}</span>
+                              <span className="font-bold text-slate-100 group-hover:text-blue-400 transition-colors truncate text-xs sm:text-sm">
+                                {t.name}
+                              </span>
                               <span
                                 className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0 ${
                                   isLeader
@@ -638,9 +640,11 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                                 {isLeader ? 'Leader' : 'Member'}
                               </span>
                             </div>
-                            <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
-                              {t.description || 'No description provided.'}
-                            </p>
+                            {(t.creator_name || t.creator_username) && (
+                              <p className="text-[10px] text-slate-500 font-mono truncate mt-0.5">
+                                by {t.creator_name} {t.creator_username && `(@${t.creator_username})`}
+                              </p>
+                            )}
                           </div>
                         </div>
 
@@ -650,145 +654,161 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                         </div>
                       </div>
 
-                      {/* Mobile Quick Action Buttons Full-Width Bar */}
-                      <div className="grid grid-cols-3 gap-1.5 pt-1.5 border-t border-slate-800/80">
+                      <p className="text-[11px] sm:text-xs text-slate-400 line-clamp-2">
+                        {t.description || 'No description provided.'}
+                      </p>
+                    </div>
+
+                    {/* Quick Action Buttons */}
+                    <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-800/80">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenTeam(t.id, 'members');
+                        }}
+                        className="flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg bg-slate-800/90 active:bg-blue-600 text-slate-200 active:text-white text-[11px] font-semibold transition-colors"
+                      >
+                        <Users className="w-3 h-3 text-blue-400" />
+                        <span>Members</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenTeam(t.id, 'shares');
+                        }}
+                        className="flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg bg-slate-800/90 active:bg-emerald-600 text-slate-200 active:text-white text-[11px] font-semibold transition-colors"
+                      >
+                        <FolderOpen className="w-3 h-3 text-emerald-400" />
+                        <span>Shares</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenTeam(t.id, 'settings');
+                        }}
+                        className="flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg bg-slate-800/90 active:bg-purple-600 text-slate-200 active:text-white text-[11px] font-semibold transition-colors"
+                      >
+                        <Settings className="w-3 h-3 text-purple-400" />
+                        <span>Settings</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Table Row View (>= lg) */}
+            <div className="hidden lg:block space-y-1.5">
+              {sortedTeams.map((t) => {
+                const isLeader = t.user_role === 'leader' || t.created_by_user_id === user?.id;
+                return (
+                  <div
+                    key={t.id}
+                    onClick={() => handleOpenTeam(t.id, 'members')}
+                    className="group flex items-center justify-between px-4 py-3 bg-slate-900/70 hover:bg-slate-850 active:bg-slate-800 rounded-xl border border-slate-800/80 hover:border-slate-700 hover:shadow-xs transition-all select-none cursor-pointer text-xs text-slate-200"
+                  >
+                    {/* Team info: Avatar + Name + Description */}
+                    <div className="flex items-center gap-3.5 flex-1 min-w-0 pr-2 lg:pr-4">
+                      <div
+                        className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-sm shadow-md shrink-0 ring-1 ring-white/10"
+                        style={{ backgroundColor: t.avatar_color || '#3b82f6' }}
+                      >
+                        {t.name.charAt(0).toUpperCase()}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-slate-100 group-hover:text-blue-400 transition-colors truncate">
+                            {t.name}
+                          </span>
+                          {(t.creator_name || t.creator_username) && (
+                            <span className="text-[10px] text-slate-400 font-mono inline-flex items-center gap-1 bg-slate-950/80 px-2 py-0.5 rounded-md border border-slate-800/80 shrink-0">
+                              <span className="text-slate-500">by</span>
+                              <span className="text-slate-300 font-medium">{t.creator_name || t.creator_username}</span>
+                              {t.creator_username && t.creator_name && (
+                                <span className="text-slate-500">(@{t.creator_username})</span>
+                              )}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5 max-w-xs xl:max-w-md">
+                          {t.description || 'No description provided.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Meta and actions */}
+                    <div className="flex items-center gap-3 lg:gap-4 xl:gap-6 shrink-0 text-slate-400">
+                      {/* Role Pill */}
+                      <div className="w-20 xl:w-24 justify-center flex">
+                        <span
+                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                            isLeader
+                              ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                              : 'bg-slate-800 text-slate-400 border-slate-700'
+                          }`}
+                        >
+                          {isLeader ? 'Leader' : 'Member'}
+                        </span>
+                      </div>
+
+                      {/* Members Count */}
+                      <div className="w-16 xl:w-20 flex items-center justify-center gap-1.5 text-xs text-slate-300">
+                        <Users className="w-3.5 h-3.5 text-slate-500" />
+                        <span>{t.members_count || 0}</span>
+                      </div>
+
+                      {/* Created Date */}
+                      <span className="w-24 xl:w-28 text-right hidden xl:inline text-[11px] text-slate-500 font-mono">
+                        {formatDate(t.created_at)}
+                      </span>
+
+                      {/* Action Buttons */}
+                      <div className="w-28 xl:w-64 flex items-center justify-end gap-1.5 shrink-0">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleOpenTeam(t.id, 'members');
                           }}
-                          className="flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg bg-slate-800/90 active:bg-blue-600 text-slate-200 active:text-white text-[11px] font-semibold transition-colors"
+                          className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shrink-0"
+                          title="View & manage members"
                         >
-                          <Users className="w-3 h-3 text-blue-400" />
-                          <span>Members</span>
+                          <Users className="w-3.5 h-3.5" />
+                          <span className="hidden xl:inline">Members</span>
                         </button>
+
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleOpenTeam(t.id, 'shares');
                           }}
-                          className="flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg bg-slate-800/90 active:bg-emerald-600 text-slate-200 active:text-white text-[11px] font-semibold transition-colors"
+                          className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shrink-0"
+                          title="View shared folders & files"
                         >
-                          <FolderOpen className="w-3 h-3 text-emerald-400" />
-                          <span>Shares</span>
+                          <FolderOpen className="w-3.5 h-3.5" />
+                          <span className="hidden xl:inline">Shares</span>
                         </button>
+
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleOpenTeam(t.id, 'settings');
                           }}
-                          className="flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg bg-slate-800/90 active:bg-purple-600 text-slate-200 active:text-white text-[11px] font-semibold transition-colors"
+                          className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-purple-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shrink-0"
+                          title="Team settings & danger zone"
                         >
-                          <Settings className="w-3 h-3 text-purple-400" />
-                          <span>Settings</span>
+                          <Settings className="w-3.5 h-3.5" />
+                          <span className="hidden xl:inline">Settings</span>
                         </button>
                       </div>
                     </div>
-
-                    {/* Desktop/Tablet Row View (>= sm) */}
-                    <div
-                      onClick={() => handleOpenTeam(t.id, 'members')}
-                      className="group hidden sm:flex items-center justify-between px-4 py-3 bg-slate-900/70 hover:bg-slate-850 active:bg-slate-800 rounded-xl border border-slate-800/80 hover:border-slate-700 hover:shadow-xs transition-all select-none cursor-pointer text-xs text-slate-200"
-                    >
-                      {/* Team info: Avatar + Name + Description */}
-                      <div className="flex items-center gap-3.5 flex-1 min-w-0 pr-4">
-                        <div
-                          className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-sm shadow-md shrink-0 ring-1 ring-white/10"
-                          style={{ backgroundColor: t.avatar_color || '#3b82f6' }}
-                        >
-                          {t.name.charAt(0).toUpperCase()}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-slate-100 group-hover:text-blue-400 transition-colors truncate">
-                              {t.name}
-                            </span>
-                            {(t.creator_name || t.creator_username) && (
-                              <span className="text-[10px] text-slate-400 font-mono hidden lg:inline">
-                                by {t.creator_name} {t.creator_username && `(@${t.creator_username})`}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-slate-400 truncate mt-0.5 max-w-xl">
-                            {t.description || 'No description provided.'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Meta and actions */}
-                      <div className="flex items-center gap-4 sm:gap-6 shrink-0 text-slate-400">
-                        {/* Role Pill */}
-                        <div className="w-24 justify-center flex">
-                          <span
-                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-                              isLeader
-                                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                                : 'bg-slate-800 text-slate-400 border-slate-700'
-                            }`}
-                          >
-                            {isLeader ? 'Leader' : 'Member'}
-                          </span>
-                        </div>
-
-                        {/* Members Count */}
-                        <div className="w-16 sm:w-24 flex items-center justify-center gap-1.5 text-xs text-slate-300">
-                          <Users className="w-3.5 h-3.5 text-slate-500" />
-                          <span>{t.members_count || 0}</span>
-                        </div>
-
-                        {/* Created Date */}
-                        <span className="w-28 text-right hidden md:inline text-[11px] text-slate-500 font-mono">
-                          {formatDate(t.created_at)}
-                        </span>
-
-                        {/* Action Buttons */}
-                        <div className="w-56 sm:w-64 flex items-center justify-end gap-1.5 shrink-0">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenTeam(t.id, 'members');
-                            }}
-                            className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shrink-0"
-                            title="View & manage members"
-                          >
-                            <Users className="w-3.5 h-3.5" />
-                            <span>Members</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenTeam(t.id, 'shares');
-                            }}
-                            className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shrink-0"
-                            title="View shared folders & files"
-                          >
-                            <FolderOpen className="w-3.5 h-3.5" />
-                            <span>Shares</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenTeam(t.id, 'settings');
-                            }}
-                            className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-purple-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shrink-0"
-                            title="Team settings & danger zone"
-                          >
-                            <Settings className="w-3.5 h-3.5" />
-                            <span>Settings</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </React.Fragment>
+                  </div>
                 );
               })}
             </div>
@@ -970,7 +990,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md select-none">
-            <div className="relative bg-slate-900 rounded-2xl sm:rounded-3xl max-w-2xl w-full border border-slate-800 shadow-2xl shadow-black/80 overflow-hidden flex flex-col h-[85vh] sm:h-[680px] max-h-[90vh]">
+            <div className="relative bg-slate-900 rounded-2xl sm:rounded-3xl max-w-2xl w-full border border-slate-800 shadow-2xl shadow-black/80 overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[85vh]">
               {/* Ambient Top Glow */}
               <div className="absolute -top-16 -left-16 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -998,6 +1018,12 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                         >
                           {isOwner ? 'Owner' : isLeader ? 'Leader' : 'Member'}
                         </span>
+                        {(activeTeam.creator_name || activeTeam.creator_username) && (
+                          <span className="text-[10px] sm:text-xs text-slate-400 font-mono bg-slate-900/90 px-2 py-0.5 rounded-lg border border-slate-800 shrink-0">
+                            Created by <span className="text-slate-200 font-medium">{activeTeam.creator_name || activeTeam.creator_username}</span>
+                            {activeTeam.creator_username && activeTeam.creator_name && ` (@${activeTeam.creator_username})`}
+                          </span>
+                        )}
                       </div>
                       <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 line-clamp-1">
                         {activeTeam.description || 'No description set for this team workspace.'}
@@ -1083,7 +1109,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
               </div>
 
               {/* Modal Body */}
-              <div className="p-3.5 sm:p-5 overflow-y-auto space-y-4 sm:space-y-5 relative z-10 flex-1">
+              <div className="p-3.5 sm:p-5 overflow-y-auto space-y-4 sm:space-y-5 relative z-10 flex-1 min-h-0">
                 {/* TAB 1: MEMBERS & ROLES */}
                 {activeTab === 'members' && (
                   <div className="space-y-4">
