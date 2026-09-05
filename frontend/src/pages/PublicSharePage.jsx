@@ -110,8 +110,9 @@ export default function PublicSharePage({ token, onBackToDrive }) {
       totalUploadBytes += files[i].size || 0;
     }
     
-    let totalLoaded = 0;
-    const CHUNK_SIZE = 20 * 1024 * 1024; // 20 MB chunks
+    let totalCompletedBytes = 0;
+    const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB chunks
+    const CONCURRENCY = 4;
 
     const generateUUID = () => {
       if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -129,23 +130,71 @@ export default function PublicSharePage({ token, onBackToDrive }) {
         const uploadId = generateUUID();
         const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
         
-        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-          if (controller.signal.aborted) throw new Error("AbortError");
-          const start = chunkIndex * CHUNK_SIZE;
-          const end = Math.min(start + CHUNK_SIZE, file.size);
-          const chunk = file.slice(start, end);
+        let chunkIndex = 0;
+        let activeUploads = 0;
+        let hasError = false;
+        
+        const activeChunks = new Map();
+
+        const updateProgress = () => {
+          let activeBytes = 0;
+          activeChunks.forEach((val) => { activeBytes += val; });
+          const currentTotalLoaded = totalCompletedBytes + activeBytes;
           
-          const chunkFormData = new FormData();
-          chunkFormData.append('upload_id', uploadId);
-          chunkFormData.append('chunk_index', chunkIndex);
-          chunkFormData.append('chunk', chunk);
-          
-          await publicShareAPI.uploadPublicChunk(token, chunkFormData, controller.signal);
-          
-          totalLoaded += chunk.size;
-          const percent = totalUploadBytes > 0 ? Math.min(100, Math.round((totalLoaded * 100) / totalUploadBytes)) : 100;
+          const percent = totalUploadBytes > 0 ? Math.min(100, Math.round((currentTotalLoaded * 100) / totalUploadBytes)) : 100;
           setUploadProgress(percent);
-        }
+        };
+
+        await new Promise((resolve, reject) => {
+          const next = () => {
+            if (hasError || controller.signal.aborted) {
+              if (controller.signal.aborted && !hasError) {
+                 reject(new Error("AbortError"));
+              }
+              return;
+            }
+            if (chunkIndex >= totalChunks && activeUploads === 0) {
+              resolve();
+              return;
+            }
+            
+            while (activeUploads < CONCURRENCY && chunkIndex < totalChunks && !hasError) {
+              const currentIndex = chunkIndex++;
+              activeUploads++;
+              
+              const start = currentIndex * CHUNK_SIZE;
+              const end = Math.min(start + CHUNK_SIZE, file.size);
+              const chunk = file.slice(start, end);
+              
+              const chunkFormData = new FormData();
+              chunkFormData.append('upload_id', uploadId);
+              chunkFormData.append('chunk_index', currentIndex);
+              chunkFormData.append('chunk', chunk);
+              
+              activeChunks.set(currentIndex, 0);
+              
+              publicShareAPI.uploadPublicChunk(token, chunkFormData, (e) => {
+                  activeChunks.set(currentIndex, e.loaded || 0);
+                  updateProgress();
+              }, controller.signal)
+                .then(() => {
+                  activeChunks.delete(currentIndex);
+                  totalCompletedBytes += chunk.size;
+                  updateProgress();
+                  
+                  activeUploads--;
+                  next();
+                })
+                .catch((err) => {
+                  if (!hasError) {
+                     hasError = true;
+                     reject(err);
+                  }
+                });
+            }
+          };
+          next();
+        });
         
         await publicShareAPI.uploadPublicFinalize(token, {
           upload_id: uploadId,
@@ -178,7 +227,6 @@ export default function PublicSharePage({ token, onBackToDrive }) {
       setIsUploading(false);
     }
   };
-
 
   const handleCancelUpload = () => {
     if (uploadAbortControllerRef.current) {

@@ -307,9 +307,10 @@ function AppContent() {
     let lastTime = Date.now();
     let lastLoaded = 0;
     let currentSpeed = 0;
-    let totalLoaded = 0;
+    let totalCompletedBytes = 0;
 
-    const CHUNK_SIZE = 20 * 1024 * 1024; // 20 MB chunks
+    const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB chunks
+    const CONCURRENCY = 4; // 4 concurrent chunks = 20MB in flight
 
     const generateUUID = () => {
       if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -327,27 +328,24 @@ function AppContent() {
         const uploadId = generateUUID();
         const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
         
-        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-          if (controller.signal.aborted) throw new Error("AbortError");
-          const start = chunkIndex * CHUNK_SIZE;
-          const end = Math.min(start + CHUNK_SIZE, file.size);
-          const chunk = file.slice(start, end);
+        let chunkIndex = 0;
+        let activeUploads = 0;
+        let hasError = false;
+        
+        const activeChunks = new Map();
+
+        const updateProgress = () => {
+          let activeBytes = 0;
+          activeChunks.forEach((val) => { activeBytes += val; });
+          const currentTotalLoaded = totalCompletedBytes + activeBytes;
           
-          const chunkFormData = new FormData();
-          chunkFormData.append('upload_id', uploadId);
-          chunkFormData.append('chunk_index', chunkIndex);
-          chunkFormData.append('chunk', chunk);
-          
-          await fileAPI.uploadChunk(chunkFormData, controller.signal);
-          
-          totalLoaded += chunk.size;
-          const percent = totalUploadBytes > 0 ? Math.min(100, Math.round((totalLoaded * 100) / totalUploadBytes)) : 100;
+          const percent = totalUploadBytes > 0 ? Math.min(100, Math.round((currentTotalLoaded * 100) / totalUploadBytes)) : 100;
           
           const now = Date.now();
           const timeDelta = (now - lastTime) / 1000;
           if (timeDelta >= 0.25) {
-            currentSpeed = (totalLoaded - lastLoaded) / timeDelta;
-            lastLoaded = totalLoaded;
+            currentSpeed = (currentTotalLoaded - lastLoaded) / timeDelta;
+            lastLoaded = currentTotalLoaded;
             lastTime = now;
           }
 
@@ -356,12 +354,63 @@ function AppContent() {
               ? {
                   ...prev,
                   progress: percent,
-                  loadedBytes: totalLoaded,
+                  loadedBytes: currentTotalLoaded,
                   speed: currentSpeed,
                 }
               : null
           );
-        }
+        };
+
+        await new Promise((resolve, reject) => {
+          const next = () => {
+            if (hasError || controller.signal.aborted) {
+              if (controller.signal.aborted && !hasError) {
+                 reject(new Error("AbortError"));
+              }
+              return;
+            }
+            if (chunkIndex >= totalChunks && activeUploads === 0) {
+              resolve();
+              return;
+            }
+            
+            while (activeUploads < CONCURRENCY && chunkIndex < totalChunks && !hasError) {
+              const currentIndex = chunkIndex++;
+              activeUploads++;
+              
+              const start = currentIndex * CHUNK_SIZE;
+              const end = Math.min(start + CHUNK_SIZE, file.size);
+              const chunk = file.slice(start, end);
+              
+              const chunkFormData = new FormData();
+              chunkFormData.append('upload_id', uploadId);
+              chunkFormData.append('chunk_index', currentIndex);
+              chunkFormData.append('chunk', chunk);
+              
+              activeChunks.set(currentIndex, 0);
+
+              fileAPI.uploadChunk(chunkFormData, (e) => {
+                  activeChunks.set(currentIndex, e.loaded || 0);
+                  updateProgress();
+              }, controller.signal)
+                .then(() => {
+                  activeChunks.delete(currentIndex);
+                  totalCompletedBytes += chunk.size;
+                  updateProgress();
+                  
+                  activeUploads--;
+                  next();
+                })
+                .catch((err) => {
+                  if (!hasError) {
+                     hasError = true;
+                     reject(err);
+                  }
+                });
+            }
+          };
+          next();
+        });
         
         // Finalize this file
         await fileAPI.finalizeUpload({
@@ -435,7 +484,6 @@ function AppContent() {
       );
     }
   };
-
 
   const handleCancelUpload = () => {
     if (uploadAbortControllerRef.current) {

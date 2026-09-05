@@ -63,10 +63,11 @@ export const folderAPI = {
 };
 
 export const fileAPI = {
-  uploadChunk: (formData, signal) =>
+  uploadChunk: (formData, onProgress, signal) =>
     api.post('/upload/chunk', formData, {
       signal,
       headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: onProgress,
     }),
   finalizeUpload: (data, signal) =>
     api.post('/upload/finalize', data, { signal }),
@@ -114,10 +115,11 @@ export const publicShareAPI = {
       headers: password ? { 'X-Share-Password': password } : {},
     }),
   getDownloadUrl: (token) => `/api/public/share/${token}/download`,
-  uploadPublicChunk: (token, formData, signal) =>
+  uploadPublicChunk: (token, formData, onProgress, signal) =>
     api.post(`/public/share/${token}/upload/chunk`, formData, {
       signal,
       headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: onProgress,
     }),
   uploadPublicFinalize: (token, data, signal) =>
     api.post(`/public/share/${token}/upload/finalize`, data, { signal }),
