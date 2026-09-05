@@ -61,15 +61,39 @@ func LoadConfig() *Config {
 	port := getEnv("PORT", "8080")
 	frontendPort := getEnv("FRONTEND_PORT", "5173")
 	databaseDir := getEnv("DATABASE_DIR", "database")
-	accountDBPath := getEnv("ACCOUNT_DB_PATH", filepath.Join(databaseDir, "account.db"))
-	driveDBPath := getEnv("DRIVE_DB_PATH", filepath.Join(databaseDir, "drive.db"))
-	storageDir := getEnv("STORAGE_DIR", filepath.Join(databaseDir, "uploads"))
-	logsDir := getEnv("LOGS_DIR", filepath.Join(databaseDir, "logs"))
+	logsDir := getEnv("LOGS_DIR", "logs")
+
+	// Determine Account DB Path:
+	// Automatically uses the user-configured databaseDir unless explicitly customized to a different path
+	accountDBPath := os.Getenv("ACCOUNT_DB_PATH")
+	if accountDBPath == "" || (databaseDir != "database" && (accountDBPath == "database/account.db" || strings.HasPrefix(accountDBPath, "database/"))) {
+		accountDBPath = filepath.Join(databaseDir, "account.db")
+	}
+
+	// Determine Drive DB Path:
+	driveDBPath := os.Getenv("DRIVE_DB_PATH")
+	if driveDBPath == "" || (databaseDir != "database" && (driveDBPath == "database/drive.db" || strings.HasPrefix(driveDBPath, "database/"))) {
+		driveDBPath = filepath.Join(databaseDir, "drive.db")
+	}
+
+	// Determine Storage Dir (uploads):
+	storageDir := os.Getenv("STORAGE_DIR")
+	if storageDir == "" || (databaseDir != "database" && (storageDir == "database/uploads" || strings.HasPrefix(storageDir, "database/"))) {
+		storageDir = filepath.Join(databaseDir, "uploads")
+	}
+
+	// If legacy database/logs was configured in .env but databaseDir was changed:
+	if logsDir == "database/logs" && databaseDir != "database" {
+		logsDir = filepath.Join(databaseDir, "logs")
+	}
+
 	jwtSecret := getEnv("JWT_SECRET", "eledrive-super-secure-jwt-secret-key-2025")
 	baseURL := getEnv("BASE_URL", "http://localhost:"+port)
 
-	// Ensure database and uploads directories exist
+	// Ensure ONLY the user-configured directories exist (no default unneeded directories created)
 	_ = os.MkdirAll(databaseDir, 0755)
+	_ = os.MkdirAll(filepath.Dir(accountDBPath), 0755)
+	_ = os.MkdirAll(filepath.Dir(driveDBPath), 0755)
 	_ = os.MkdirAll(storageDir, 0755)
 	_ = os.MkdirAll(logsDir, 0755)
 

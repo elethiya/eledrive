@@ -22,6 +22,12 @@ func InitDB(cfg *config.Config) (*sql.DB, error) {
 	if err := os.MkdirAll(cfg.DatabaseDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
+	if err := os.MkdirAll(filepath.Dir(cfg.AccountDBPath), 0755); err != nil {
+		return nil, fmt.Errorf("failed to create account database directory: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(cfg.DriveDBPath), 0755); err != nil {
+		return nil, fmt.Errorf("failed to create drive database directory: %w", err)
+	}
 	if err := os.MkdirAll(cfg.StorageDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create storage directory: %w", err)
 	}

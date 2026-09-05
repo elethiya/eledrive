@@ -12,78 +12,74 @@ import (
 
 var (
 	CurrentLogSessionDir string
-	serverLogFile        *os.File
-	activityLogFile      *os.File
-	requestLogFile       *os.File
+	CurrentLogFilePath   string
+	currentLogFile       *os.File
 	logMu                sync.Mutex
 )
 
-// InitLogger creates database/logs/<date>/<time>/ folders
-// and sets up log outputs
+// InitLogger creates <logsBaseDir>/<date>/ folder and opens a single <time>.log file inside it.
+// No subfolder for time is created, and all logs (server, activity, requests) are unified into this single file.
 func InitLogger(logsBaseDir string) (string, error) {
 	logMu.Lock()
 	defer logMu.Unlock()
 
 	now := time.Now()
 	dateFolder := now.Format("2006-01-02")
-	timeFolder := now.Format("15:04:05")
+	timeFileName := fmt.Sprintf("%s.log", now.Format("15:04:05"))
 
-	sessionDir := filepath.Join(logsBaseDir, dateFolder, timeFolder)
-	if err := os.MkdirAll(sessionDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create log session directory: %w", err)
+	dateDir := filepath.Join(logsBaseDir, dateFolder)
+	if err := os.MkdirAll(dateDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create log date directory: %w", err)
 	}
 
-	CurrentLogSessionDir = sessionDir
+	CurrentLogSessionDir = dateDir
 
-	// Server console runtime log
-	sFile, err := os.OpenFile(filepath.Join(sessionDir, "server.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err == nil {
-		serverLogFile = sFile
-		log.SetOutput(io.MultiWriter(os.Stdout, sFile))
+	logFilePath := filepath.Join(dateDir, timeFileName)
+	file, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return "", fmt.Errorf("failed to open log file %s: %w", logFilePath, err)
 	}
 
-	// Activity audit log
-	aFile, err := os.OpenFile(filepath.Join(sessionDir, "activity.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err == nil {
-		activityLogFile = aFile
+	// Close previously active log file if any
+	if currentLogFile != nil {
+		_ = currentLogFile.Close()
 	}
+	currentLogFile = file
+	CurrentLogFilePath = logFilePath
 
-	// Request log
-	rFile, err := os.OpenFile(filepath.Join(sessionDir, "requests.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err == nil {
-		requestLogFile = rFile
-	}
+	// Server console runtime log: route standard output to stdout and this single log file
+	log.SetOutput(io.MultiWriter(os.Stdout, file))
 
-	return sessionDir, nil
+	return logFilePath, nil
 }
 
-// LogActivityToFile records an audit event to activity.log in the current log folder
+// LogActivityToFile records an audit event to the single session log file
 func LogActivityToFile(userID, userName, action, itemType, itemID, itemName, details string) {
 	logMu.Lock()
 	defer logMu.Unlock()
 
-	if activityLogFile != nil {
-		line := fmt.Sprintf("[%s] [USER: %s (%s)] [ACTION: %s] [TARGET: %s:%s (%s)] %s\n",
+	if currentLogFile != nil {
+		line := fmt.Sprintf("[%s] [ACTIVITY] [USER: %s (%s)] [ACTION: %s] [TARGET: %s:%s (%s)] %s\n",
 			time.Now().Format("2006-01-02 15:04:05"),
 			userName, userID,
 			action,
 			itemType, itemID, itemName,
 			details,
 		)
-		_, _ = activityLogFile.WriteString(line)
+		_, _ = currentLogFile.WriteString(line)
 	}
 }
 
-// LogRequestToFile logs HTTP requests to requests.log in the current log folder
+// LogRequestToFile logs HTTP requests to the single session log file
 func LogRequestToFile(method, path, status, duration, ip string) {
 	logMu.Lock()
 	defer logMu.Unlock()
 
-	if requestLogFile != nil {
-		line := fmt.Sprintf("[%s] %s %s | STATUS: %s | DURATION: %s | IP: %s\n",
+	if currentLogFile != nil {
+		line := fmt.Sprintf("[%s] [REQUEST] %s %s | STATUS: %s | DURATION: %s | IP: %s\n",
 			time.Now().Format("2006-01-02 15:04:05"),
 			method, path, status, duration, ip,
 		)
-		_, _ = requestLogFile.WriteString(line)
+		_, _ = currentLogFile.WriteString(line)
 	}
 }

@@ -55,10 +55,12 @@ func main() {
 
 	cfg := config.LoadConfig()
 
-	// Initialize file & folder logger in database/logs/<date>/<time>.log/
-	sessionDir, err := utils.InitLogger(cfg.LogsDir)
+	// Initialize file logger in <LogsDir>/<date>/<time>.log
+	logFile, err := utils.InitLogger(cfg.LogsDir)
 	if err != nil {
-		log.Printf("\033[1;33m[WARN]\033[0m Failed to initialize log folder: %v", err)
+		log.Printf("\033[1;33m[WARN]\033[0m Failed to initialize log file: %v", err)
+	} else {
+		log.Printf("\033[1;34m[LOGS]\033[0m Logging session to: %s", logFile)
 	}
 
 	// Initialize Database
@@ -275,7 +277,7 @@ func main() {
 	log.Printf("\033[1;34m[STORAGE]\033[0m  Storage dir: %s", cfg.StorageDir)
 	log.Printf("\033[1;35m[ACCOUNT]\033[0m  Account DB:  %s", cfg.AccountDBPath)
 	log.Printf("\033[1;35m[DRIVE]\033[0m    Drive DB:    %s", cfg.DriveDBPath)
-	log.Printf("\033[1;36m[LOGS]\033[0m     Logs dir:    %s", sessionDir)
+	log.Printf("\033[1;36m[LOGS]\033[0m     Log file:    %s", logFile)
 	log.Printf("\033[1;34m==================================================\033[0m")
 
 	if err := http.ListenAndServe(addr, r); err != nil {
