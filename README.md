@@ -276,11 +276,10 @@ EleDrive can be configured using environment variables:
 
 | Variable | Default | Description |
 |---|---|---|
-| `PORT` | `8080` | Port for the HTTP server |
-| `DATABASE_DIR` | `database` | Root directory for databases, uploads, and logs |
-| `ACCOUNT_DB_PATH` | `database/account.db` | Path to the user accounts & settings SQLite database |
-| `DRIVE_DB_PATH` | `database/drive.db` | Path to the files & folders SQLite database |
-| `STORAGE_DIR` | `database/uploads` | Path to directory where files are stored |
-| `LOGS_DIR` | `database/logs` | Path to directory where dated/timed logs are stored |
+| `PORT` | `3030` | Port for the HTTP server |
+| `DATABASE_DIR` | `/home/elethiya/platfrom/database` | Root directory for databases, uploads, and logs |
+| `ACCOUNT_DB_PATH` | `$DATABASE_DIR/account.db` | Path to the user accounts & settings SQLite database |
+| `DRIVE_DB_PATH` | `$DATABASE_DIR/drive.db` | Path to the files & folders SQLite database |
+| `STORAGE_DIR` | `$DATABASE_DIR/uploads` | Path to directory where files are stored |
+| `LOGS_DIR` | `$DATABASE_DIR/logs` | Path to directory where dated/timed logs are stored |
 | `JWT_SECRET` | `eledrive-secret-key-...` | Secret key used for signing JWT tokens |
-| `MAX_UPLOAD_SIZE_MB`| `1024` (1 GB) | Maximum allowed file upload size in MB |
