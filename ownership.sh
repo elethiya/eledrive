@@ -35,7 +35,15 @@ elif [ -f "${ROOT_DIR}/.evn" ]; then
 fi
 PORT="${PORT:-8080}"
 
-DB_PATH="${ACCOUNT_DB_PATH:-${ROOT_DIR}/database/account.db}"
+if [ -n "${DATABASE_DIR:-}" ]; then
+    if [ -z "${ACCOUNT_DB_PATH:-}" ]; then
+        DB_PATH="${DATABASE_DIR}/account.db"
+    else
+        DB_PATH="$ACCOUNT_DB_PATH"
+    fi
+else
+    DB_PATH="${ACCOUNT_DB_PATH:-${ROOT_DIR}/database/account.db}"
+fi
 
 # Fallback to legacy path if database/account.db not yet generated
 if [ ! -f "$DB_PATH" ] && [ -f "${ROOT_DIR}/data/eledrive.db" ]; then

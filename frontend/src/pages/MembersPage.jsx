@@ -489,7 +489,7 @@ function MemberProfileCard({ m, meta, isCurrent, onSelectMember }) {
           onSelectMember(m);
         }
       }}
-      className="p-4 rounded-2xl bg-transparent hover:bg-slate-900/50 border border-slate-800/80 hover:border-slate-700/80 transition-all duration-200 cursor-pointer group shadow-xs hover:shadow-lg hover:-translate-y-0.5 flex flex-col justify-between gap-3 text-left focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+      className="p-4 rounded-2xl bg-slate-950/60 hover:bg-slate-900/80 border border-slate-800/80 hover:border-slate-700/80 transition-all duration-200 cursor-pointer group shadow-xs hover:shadow-lg hover:-translate-y-0.5 flex flex-col justify-between gap-3 text-left focus:outline-none focus:ring-1 focus:ring-blue-500/50"
     >
       {/* Top: Avatar & User Identity */}
       <div className="flex items-start gap-3 min-w-0">
@@ -572,9 +572,12 @@ function MemberDetailModal({ member, meta, onClose, onCopyEmail, copied, current
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
       <div className="fixed inset-0" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 z-10 animate-in zoom-in-95 duration-150">
+      <div className="relative w-full max-w-md bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl p-5 pb-8 sm:p-6 shadow-2xl space-y-5 z-10 animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+        {/* Mobile Drag Handle Indicator */}
+        <div className="w-12 h-1.5 bg-slate-800 rounded-full mx-auto sm:hidden mb-2" />
+
         {/* Close Button */}
         <button
           type="button"

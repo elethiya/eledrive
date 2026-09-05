@@ -477,23 +477,6 @@ export default function ForensicPage({ onNavigateView }) {
             </>
           )}
 
-          {/* Owner Quick Access Manager Trigger in Header */}
-          {isOwner && (
-            <button
-              type="button"
-              onClick={() => setIsAccessModalOpen(true)}
-              className="flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/40 transition-all shadow-xs"
-              title="Open Forensic Access Manager"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span className="hidden min-[420px]:inline">Access Manager</span>
-              {grants.length > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-amber-500/30 text-amber-200 text-[10px] font-mono font-bold">
-                  {grants.length}
-                </span>
-              )}
-            </button>
-          )}
 
           {/* Refresh Action */}
           <button
@@ -545,14 +528,14 @@ export default function ForensicPage({ onNavigateView }) {
               </span>
             )}
           </button>
-
+          
           {/* List Type Button to open Forensic Access Manager in Floating Window */}
           {isOwner && (
             <button
               type="button"
               onClick={() => setIsAccessModalOpen(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 active:bg-amber-500/25 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 transition-all shrink-0 shadow-xs"
-              title="Open Forensic Access Manager in floating window"
+              title="Open Forensic Access Manager"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
               <span>Forensic Access Manager</span>
@@ -563,6 +546,7 @@ export default function ForensicPage({ onNavigateView }) {
               )}
             </button>
           )}
+
         </div>
       </div>
 
@@ -646,8 +630,8 @@ export default function ForensicPage({ onNavigateView }) {
               </div>
 
               {/* Interactive Scanner Card */}
-              <div className="p-4 sm:p-6 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-4 sm:space-y-5 min-w-0">
-                <div className="min-w-0">
+              <div className="sm:p-6 sm:rounded-3xl sm:bg-slate-900 sm:border sm:border-slate-800 sm:shadow-xl space-y-4 sm:space-y-5 min-w-0">
+                <div className="min-w-0 px-1 sm:px-0">
                   <h2 className="text-xs sm:text-sm font-bold text-slate-100 flex items-center gap-2">
                     <ScanLine className="w-4 h-4 text-emerald-400" />
                     <span>Suspect Asset Analyzer & Ledger Search</span>
@@ -1055,8 +1039,8 @@ export default function ForensicPage({ onNavigateView }) {
           {/* TAB 2: TRACKED FILES LEDGER */}
           {/* ===================================================================== */}
           {activeTab === 'files' && (
-            <div className="p-4 sm:p-6 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-4 min-w-0">
-              <div className="flex items-center justify-between min-w-0">
+            <div className="sm:p-6 sm:rounded-3xl sm:bg-slate-900 sm:border sm:border-slate-800 space-y-4 min-w-0">
+              <div className="flex items-center justify-between min-w-0 px-1 sm:px-0">
                 <div className="flex items-center gap-2 min-w-0">
                   <Shield className="w-4 h-4 text-emerald-400 shrink-0" />
                   <h3 className="text-xs sm:text-sm font-bold text-slate-100 truncate">
