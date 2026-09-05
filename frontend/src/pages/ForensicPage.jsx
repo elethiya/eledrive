@@ -903,11 +903,11 @@ export default function ForensicPage({ onNavigateView }) {
                           </div>
                         )}
 
-                        {/* Leaker Profile Grid - Fully responsive */}
+                        {/* Profile Grid - Adapts for Leaker or Owner */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 min-w-0">
                           <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 min-w-0">
                             <span className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
-                              Identified Leaker
+                              {inspectionResult.leaker_identified ? 'Identified Leaker' : 'Asset Uploader'}
                             </span>
                             <div className="flex items-center gap-2 min-w-0">
                               <div
@@ -916,14 +916,18 @@ export default function ForensicPage({ onNavigateView }) {
                                   backgroundColor: inspectionResult.avatar_color || '#3b82f6',
                                 }}
                               >
-                                {(inspectionResult.leaker_name || inspectionResult.leaker_username || 'U').charAt(0).toUpperCase()}
+                                {inspectionResult.leaker_identified
+                                  ? (inspectionResult.leaker_name || inspectionResult.leaker_username || 'U').charAt(0).toUpperCase()
+                                  : (inspectionResult.uploader_name || inspectionResult.uploader_username || 'U').charAt(0).toUpperCase()}
                               </div>
                               <div className="min-w-0 flex-1">
                                 <div className="text-xs font-bold text-slate-100 truncate">
-                                  {inspectionResult.leaker_name || 'Identified User'}
+                                  {inspectionResult.leaker_identified
+                                    ? (inspectionResult.leaker_name || 'Identified User')
+                                    : (inspectionResult.uploader_name || 'Unknown Uploader')}
                                 </div>
                                 <div className="text-[10px] text-slate-400 truncate">
-                                  @{inspectionResult.leaker_username || 'user'}
+                                  @{inspectionResult.leaker_identified ? (inspectionResult.leaker_username || 'user') : (inspectionResult.uploader_username || 'user')}
                                 </div>
                               </div>
                             </div>
@@ -933,37 +937,43 @@ export default function ForensicPage({ onNavigateView }) {
                             <span className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
                               User Email
                             </span>
-                            <div className="text-xs font-semibold text-slate-200 truncate" title={inspectionResult.leaker_email}>
-                              {inspectionResult.leaker_email || 'N/A'}
+                            <div className="text-xs font-semibold text-slate-200 truncate" title={inspectionResult.leaker_identified ? inspectionResult.leaker_email : inspectionResult.uploader_email}>
+                              {inspectionResult.leaker_identified ? (inspectionResult.leaker_email || 'N/A') : (inspectionResult.uploader_email || 'N/A')}
                             </div>
                             <div className="text-[10px] text-slate-500 font-mono mt-0.5 truncate">
-                              ID: {inspectionResult.leaker_id ? inspectionResult.leaker_id.slice(0, 8) + '...' : 'N/A'}
+                              ID: {inspectionResult.leaker_identified 
+                                    ? (inspectionResult.leaker_id ? inspectionResult.leaker_id.slice(0, 8) + '...' : 'N/A')
+                                    : (inspectionResult.uploader_id ? inspectionResult.uploader_id.slice(0, 8) + '...' : 'N/A')}
                             </div>
                           </div>
 
                           <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 min-w-0">
                             <span className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
-                              Timestamp
+                              {inspectionResult.leaker_identified ? 'Timestamp' : 'Uploaded On'}
                             </span>
                             <div className="text-xs font-mono font-bold text-slate-200 truncate">
-                              {inspectionResult.accessed_at || inspectionResult.download_timestamp
-                                ? formatDate(inspectionResult.accessed_at || inspectionResult.download_timestamp)
-                                : 'N/A'}
+                              {inspectionResult.leaker_identified 
+                                ? (inspectionResult.accessed_at || inspectionResult.download_timestamp ? formatDate(inspectionResult.accessed_at || inspectionResult.download_timestamp) : 'N/A')
+                                : (inspectionResult.uploaded_at ? formatDate(inspectionResult.uploaded_at) : 'N/A')}
                             </div>
                             <div className="text-[10px] text-slate-500 font-mono mt-0.5 truncate">
-                              Exact Stamped Time
+                              {inspectionResult.leaker_identified ? 'Exact Stamped Time' : 'File Creation'}
                             </div>
                           </div>
 
                           <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 min-w-0">
                             <span className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
-                              Source IP
+                              {inspectionResult.leaker_identified ? 'Source IP' : 'Asset Size'}
                             </span>
                             <div className="text-xs font-mono font-bold text-slate-200 truncate">
-                              {inspectionResult.client_ip || inspectionResult.leaker_ip || '127.0.0.1'}
+                              {inspectionResult.leaker_identified
+                                ? (inspectionResult.client_ip || inspectionResult.leaker_ip || '127.0.0.1')
+                                : formatBytes(inspectionResult.file_size || 0)}
                             </div>
-                            <div className="text-[10px] text-slate-500 truncate" title={inspectionResult.user_agent}>
-                              {inspectionResult.user_agent || 'Browser Session'}
+                            <div className="text-[10px] text-slate-500 truncate" title={inspectionResult.leaker_identified ? inspectionResult.user_agent : inspectionResult.file_type}>
+                              {inspectionResult.leaker_identified
+                                ? (inspectionResult.user_agent || 'Browser Session')
+                                : (inspectionResult.file_type || 'Unknown Type')}
                             </div>
                           </div>
                         </div>
