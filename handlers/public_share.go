@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"strconv"
 	"time"
 
 	"eledrive/config"
@@ -592,5 +593,150 @@ func (h *PublicShareHandler) UploadPublic(w http.ResponseWriter, r *http.Request
 	utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"count": len(uploadedFiles),
 		"files": uploadedFiles,
+	})
+}
+
+func (h *PublicShareHandler) UploadPublicChunk(w http.ResponseWriter, r *http.Request) {
+	allowShares, _, _ := db.GetPublicSharingSettings()
+	if !allowShares {
+		utils.RespondError(w, http.StatusForbidden, "Public share links are currently disabled")
+		return
+	}
+
+	token := chi.URLParam(r, "token")
+	var permission string
+	var expAt sql.NullTime
+
+	err := db.DB.QueryRow(`
+		SELECT permission, expires_at FROM share_links WHERE token = ?
+	`, token).Scan(&permission, &expAt)
+	
+	if err != nil || permission != "upload_and_view" {
+		utils.RespondError(w, http.StatusForbidden, "Invalid share link or view-only")
+		return
+	}
+	if expAt.Valid && expAt.Time.Before(time.Now()) {
+		utils.RespondError(w, http.StatusGone, "Share link has expired")
+		return
+	}
+
+	err = r.ParseMultipartForm(50 << 20) // 50MB
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "Failed to parse chunk upload")
+		return
+	}
+
+	uploadID := r.FormValue("upload_id")
+	chunkIndexStr := r.FormValue("chunk_index")
+	
+	if uploadID == "" || chunkIndexStr == "" {
+		utils.RespondError(w, http.StatusBadRequest, "Missing upload_id or chunk_index")
+		return
+	}
+
+	chunkIndex, err := strconv.Atoi(chunkIndexStr)
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "Invalid chunk_index")
+		return
+	}
+
+	file, _, err := r.FormFile("chunk")
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "Missing chunk file")
+		return
+	}
+	defer file.Close()
+
+	if err := h.storage.SaveChunk(uploadID, chunkIndex, file); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to save chunk")
+		return
+	}
+
+	utils.RespondSuccess(w, http.StatusOK, "Chunk uploaded", nil)
+}
+
+func (h *PublicShareHandler) UploadPublicFinalize(w http.ResponseWriter, r *http.Request) {
+	allowShares, _, _ := db.GetPublicSharingSettings()
+	if !allowShares {
+		utils.RespondError(w, http.StatusForbidden, "Public share links are currently disabled")
+		return
+	}
+
+	token := chi.URLParam(r, "token")
+	var link models.ShareLink
+	var expAt sql.NullTime
+
+	err := db.DB.QueryRow(`
+		SELECT id, token, target_type, target_id, created_by_user_id, permission, expires_at
+		FROM share_links
+		WHERE token = ?
+	`, token).Scan(
+		&link.ID, &link.Token, &link.TargetType, &link.TargetID, &link.CreatedByUserID,
+		&link.Permission, &expAt,
+	)
+	if err != nil || link.TargetType != "folder" || link.Permission != "upload_and_view" {
+		utils.RespondError(w, http.StatusForbidden, "Invalid share link for upload")
+		return
+	}
+	if expAt.Valid && expAt.Time.Before(time.Now()) {
+		utils.RespondError(w, http.StatusGone, "Share link has expired")
+		return
+	}
+
+	var req struct {
+		UploadID     string `json:"upload_id"`
+		Filename     string `json:"filename"`
+		TotalChunks  int    `json:"total_chunks"`
+		TotalSize    int64  `json:"total_size"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	targetFolderID := link.TargetID
+	targetOwnerID := link.CreatedByUserID
+
+	diskName, writtenBytes, err := h.storage.MergeChunks(req.UploadID, req.TotalChunks, req.Filename)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to merge chunks")
+		return
+	}
+
+	ext := filepath.Ext(req.Filename)
+	mimeType := utils.DetectMimeType(req.Filename)
+	fileID := uuid.New().String()
+	now := time.Now()
+
+	_, err = db.DB.Exec(`
+		INSERT INTO files (id, name, original_name, folder_id, owner_id, storage_path, size, mime_type, extension, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, fileID, req.Filename, req.Filename, targetFolderID, targetOwnerID, diskName, writtenBytes, mimeType, ext, now, now)
+
+	if err != nil {
+		_ = h.storage.DeleteFile(diskName)
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to save file to database")
+		return
+	}
+
+	_, _ = h.storage.UpdateUserStorage(targetOwnerID)
+
+	fileObj := models.File{
+		ID:           fileID,
+		Name:         req.Filename,
+		OriginalName: req.Filename,
+		FolderID:     &targetFolderID,
+		OwnerID:      targetOwnerID,
+		Size:         writtenBytes,
+		MimeType:     mimeType,
+		Extension:    ext,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"file": fileObj,
 	})
 }

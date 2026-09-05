@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"encoding/json"
+	"strconv"
 	"time"
 
 	"eledrive/config"
@@ -239,4 +241,152 @@ func (h *UploadHandler) ensureFolderPath(relDir string, parentFolderID *string, 
 		return *currentParentID, nil
 	}
 	return "", nil
+}
+
+
+func (h *UploadHandler) UploadChunk(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseMultipartForm(50 << 20) // 50MB
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "Failed to parse chunk upload")
+		return
+	}
+
+	uploadID := r.FormValue("upload_id")
+	chunkIndexStr := r.FormValue("chunk_index")
+	
+	if uploadID == "" || chunkIndexStr == "" {
+		utils.RespondError(w, http.StatusBadRequest, "Missing upload_id or chunk_index")
+		return
+	}
+
+	chunkIndex, err := strconv.Atoi(chunkIndexStr)
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "Invalid chunk_index")
+		return
+	}
+
+	file, _, err := r.FormFile("chunk")
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "Missing chunk file")
+		return
+	}
+	defer file.Close()
+
+	if err := h.storage.SaveChunk(uploadID, chunkIndex, file); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to save chunk")
+		return
+	}
+
+	utils.RespondSuccess(w, http.StatusOK, "Chunk uploaded", nil)
+}
+
+func (h *UploadHandler) UploadFinalize(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+
+	var req struct {
+		UploadID     string `json:"upload_id"`
+		Filename     string `json:"filename"`
+		RelativePath string `json:"relative_path"`
+		FolderID     string `json:"folder_id"`
+		TotalChunks  int    `json:"total_chunks"`
+		TotalSize    int64  `json:"total_size"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	targetFolderID := req.FolderID
+	targetOwnerID := claims.UserID
+
+	if targetFolderID != "" {
+		targetFolder, perm, err := CheckFolderAccess(claims.UserID, targetFolderID)
+		if err != nil || (perm != "owner" && perm != "editor") {
+			utils.RespondError(w, http.StatusForbidden, "No permission to upload into this folder")
+			return
+		}
+		targetOwnerID = targetFolder.OwnerID
+	}
+
+	var storageLimit, storageUsed int64
+	_ = db.DB.QueryRow("SELECT storage_limit, storage_used FROM users WHERE id = ?", targetOwnerID).Scan(&storageLimit, &storageUsed)
+
+	if storageUsed+req.TotalSize > storageLimit {
+		utils.RespondError(w, http.StatusInsufficientStorage, "Storage quota exceeded")
+		return
+	}
+
+	var destFolderID *string
+	if targetFolderID != "" {
+		destFolderID = &targetFolderID
+	}
+
+	folderCache := make(map[string]string)
+	if req.RelativePath != "" {
+		cleanRel := filepath.Clean(req.RelativePath)
+		dirPart := filepath.Dir(cleanRel)
+		if dirPart != "." && dirPart != "/" && dirPart != "" {
+			resolvedFolderID, err := h.ensureFolderPath(dirPart, destFolderID, targetOwnerID, folderCache)
+			if err == nil && resolvedFolderID != "" {
+				destFolderID = &resolvedFolderID
+			}
+		}
+	}
+
+	diskName, writtenBytes, err := h.storage.MergeChunks(req.UploadID, req.TotalChunks, req.Filename)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to merge chunks")
+		return
+	}
+
+	ext := filepath.Ext(req.Filename)
+	mimeType := utils.DetectMimeType(req.Filename)
+	fileID := uuid.New().String()
+	now := time.Now()
+
+	secretUUID := utils.GenerateSecretUUID()
+	metaJSON, _ := utils.BuildForensicMeta(secretUUID, claims.UserID, claims.Email, claims.Username, req.Filename, h.cfg.JWTSecret)
+
+	fullDiskPath := h.storage.GetFilePath(diskName)
+	_ = utils.InjectForensicWatermark(fullDiskPath, secretUUID, claims.UserID, claims.Email, claims.Username, h.cfg.JWTSecret)
+
+	_, err = db.DB.Exec(`
+		INSERT INTO files (id, name, original_name, folder_id, owner_id, storage_path, size, mime_type, extension, secret_uuid, forensic_meta, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, fileID, req.Filename, req.Filename, destFolderID, targetOwnerID, diskName, writtenBytes, mimeType, ext, secretUUID, metaJSON, now, now)
+
+	if err != nil {
+		_ = h.storage.DeleteFile(diskName)
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to save file to database")
+		return
+	}
+
+	_, _ = h.storage.UpdateUserStorage(targetOwnerID)
+	db.LogActivity(claims.UserID, claims.Username, "upload", "file", fileID, req.Filename, fmt.Sprintf("Uploaded %s (%d bytes) [Secret UUID: %s]", req.Filename, writtenBytes, secretUUID))
+
+	events.Broadcast("file:create", "file", "upload", "", req.FolderID, claims.UserID, map[string]interface{}{
+		"count": 1,
+		"folder_id": req.FolderID,
+	})
+
+	fileObj := models.File{
+		ID:           fileID,
+		Name:         req.Filename,
+		OriginalName: req.Filename,
+		FolderID:     destFolderID,
+		OwnerID:      targetOwnerID,
+		Size:         writtenBytes,
+		MimeType:     mimeType,
+		Extension:    ext,
+		SecretUUID:   secretUUID,
+		ForensicMeta: metaJSON,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"file": fileObj,
+	})
 }

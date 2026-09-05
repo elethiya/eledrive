@@ -275,7 +275,6 @@ function AppContent() {
     }
   };
 
-  // Upload Files or Folders/Projects with real-time network speed, file size tracking, and cancel support
   const handleUploadFiles = async (filesList) => {
     if (!filesList || filesList.length === 0) return;
 
@@ -305,34 +304,50 @@ function AppContent() {
       error: null,
     });
 
-    const formData = new FormData();
-    if (currentFolderId) {
-      formData.append('folder_id', currentFolderId);
-    }
-
-    filesList.forEach((file) => {
-      formData.append('files', file);
-      if (file.webkitRelativePath) {
-        formData.append('paths', file.webkitRelativePath);
-      }
-    });
-
     let lastTime = Date.now();
     let lastLoaded = 0;
     let currentSpeed = 0;
+    let totalLoaded = 0;
+
+    const CHUNK_SIZE = 20 * 1024 * 1024; // 20 MB chunks
+
+    const generateUUID = () => {
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+      }
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    };
 
     try {
-      await fileAPI.uploadFiles(
-        formData,
-        (percent, stats) => {
+      for (let i = 0; i < filesList.length; i++) {
+        const file = filesList[i];
+        const uploadId = generateUUID();
+        const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
+        
+        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+          if (controller.signal.aborted) throw new Error("AbortError");
+          const start = chunkIndex * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, file.size);
+          const chunk = file.slice(start, end);
+          
+          const chunkFormData = new FormData();
+          chunkFormData.append('upload_id', uploadId);
+          chunkFormData.append('chunk_index', chunkIndex);
+          chunkFormData.append('chunk', chunk);
+          
+          await fileAPI.uploadChunk(chunkFormData, controller.signal);
+          
+          totalLoaded += chunk.size;
+          const percent = totalUploadBytes > 0 ? Math.min(100, Math.round((totalLoaded * 100) / totalUploadBytes)) : 100;
+          
           const now = Date.now();
           const timeDelta = (now - lastTime) / 1000;
-          const loaded = stats?.loaded ?? Math.round((totalUploadBytes * percent) / 100);
-          const total = stats?.total ?? totalUploadBytes;
-
           if (timeDelta >= 0.25) {
-            currentSpeed = (loaded - lastLoaded) / timeDelta;
-            lastLoaded = loaded;
+            currentSpeed = (totalLoaded - lastLoaded) / timeDelta;
+            lastLoaded = totalLoaded;
             lastTime = now;
           }
 
@@ -341,15 +356,23 @@ function AppContent() {
               ? {
                   ...prev,
                   progress: percent,
-                  loadedBytes: loaded,
-                  totalBytes: total,
+                  loadedBytes: totalLoaded,
                   speed: currentSpeed,
                 }
               : null
           );
-        },
-        controller.signal
-      );
+        }
+        
+        // Finalize this file
+        await fileAPI.finalizeUpload({
+          upload_id: uploadId,
+          filename: file.name,
+          relative_path: file.webkitRelativePath || '',
+          folder_id: currentFolderId || '',
+          total_chunks: totalChunks,
+          total_size: file.size
+        }, controller.signal);
+      }
 
       uploadAbortControllerRef.current = null;
 
@@ -381,7 +404,8 @@ function AppContent() {
         controller.signal.aborted ||
         err?.name === 'CanceledError' ||
         err?.name === 'AbortError' ||
-        err?.code === 'ERR_CANCELED'
+        err?.code === 'ERR_CANCELED' ||
+        err.message === 'AbortError'
       ) {
         setUploadStatus((prev) =>
           prev
@@ -411,6 +435,7 @@ function AppContent() {
       );
     }
   };
+
 
   const handleCancelUpload = () => {
     if (uploadAbortControllerRef.current) {

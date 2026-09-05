@@ -144,6 +144,8 @@ func main() {
 		api.Get("/public/share/{token}", publicShareHandler.GetPublicShareInfo)
 		api.Get("/public/share/{token}/download", publicShareHandler.DownloadPublic)
 		api.Post("/public/share/{token}/upload", publicShareHandler.UploadPublic)
+		api.Post("/public/share/{token}/upload/chunk", publicShareHandler.UploadPublicChunk)
+		api.Post("/public/share/{token}/upload/finalize", publicShareHandler.UploadPublicFinalize)
 
 		// Authenticated Routes
 		api.Group(func(auth chi.Router) {
@@ -186,6 +188,8 @@ func main() {
 
 			// Uploads (Files & Projects / Folders)
 			auth.Post("/upload", uploadHandler.Upload)
+			auth.Post("/upload/chunk", uploadHandler.UploadChunk)
+			auth.Post("/upload/finalize", uploadHandler.UploadFinalize)
 
 			// Team Member Direct Shares
 			auth.Post("/shares", shareHandler.Create)

@@ -267,3 +267,58 @@ func (s *StorageService) UpdateUserStorage(userID string) (int64, error) {
 	_, err = db.DB.Exec("UPDATE users SET storage_used = ? WHERE id = ?", used, userID)
 	return used, err
 }
+// SaveChunk saves a single chunk to the temp directory
+func (s *StorageService) SaveChunk(uploadID string, chunkIndex int, r io.Reader) error {
+	chunkDir := filepath.Join(s.cfg.StorageDir, "chunks", uploadID)
+	if err := os.MkdirAll(chunkDir, 0755); err != nil {
+		return err
+	}
+	
+	chunkPath := filepath.Join(chunkDir, fmt.Sprintf("%d.part", chunkIndex))
+	out, err := os.Create(chunkPath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, r)
+	return err
+}
+
+// MergeChunks merges all chunks for an uploadID into a single file and returns the disk name and size
+func (s *StorageService) MergeChunks(uploadID string, totalChunks int, originalFilename string) (string, int64, error) {
+	chunkDir := filepath.Join(s.cfg.StorageDir, "chunks", uploadID)
+	defer os.RemoveAll(chunkDir)
+
+	// In Eledrive, SaveUploadedFile generates the uuid. We can generate one here.
+	ext := filepath.Ext(originalFilename)
+	diskName := fmt.Sprintf("%s%s", uploadID, ext)
+	fullPath := filepath.Join(s.cfg.StorageDir, diskName)
+
+	out, err := os.Create(fullPath)
+	if err != nil {
+		return "", 0, err
+	}
+	defer out.Close()
+
+	var totalSize int64 = 0
+
+	for i := 0; i < totalChunks; i++ {
+		chunkPath := filepath.Join(chunkDir, fmt.Sprintf("%d.part", i))
+		in, err := os.Open(chunkPath)
+		if err != nil {
+			_ = os.Remove(fullPath)
+			return "", 0, fmt.Errorf("missing chunk %d: %w", i, err)
+		}
+		
+		written, err := io.Copy(out, in)
+		in.Close()
+		if err != nil {
+			_ = os.Remove(fullPath)
+			return "", 0, err
+		}
+		totalSize += written
+	}
+
+	return diskName, totalSize, nil
+}
