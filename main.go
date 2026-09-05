@@ -150,6 +150,8 @@ func main() {
 			auth.Get("/auth/me", authHandler.Me)
 			auth.Get("/users/search", authHandler.SearchUsers)
 			auth.Get("/users", authHandler.ListTeamMembers)
+			auth.Get("/members", authHandler.GetMembers)
+			auth.Get("/members/presence", authHandler.GetMembersPresence)
 
 			// Profile Settings (Per User)
 			auth.Put("/user/profile", profileHandler.UpdateProfile)

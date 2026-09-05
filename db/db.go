@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"eledrive/config"
@@ -453,4 +454,22 @@ func GetMaintenanceStatus() (bool, string) {
 		notice = "Platform is currently undergoing scheduled maintenance. Please check back shortly."
 	}
 	return (isMaintStr == "true" || isMaintStr == "1"), notice
+}
+
+func GetPublicSharingSettings() (allowShares bool, requirePW bool, defaultExpiryDays int) {
+	if DB == nil {
+		return true, false, 30
+	}
+	var allowStr, reqPWStr, expiryStr string
+	_ = DB.QueryRow("SELECT value FROM main.system_settings WHERE key = 'allow_public_shares'").Scan(&allowStr)
+	_ = DB.QueryRow("SELECT value FROM main.system_settings WHERE key = 'require_link_passwords'").Scan(&reqPWStr)
+	_ = DB.QueryRow("SELECT value FROM main.system_settings WHERE key = 'default_link_expiry_days'").Scan(&expiryStr)
+
+	allowShares = allowStr != "false" && allowStr != "0"
+	requirePW = reqPWStr == "true" || reqPWStr == "1"
+	defaultExpiryDays = 30
+	if n, err := strconv.Atoi(expiryStr); err == nil && n >= 0 {
+		defaultExpiryDays = n
+	}
+	return allowShares, requirePW, defaultExpiryDays
 }

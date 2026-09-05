@@ -10,6 +10,7 @@ import (
 
 	"eledrive/config"
 	"eledrive/db"
+	"eledrive/events"
 	"eledrive/utils"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -59,6 +60,8 @@ func AuthMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
 				return
 			}
 
+			events.GlobalHub.RecordActiveUser(claims.UserID)
+
 			ctx := context.WithValue(r.Context(), UserContextKey, claims)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -71,6 +74,7 @@ func OptionalAuthMiddleware(cfg *config.Config) func(http.Handler) http.Handler 
 			tokenStr := extractToken(r)
 			if tokenStr != "" {
 				if claims, err := parseToken(tokenStr, cfg); err == nil {
+					events.GlobalHub.RecordActiveUser(claims.UserID)
 					ctx := context.WithValue(r.Context(), UserContextKey, claims)
 					next.ServeHTTP(w, r.WithContext(ctx))
 					return

@@ -362,6 +362,110 @@ func (h *AuthHandler) ListTeamMembers(w http.ResponseWriter, r *http.Request) {
 	utils.RespondJSON(w, http.StatusOK, users)
 }
 
+// GetMembers returns the complete workspace member directory with online status, category, and team affiliations
+func (h *AuthHandler) GetMembers(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+
+	// 1. Fetch team affiliations for all users
+	teamRows, err := db.DB.Query(`
+		SELECT tm.user_id, t.id, t.name, COALESCE(tm.role, 'member'), COALESCE(t.avatar_color, '#3b82f6')
+		FROM main.team_members tm
+		JOIN main.teams t ON tm.team_id = t.id
+		ORDER BY t.name ASC
+	`)
+	userTeamsMap := make(map[string][]models.MemberTeamInfo)
+	if err == nil {
+		defer teamRows.Close()
+		for teamRows.Next() {
+			var uid, tid, tname, trole, tcolor string
+			if scanErr := teamRows.Scan(&uid, &tid, &tname, &trole, &tcolor); scanErr == nil {
+				userTeamsMap[uid] = append(userTeamsMap[uid], models.MemberTeamInfo{
+					ID:    tid,
+					Name:  tname,
+					Role:  trole,
+					Color: tcolor,
+				})
+			}
+		}
+	}
+
+	// 2. Fetch all approved users
+	rows, err := db.DB.Query(`
+		SELECT id, email, username, name, avatar_color, role, COALESCE(status, 'approved') AS status,
+		       created_at, updated_at
+		FROM main.users
+		WHERE status = 'approved' OR status IS NULL
+		ORDER BY 
+			CASE 
+				WHEN role = 'owner' THEN 1 
+				WHEN role = 'admin' THEN 2 
+				ELSE 3 
+			END, 
+			name ASC
+	`)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to fetch workspace members")
+		return
+	}
+	defer rows.Close()
+
+	members := make([]models.WorkspaceMember, 0)
+	for rows.Next() {
+		var m models.WorkspaceMember
+		if err := rows.Scan(
+			&m.ID, &m.Email, &m.Username, &m.Name, &m.AvatarColor, &m.Role, &m.Status,
+			&m.CreatedAt, &m.UpdatedAt,
+		); err == nil {
+			// Teams
+			teams, ok := userTeamsMap[m.ID]
+			if !ok || teams == nil {
+				teams = []models.MemberTeamInfo{}
+			}
+			m.Teams = teams
+
+			// Determine Category: owner, admin, team_member, user
+			switch m.Role {
+			case "owner":
+				m.Category = "owner"
+			case "admin":
+				m.Category = "admin"
+			default:
+				if len(m.Teams) > 0 {
+					m.Category = "team_member"
+				} else {
+					m.Category = "user"
+				}
+			}
+
+			// Online Presence & Last Seen
+			m.IsOnline = events.GlobalHub.IsUserOnline(m.ID)
+			m.LastSeen = events.GlobalHub.GetUserLastSeen(m.ID)
+
+			// Owner Email Privacy Protection (if caller is not owner and target is owner)
+			if claims.Role != "owner" && m.Role == "owner" {
+				m.Email = "[Owner Protected]"
+			}
+
+			members = append(members, m)
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to read workspace members")
+		return
+	}
+
+	utils.RespondJSON(w, http.StatusOK, members)
+}
+
+// GetMembersPresence returns map of currently online users
+func (h *AuthHandler) GetMembersPresence(w http.ResponseWriter, r *http.Request) {
+	utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"presence":  events.GlobalHub.GetAllPresence(),
+		"timestamp": time.Now().UnixMilli(),
+	})
+}
+
 type PasswordResetRequestPayload struct {
 	EmailOrUsername string `json:"email_or_username"`
 	Reason          string `json:"reason"`
@@ -479,6 +583,7 @@ func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Reques
 
 func (h *AuthHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request) {
 	isMaint, notice := db.GetMaintenanceStatus()
+	allowShares, requirePW, defaultExpiry := db.GetPublicSharingSettings()
 
 	var allowRegStr string
 	_ = db.DB.QueryRow("SELECT value FROM main.system_settings WHERE key = 'allow_public_registration'").Scan(&allowRegStr)
@@ -495,6 +600,9 @@ func (h *AuthHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request) {
 		"maintenance_notice":        notice,
 		"allow_public_registration": allowReg,
 		"site_name":                 siteName,
+		"allow_public_shares":       allowShares,
+		"require_link_passwords":    requirePW,
+		"default_link_expiry_days":  defaultExpiry,
 	})
 }
 

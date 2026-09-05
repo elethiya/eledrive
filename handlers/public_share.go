@@ -49,6 +49,12 @@ func generateToken(n int) string {
 
 func (h *PublicShareHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r.Context())
+	allowShares, requirePW, defaultExpiry := db.GetPublicSharingSettings()
+	if !allowShares {
+		utils.RespondError(w, http.StatusForbidden, "Public share links are currently disabled by administrator policy")
+		return
+	}
+
 	var req CreateShareLinkRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.RespondError(w, http.StatusBadRequest, "Invalid request payload")
@@ -63,6 +69,11 @@ func (h *PublicShareHandler) CreateLink(w http.ResponseWriter, r *http.Request) 
 
 	if req.Permission != "upload_and_view" {
 		req.Permission = "view"
+	}
+
+	if requirePW && (req.Password == nil || strings.TrimSpace(*req.Password) == "") {
+		utils.RespondError(w, http.StatusBadRequest, "A passcode is required on all public links by platform security policy")
+		return
 	}
 
 	// Verify user is owner or editor
@@ -94,6 +105,9 @@ func (h *PublicShareHandler) CreateLink(w http.ResponseWriter, r *http.Request) 
 	var expiresAt *time.Time
 	if req.ExpireDays != nil && *req.ExpireDays > 0 {
 		exp := time.Now().AddDate(0, 0, *req.ExpireDays)
+		expiresAt = &exp
+	} else if (req.ExpireDays == nil || *req.ExpireDays == 0) && defaultExpiry > 0 {
+		exp := time.Now().AddDate(0, 0, defaultExpiry)
 		expiresAt = &exp
 	}
 
@@ -190,6 +204,12 @@ func (h *PublicShareHandler) DeleteLink(w http.ResponseWriter, r *http.Request) 
 // PUBLIC UNPROTECTED ENDPOINTS (Verified via token)
 
 func (h *PublicShareHandler) GetPublicShareInfo(w http.ResponseWriter, r *http.Request) {
+	allowShares, _, _ := db.GetPublicSharingSettings()
+	if !allowShares {
+		utils.RespondError(w, http.StatusForbidden, "Public share links are currently disabled by administrator policy")
+		return
+	}
+
 	token := chi.URLParam(r, "token")
 	var link models.ShareLink
 	var pwHash sql.NullString
@@ -344,6 +364,12 @@ func (h *PublicShareHandler) GetPublicShareInfo(w http.ResponseWriter, r *http.R
 }
 
 func (h *PublicShareHandler) DownloadPublic(w http.ResponseWriter, r *http.Request) {
+	allowShares, _, _ := db.GetPublicSharingSettings()
+	if !allowShares {
+		utils.RespondError(w, http.StatusForbidden, "Public share links are currently disabled by administrator policy")
+		return
+	}
+
 	token := chi.URLParam(r, "token")
 	var link models.ShareLink
 	var pwHash sql.NullString
@@ -420,6 +446,12 @@ func (h *PublicShareHandler) DownloadPublic(w http.ResponseWriter, r *http.Reque
 
 // UploadPublic allows team members or guests to upload files directly into a shared folder if permission is upload_and_view
 func (h *PublicShareHandler) UploadPublic(w http.ResponseWriter, r *http.Request) {
+	allowShares, _, _ := db.GetPublicSharingSettings()
+	if !allowShares {
+		utils.RespondError(w, http.StatusForbidden, "Public share links are currently disabled by administrator policy")
+		return
+	}
+
 	token := chi.URLParam(r, "token")
 	var link models.ShareLink
 	var expAt sql.NullTime

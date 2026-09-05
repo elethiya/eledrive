@@ -557,10 +557,11 @@ func (h *AdminHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if claims.Role != "owner" {
-		// Non-owner administrators have no access to modify Forensic Attribution & Security settings
-		delete(pairs, "forensic_watermarking_enabled")
-		delete(pairs, "steganographic_canary_enabled")
-		delete(pairs, "log_forensic_downloads")
+		// Non-owner administrators have access ONLY to System Operations & Maintenance
+		pairs = map[string]string{
+			"maintenance_mode":   strconv.FormatBool(req.MaintenanceMode),
+			"maintenance_notice": req.MaintenanceNotice,
+		}
 	}
 
 	for k, v := range pairs {

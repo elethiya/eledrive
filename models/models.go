@@ -26,6 +26,29 @@ type UserPublic struct {
 	Role        string `json:"role,omitempty"`
 }
 
+type MemberTeamInfo struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Role  string `json:"role"` // 'leader' or 'member'
+	Color string `json:"color"`
+}
+
+type WorkspaceMember struct {
+	ID          string           `json:"id"`
+	Email       string           `json:"email"`
+	Username    string           `json:"username"`
+	Name        string           `json:"name"`
+	AvatarColor string           `json:"avatar_color"`
+	Role        string           `json:"role"`     // 'owner', 'admin', 'member'
+	Category    string           `json:"category"` // 'owner', 'admin', 'team_member', 'user'
+	Status      string           `json:"status"`   // 'approved', 'pending', 'rejected'
+	IsOnline    bool             `json:"is_online"`
+	LastSeen    int64            `json:"last_seen,omitempty"`
+	Teams       []MemberTeamInfo `json:"teams"`
+	CreatedAt   time.Time        `json:"created_at"`
+	UpdatedAt   time.Time        `json:"updated_at"`
+}
+
 type Folder struct {
 	ID               string    `json:"id"`
 	Name             string    `json:"name"`

@@ -483,8 +483,16 @@ export default function AdminPage({ onBackToDrive }) {
   };
 
   const openCategoryModal = (catId) => {
-    if (catId === 'forensics' && !isOwner) {
-      toast.error("Access Denied: 'Forensic Attribution & Security' settings can only be accessed and modified by the Workspace Owner.");
+    if (!isOwner && catId !== 'maintenance') {
+      const catNames = {
+        storage: 'Storage & Upload Quotas',
+        registration: 'Registration & Access Control',
+        security: 'Security & Session Policies',
+        sharing: 'Sharing & Public Links',
+        retention: 'Data Retention & Lifecycle',
+        forensics: 'Forensic Attribution & Security',
+      };
+      toast.error(`Access Denied: '${catNames[catId] || catId}' can only be configured by the Workspace Owner. Administrators only have access to System Operations & Maintenance.`);
       return;
     }
     setActiveCategory(catId);
@@ -805,6 +813,25 @@ export default function AdminPage({ onBackToDrive }) {
           </button>
 
           <button
+            type="button"
+            onClick={() => setActiveTab('proposals')}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
+              activeTab === 'proposals'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+            }`}
+            title="Review and manage team creation proposals"
+          >
+            <Users className="w-4 h-4 text-blue-400" />
+            <span>Team Proposals</span>
+            {pendingTeamRequests.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 font-black text-[10px]">
+                {pendingTeamRequests.length}
+              </span>
+            )}
+          </button>
+
+          <button
             onClick={() => setActiveTab('security')}
             className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
               activeTab === 'security'
@@ -845,60 +872,11 @@ export default function AdminPage({ onBackToDrive }) {
             <span className="hidden sm:inline">Platform </span>
             <span>Settings</span>
           </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('proposals')}
-            className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
-              activeTab === 'proposals'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
-            }`}
-            title="Review and manage team creation proposals"
-          >
-            <Users className="w-4 h-4 text-blue-400" />
-            <span>Team Proposals</span>
-            {pendingTeamRequests.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 font-black text-[10px]">
-                {pendingTeamRequests.length}
-              </span>
-            )}
-          </button>
         </div>
 
         {/* TAB 1: USERS MANAGEMENT */}
         {activeTab === 'users' && (
           <div className="space-y-4">
-            {/* Pending Team Creation Proposals Alert Banner */}
-            {pendingTeamRequests.length > 0 && (
-              <div className="bg-gradient-to-r from-blue-950/40 via-blue-900/20 to-slate-900 border border-blue-500/30 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg shadow-blue-950/20">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-400 flex items-center justify-center shrink-0">
-                    <Users className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-xs font-bold text-slate-100">
-                        {pendingTeamRequests.length} Team Creation {pendingTeamRequests.length === 1 ? 'Proposal' : 'Proposals'} Pending
-                      </h4>
-                      <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      Users submitted proposals to create new team workspaces. Review requested details and authorize team creation.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('proposals')}
-                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 shadow-md shadow-blue-600/20"
-                >
-                  <Users className="w-3.5 h-3.5" />
-                  <span>Review Proposals ({pendingTeamRequests.length})</span>
-                </button>
-              </div>
-            )}
-
             {/* Pending Password Reset Requests Alert Banner */}
             {pendingResets.length > 0 && (
               <div className="bg-gradient-to-r from-amber-950/40 via-amber-900/20 to-slate-900 border border-amber-500/30 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg shadow-amber-950/20">
@@ -982,25 +960,6 @@ export default function AdminPage({ onBackToDrive }) {
                   {pendingResets.length > 0 && (
                     <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 text-[10px] font-bold">
                       {pendingResets.length}
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('proposals')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 flex items-center gap-1.5 border ml-1 ${
-                    pendingTeamRequests.length > 0
-                      ? 'bg-blue-500/15 text-blue-300 border-blue-500/40 hover:bg-blue-500/25 shadow-xs'
-                      : 'text-slate-400 border-slate-800 hover:bg-slate-800'
-                  }`}
-                  title="View and manage team creation proposals"
-                >
-                  <Users className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Team Proposals</span>
-                  {pendingTeamRequests.length > 0 && (
-                    <span className="px-1.5 py-0.2 rounded-full bg-blue-500 text-white text-[10px] font-bold">
-                      {pendingTeamRequests.length}
                     </span>
                   )}
                 </button>
@@ -2390,146 +2349,376 @@ export default function AdminPage({ onBackToDrive }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* 1. Storage & Quotas */}
               <div
-                onClick={() => openCategoryModal('storage')}
-                className="group relative bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-blue-500/40 rounded-3xl p-5 shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between select-none"
+                onClick={() => {
+                  if (!isOwner) {
+                    toast.error("Access Denied: 'Storage & Upload Quotas' can only be configured by the Workspace Owner.");
+                    return;
+                  }
+                  openCategoryModal('storage');
+                }}
+                className={`group relative rounded-3xl p-5 shadow-lg transition-all duration-200 flex flex-col justify-between select-none ${
+                  isOwner
+                    ? 'bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-blue-500/40 cursor-pointer'
+                    : 'bg-slate-950/60 border border-slate-800/60 opacity-75 cursor-not-allowed'
+                }`}
               >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 group-hover:scale-105 transition-transform">
+                    <div
+                      className={`p-3 rounded-2xl border ${
+                        isOwner
+                          ? 'bg-blue-500/10 border-blue-500/20 text-blue-400 group-hover:scale-105'
+                          : 'bg-slate-900 border-slate-800 text-slate-500'
+                      } transition-transform`}
+                    >
                       <HardDrive className="w-6 h-6" />
                     </div>
-                    <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-medium text-slate-300">
-                      {settings.default_quota_gb} GB • {settings.max_upload_size_mb} MB Max
-                    </span>
+                    {isOwner ? (
+                      <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-medium text-slate-300">
+                        {settings.default_quota_gb} GB • {settings.max_upload_size_mb} MB Max
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] font-medium text-amber-400 flex items-center gap-1">
+                        <Lock className="w-3 h-3" />
+                        Owner Only
+                      </span>
+                    )}
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-slate-100 group-hover:text-blue-300 transition-colors">
-                      Storage & Upload Quotas
-                    </h4>
+                    <div className="flex items-center gap-2">
+                      <h4
+                        className={`text-sm font-bold ${
+                          isOwner ? 'text-slate-100 group-hover:text-blue-300' : 'text-slate-300'
+                        } transition-colors`}
+                      >
+                        Storage & Upload Quotas
+                      </h4>
+                      {!isOwner && (
+                        <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded-sm bg-slate-800 text-amber-400 border border-amber-500/20">
+                          Restricted
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                       Baseline user drive quotas, single upload payload caps, concurrent chunked uploads, and bulk ZIP archives.
                     </p>
                   </div>
                 </div>
-                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-blue-400 font-semibold group-hover:translate-x-0.5 transition-all">
-                  <span>Configure Storage</span>
-                  <ChevronRight className="w-4 h-4" />
+                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs font-semibold">
+                  {isOwner ? (
+                    <>
+                      <span className="text-blue-400 group-hover:translate-x-0.5 transition-all">Configure Storage</span>
+                      <ChevronRight className="w-4 h-4 text-blue-400" />
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-slate-500 flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-amber-400/80" />
+                        Restricted to Workspace Owner
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-600">Locked</span>
+                    </>
+                  )}
                 </div>
               </div>
 
               {/* 2. Registration & Access */}
               <div
-                onClick={() => openCategoryModal('registration')}
-                className="group relative bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-emerald-500/40 rounded-3xl p-5 shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between select-none"
+                onClick={() => {
+                  if (!isOwner) {
+                    toast.error("Access Denied: 'Registration & Access Control' can only be configured by the Workspace Owner.");
+                    return;
+                  }
+                  openCategoryModal('registration');
+                }}
+                className={`group relative rounded-3xl p-5 shadow-lg transition-all duration-200 flex flex-col justify-between select-none ${
+                  isOwner
+                    ? 'bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-emerald-500/40 cursor-pointer'
+                    : 'bg-slate-950/60 border border-slate-800/60 opacity-75 cursor-not-allowed'
+                }`}
               >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 group-hover:scale-105 transition-transform">
+                    <div
+                      className={`p-3 rounded-2xl border ${
+                        isOwner
+                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 group-hover:scale-105'
+                          : 'bg-slate-900 border-slate-800 text-slate-500'
+                      } transition-transform`}
+                    >
                       <UserCheck className="w-6 h-6" />
                     </div>
-                    <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-medium text-slate-300">
-                      {settings.allow_public_registration ? 'Signups Open' : 'Signups Closed'}
-                    </span>
+                    {isOwner ? (
+                      <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-medium text-slate-300">
+                        {settings.allow_public_registration ? 'Signups Open' : 'Signups Closed'}
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] font-medium text-amber-400 flex items-center gap-1">
+                        <Lock className="w-3 h-3" />
+                        Owner Only
+                      </span>
+                    )}
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-slate-100 group-hover:text-emerald-300 transition-colors">
-                      Registration & Access Control
-                    </h4>
+                    <div className="flex items-center gap-2">
+                      <h4
+                        className={`text-sm font-bold ${
+                          isOwner ? 'text-slate-100 group-hover:text-emerald-300' : 'text-slate-300'
+                        } transition-colors`}
+                      >
+                        Registration & Access Control
+                      </h4>
+                      {!isOwner && (
+                        <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded-sm bg-slate-800 text-amber-400 border border-amber-500/20">
+                          Restricted
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                       Public account registration portal, mandatory administrative approval workflow, and team workspace creation.
                     </p>
                   </div>
                 </div>
-                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-emerald-400 font-semibold group-hover:translate-x-0.5 transition-all">
-                  <span>Configure Access</span>
-                  <ChevronRight className="w-4 h-4" />
+                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs font-semibold">
+                  {isOwner ? (
+                    <>
+                      <span className="text-emerald-400 group-hover:translate-x-0.5 transition-all">Configure Access</span>
+                      <ChevronRight className="w-4 h-4 text-emerald-400" />
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-slate-500 flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-amber-400/80" />
+                        Restricted to Workspace Owner
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-600">Locked</span>
+                    </>
+                  )}
                 </div>
               </div>
 
               {/* 3. Security & Sessions */}
               <div
-                onClick={() => openCategoryModal('security')}
-                className="group relative bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-indigo-500/40 rounded-3xl p-5 shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between select-none"
+                onClick={() => {
+                  if (!isOwner) {
+                    toast.error("Access Denied: 'Security & Session Policies' can only be configured by the Workspace Owner.");
+                    return;
+                  }
+                  openCategoryModal('security');
+                }}
+                className={`group relative rounded-3xl p-5 shadow-lg transition-all duration-200 flex flex-col justify-between select-none ${
+                  isOwner
+                    ? 'bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-indigo-500/40 cursor-pointer'
+                    : 'bg-slate-950/60 border border-slate-800/60 opacity-75 cursor-not-allowed'
+                }`}
               >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 group-hover:scale-105 transition-transform">
+                    <div
+                      className={`p-3 rounded-2xl border ${
+                        isOwner
+                          ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400 group-hover:scale-105'
+                          : 'bg-slate-900 border-slate-800 text-slate-500'
+                      } transition-transform`}
+                    >
                       <Shield className="w-6 h-6" />
                     </div>
-                    <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-medium text-slate-300">
-                      {settings.session_timeout_hours}h Session • {settings.max_login_attempts} Max Fails
-                    </span>
+                    {isOwner ? (
+                      <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-medium text-slate-300">
+                        {settings.session_timeout_hours}h Session • {settings.max_login_attempts} Max Fails
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] font-medium text-amber-400 flex items-center gap-1">
+                        <Lock className="w-3 h-3" />
+                        Owner Only
+                      </span>
+                    )}
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-slate-100 group-hover:text-indigo-300 transition-colors">
-                      Security & Session Policies
-                    </h4>
+                    <div className="flex items-center gap-2">
+                      <h4
+                        className={`text-sm font-bold ${
+                          isOwner ? 'text-slate-100 group-hover:text-indigo-300' : 'text-slate-300'
+                        } transition-colors`}
+                      >
+                        Security & Session Policies
+                      </h4>
+                      {!isOwner && (
+                        <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded-sm bg-slate-800 text-amber-400 border border-amber-500/20">
+                          Restricted
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                       Session inactivity lifespans, password complexity enforcement, brute-force rate-limiting, and password recovery.
                     </p>
                   </div>
                 </div>
-                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-indigo-400 font-semibold group-hover:translate-x-0.5 transition-all">
-                  <span>Configure Security</span>
-                  <ChevronRight className="w-4 h-4" />
+                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs font-semibold">
+                  {isOwner ? (
+                    <>
+                      <span className="text-indigo-400 group-hover:translate-x-0.5 transition-all">Configure Security</span>
+                      <ChevronRight className="w-4 h-4 text-indigo-400" />
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-slate-500 flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-amber-400/80" />
+                        Restricted to Workspace Owner
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-600">Locked</span>
+                    </>
+                  )}
                 </div>
               </div>
 
               {/* 4. Sharing & Public Links */}
               <div
-                onClick={() => openCategoryModal('sharing')}
-                className="group relative bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-purple-500/40 rounded-3xl p-5 shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between select-none"
+                onClick={() => {
+                  if (!isOwner) {
+                    toast.error("Access Denied: 'Sharing & Public Links' can only be configured by the Workspace Owner.");
+                    return;
+                  }
+                  openCategoryModal('sharing');
+                }}
+                className={`group relative rounded-3xl p-5 shadow-lg transition-all duration-200 flex flex-col justify-between select-none ${
+                  isOwner
+                    ? 'bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-purple-500/40 cursor-pointer'
+                    : 'bg-slate-950/60 border border-slate-800/60 opacity-75 cursor-not-allowed'
+                }`}
               >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="p-3 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400 group-hover:scale-105 transition-transform">
+                    <div
+                      className={`p-3 rounded-2xl border ${
+                        isOwner
+                          ? 'bg-purple-500/10 border-purple-500/20 text-purple-400 group-hover:scale-105'
+                          : 'bg-slate-900 border-slate-800 text-slate-500'
+                      } transition-transform`}
+                    >
                       <Share2 className="w-6 h-6" />
                     </div>
-                    <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-medium text-slate-300">
-                      {settings.allow_public_shares ? 'Public Links Active' : 'Links Disabled'}
-                    </span>
+                    {isOwner ? (
+                      <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-medium text-slate-300">
+                        {settings.allow_public_shares ? 'Public Links Active' : 'Links Disabled'}
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] font-medium text-amber-400 flex items-center gap-1">
+                        <Lock className="w-3 h-3" />
+                        Owner Only
+                      </span>
+                    )}
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-slate-100 group-hover:text-purple-300 transition-colors">
-                      Sharing & Public Links
-                    </h4>
+                    <div className="flex items-center gap-2">
+                      <h4
+                        className={`text-sm font-bold ${
+                          isOwner ? 'text-slate-100 group-hover:text-purple-300' : 'text-slate-300'
+                        } transition-colors`}
+                      >
+                        Sharing & Public Links
+                      </h4>
+                      {!isOwner && (
+                        <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded-sm bg-slate-800 text-amber-400 border border-amber-500/20">
+                          Restricted
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                       External file and folder share links, mandatory passcode protection rules, and default link expiration durations.
                     </p>
                   </div>
                 </div>
-                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-purple-400 font-semibold group-hover:translate-x-0.5 transition-all">
-                  <span>Configure Sharing</span>
-                  <ChevronRight className="w-4 h-4" />
+                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs font-semibold">
+                  {isOwner ? (
+                    <>
+                      <span className="text-purple-400 group-hover:translate-x-0.5 transition-all">Configure Sharing</span>
+                      <ChevronRight className="w-4 h-4 text-purple-400" />
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-slate-500 flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-amber-400/80" />
+                        Restricted to Workspace Owner
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-600">Locked</span>
+                    </>
+                  )}
                 </div>
               </div>
 
               {/* 5. Data Retention & Lifecycle */}
               <div
-                onClick={() => openCategoryModal('retention')}
-                className="group relative bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-amber-500/40 rounded-3xl p-5 shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between select-none"
+                onClick={() => {
+                  if (!isOwner) {
+                    toast.error("Access Denied: 'Data Retention & Lifecycle' can only be configured by the Workspace Owner.");
+                    return;
+                  }
+                  openCategoryModal('retention');
+                }}
+                className={`group relative rounded-3xl p-5 shadow-lg transition-all duration-200 flex flex-col justify-between select-none ${
+                  isOwner
+                    ? 'bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-amber-500/40 cursor-pointer'
+                    : 'bg-slate-950/60 border border-slate-800/60 opacity-75 cursor-not-allowed'
+                }`}
               >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 group-hover:scale-105 transition-transform">
+                    <div
+                      className={`p-3 rounded-2xl border ${
+                        isOwner
+                          ? 'bg-amber-500/10 border-amber-500/20 text-amber-400 group-hover:scale-105'
+                          : 'bg-slate-900 border-slate-800 text-slate-500'
+                      } transition-transform`}
+                    >
                       <Archive className="w-6 h-6" />
                     </div>
-                    <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-medium text-slate-300">
-                      Trash: {settings.trash_retention_days ? `${settings.trash_retention_days}d` : 'Indefinite'}
-                    </span>
+                    {isOwner ? (
+                      <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-medium text-slate-300">
+                        Trash: {settings.trash_retention_days ? `${settings.trash_retention_days}d` : 'Indefinite'}
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] font-medium text-amber-400 flex items-center gap-1">
+                        <Lock className="w-3 h-3" />
+                        Owner Only
+                      </span>
+                    )}
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-slate-100 group-hover:text-amber-300 transition-colors">
-                      Data Retention & Lifecycle
-                    </h4>
+                    <div className="flex items-center gap-2">
+                      <h4
+                        className={`text-sm font-bold ${
+                          isOwner ? 'text-slate-100 group-hover:text-amber-300' : 'text-slate-300'
+                        } transition-colors`}
+                      >
+                        Data Retention & Lifecycle
+                      </h4>
+                      {!isOwner && (
+                        <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded-sm bg-slate-800 text-amber-400 border border-amber-500/20">
+                          Restricted
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                       Automated purge schedules for soft-deleted trash bin items and security audit log retention periods.
                     </p>
                   </div>
                 </div>
-                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-amber-400 font-semibold group-hover:translate-x-0.5 transition-all">
-                  <span>Configure Retention</span>
-                  <ChevronRight className="w-4 h-4" />
+                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs font-semibold">
+                  {isOwner ? (
+                    <>
+                      <span className="text-amber-400 group-hover:translate-x-0.5 transition-all">Configure Retention</span>
+                      <ChevronRight className="w-4 h-4 text-amber-400" />
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-slate-500 flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-amber-400/80" />
+                        Restricted to Workspace Owner
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-600">Locked</span>
+                    </>
+                  )}
                 </div>
               </div>
 

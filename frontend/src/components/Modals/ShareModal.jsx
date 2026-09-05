@@ -12,7 +12,7 @@ import {
   Eye,
   Shield,
 } from 'lucide-react';
-import { shareAPI, publicShareAPI, authAPI, teamAPI } from '../../api/client';
+import { shareAPI, publicShareAPI, authAPI, teamAPI, systemAPI } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
@@ -22,6 +22,13 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
   const toast = useToast();
   const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState('team');
+
+  // Sharing System Policy state
+  const [sharingPolicy, setSharingPolicy] = useState({
+    allow_public_shares: true,
+    require_link_passwords: false,
+    default_link_expiry_days: 30,
+  });
 
   // Team Share state
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,6 +52,19 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
     if (isOpen && item) {
       loadTeamShares();
       loadPublicLink();
+      systemAPI.getStatus().then((res) => {
+        const data = res?.data !== undefined ? res.data : res;
+        if (data) {
+          setSharingPolicy({
+            allow_public_shares: data.allow_public_shares !== false,
+            require_link_passwords: Boolean(data.require_link_passwords),
+            default_link_expiry_days: data.default_link_expiry_days !== undefined ? data.default_link_expiry_days : 30,
+          });
+          if (data.default_link_expiry_days !== undefined) {
+            setLinkExpireDays(data.default_link_expiry_days);
+          }
+        }
+      }).catch(console.error);
       teamAPI.getAvailableUsers().then((res) => {
         if (res.data) setAvailableTeammates(res.data);
       }).catch(console.error);
@@ -182,6 +202,14 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
   };
 
   const handleCreateLink = async () => {
+    if (!sharingPolicy.allow_public_shares) {
+      toast.error('Public share links are currently disabled by platform administrator policy');
+      return;
+    }
+    if (sharingPolicy.require_link_passwords && !linkPassword.trim()) {
+      toast.error('A security passcode is required on all public links by platform policy');
+      return;
+    }
     setLinkLoading(true);
     try {
       const res = await publicShareAPI.createLink({
@@ -197,7 +225,7 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
         toast.success('Public share link created!');
       }
     } catch (err) {
-      toast.error(err.message);
+      toast.error(err.response?.data?.error || err.message || 'Failed to create share link');
     } finally {
       setLinkLoading(false);
     }
@@ -624,6 +652,18 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                   )}
                 </div>
               </div>
+            ) : !sharingPolicy.allow_public_shares ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-slate-300 space-y-2">
+                  <div className="flex items-center gap-2 font-bold text-amber-400">
+                    <Lock className="w-4 h-4" />
+                    <span>Public Share Links Disabled</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    External public share links are currently disabled by the platform administrator. You can still share files and folders directly with team members and collaborators under the "Collaborators & Teams" tab.
+                  </p>
+                </div>
+              </div>
             ) : (
               <div className="space-y-4">
                 <p className="text-slate-400">
@@ -677,31 +717,55 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                 )}
 
                 <div>
-                  <label className="block font-semibold text-slate-300 mb-1">
-                    Optional Password Protection
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-300">
+                      {sharingPolicy.require_link_passwords ? 'Mandatory Passcode' : 'Optional Password Protection'}
+                    </label>
+                    {sharingPolicy.require_link_passwords && (
+                      <span className="text-[10px] font-mono uppercase font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">
+                        Required by Admin
+                      </span>
+                    )}
+                  </div>
                   <div className="relative">
                     <Lock className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="password"
-                      placeholder="Leave blank for public link"
+                      placeholder={sharingPolicy.require_link_passwords ? "Enter required passcode" : "Leave blank for public link"}
                       value={linkPassword}
                       onChange={(e) => setLinkPassword(e.target.value)}
-                      className="w-full pl-8 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:border-blue-500 outline-none"
+                      className={`w-full pl-8 pr-3 py-2 bg-slate-950 border rounded-xl text-slate-100 outline-none ${
+                        sharingPolicy.require_link_passwords && !linkPassword.trim()
+                          ? 'border-amber-500/50 focus:border-amber-500'
+                          : 'border-slate-800 focus:border-blue-500'
+                      }`}
                     />
                   </div>
+                  {sharingPolicy.require_link_passwords && (
+                    <p className="text-[10px] text-amber-400/90 mt-1">
+                      Platform security policy requires a passcode on all external public share links.
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-300 mb-1">
-                    Link Expiration
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-300">
+                      Link Expiration
+                    </label>
+                    {sharingPolicy.default_link_expiry_days > 0 && (
+                      <span className="text-[10px] font-mono text-purple-400 font-medium">
+                        Default: {sharingPolicy.default_link_expiry_days} Days
+                      </span>
+                    )}
+                  </div>
                   <select
                     value={linkExpireDays}
                     onChange={(e) => setLinkExpireDays(Number(e.target.value))}
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl outline-none text-slate-200"
                   >
                     <option value={7}>7 Days</option>
+                    <option value={14}>14 Days</option>
                     <option value={30}>30 Days</option>
                     <option value={90}>90 Days</option>
                     <option value={0}>Never expires</option>
@@ -711,7 +775,7 @@ export default function ShareModal({ isOpen, onClose, item, itemType = 'folder' 
                 <button
                   onClick={handleCreateLink}
                   disabled={linkLoading}
-                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-md shadow-blue-600/20 transition-all"
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-md shadow-blue-600/20 transition-all cursor-pointer"
                 >
                   {linkLoading ? 'Creating...' : 'Create Share Link'}
                 </button>

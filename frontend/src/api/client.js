@@ -179,6 +179,11 @@ export const teamAPI = {
   getAvailableUsers: () => api.get('/team-members/available'),
 };
 
+export const memberAPI = {
+  getMembers: () => api.get('/members'),
+  getPresence: () => api.get('/members/presence'),
+};
+
 export const webhookAPI = {
   trigger: (data) => api.post('/webhook', data),
 };

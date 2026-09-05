@@ -14,6 +14,7 @@ import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
 import PublicSharePage from './pages/PublicSharePage';
 import TeamsPage from './pages/TeamsPage';
+import MembersPage from './pages/MembersPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 
@@ -30,7 +31,7 @@ import { Search, X, Wrench, AlertTriangle, RefreshCw } from 'lucide-react';
 import FileCard from './components/FileCard';
 import { folderAPI, fileAPI, systemAPI, downloadWithProgress } from './api/client';
 
-const VALID_VIEWS = ['drive', 'teams', 'shared', 'recent', 'starred', 'trash', 'profile', 'admin'];
+const VALID_VIEWS = ['drive', 'teams', 'members', 'shared', 'recent', 'starred', 'trash', 'profile', 'admin'];
 
 function parseNavigationFromLocation() {
   const path = window.location.pathname;
@@ -43,6 +44,7 @@ function parseNavigationFromLocation() {
   // Check URL paths
   if (path === '/admin' || path.startsWith('/admin/')) return { view: 'admin', folderId: '' };
   if (path === '/teams' || path.startsWith('/teams/')) return { view: 'teams', folderId: '' };
+  if (path === '/members' || path.startsWith('/members/')) return { view: 'members', folderId: '' };
   if (path.startsWith('/shared/folder/')) {
     const folderId = path.split('/shared/folder/')[1]?.split('/')[0] || '';
     return { view: 'shared', folderId };
@@ -185,6 +187,7 @@ function AppContent() {
     let targetPath = '/';
     if (currentView === 'admin') targetPath = '/admin';
     else if (currentView === 'teams') targetPath = '/teams';
+    else if (currentView === 'members') targetPath = '/members';
     else if (currentView === 'shared') {
       targetPath = currentFolderId ? `/shared/folder/${currentFolderId}` : '/shared';
     }
@@ -924,6 +927,10 @@ function AppContent() {
                   }}
                   onOpenPreview={(file) => setPreviewModalFile(file)}
                 />
+              )}
+
+              {currentView === 'members' && (
+                <MembersPage onNavigateView={(view) => setCurrentView(view)} />
               )}
 
               {currentView === 'shared' && (

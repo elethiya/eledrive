@@ -13,6 +13,7 @@ import {
   Cloud,
   ChevronDown,
   User,
+  UserCheck,
   ShieldCheck,
   Crown,
   X,
@@ -48,6 +49,7 @@ export default function Sidebar({
   const navItems = [
     { id: 'drive', label: 'My Drive', icon: HardDrive },
     { id: 'teams', label: 'Teams', icon: Users },
+    { id: 'members', label: 'Members', icon: UserCheck },
     { id: 'shared', label: 'Shared with me', icon: Share2 },
     { id: 'recent', label: 'Recent', icon: Clock },
     { id: 'starred', label: 'Starred', icon: Star },
