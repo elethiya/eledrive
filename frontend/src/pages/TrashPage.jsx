@@ -18,11 +18,11 @@ export default function TrashPage() {
 
   // Real-time Event Subscription for Trash
   useRealtimeEvent(['trash', 'file', 'folder', 'sync'], () => {
-    loadTrash();
+    loadTrash(false);
   });
 
-  const loadTrash = async () => {
-    setLoading(true);
+  const loadTrash = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const res = await statsAPI.getTrash();
       if (res.data) setData(res.data);
@@ -100,7 +100,7 @@ export default function TrashPage() {
             onClick={async () => {
               setIsRefreshing(true);
               try {
-                await loadTrash();
+                await loadTrash(false);
               } finally {
                 setTimeout(() => setIsRefreshing(false), 600);
               }

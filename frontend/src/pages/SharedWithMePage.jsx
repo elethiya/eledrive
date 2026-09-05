@@ -26,13 +26,13 @@ export default function SharedWithMePage({
   });
 
   useEffect(() => {
-    const handleRefreshEvent = () => loadShared();
+    const handleRefreshEvent = () => loadShared(false);
     window.addEventListener('eledrive:refresh_content', handleRefreshEvent);
     return () => window.removeEventListener('eledrive:refresh_content', handleRefreshEvent);
   }, []);
 
-  const loadShared = async () => {
-    setLoading(true);
+  const loadShared = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const res = await shareAPI.getSharedWithMe();
       if (res.data) {
@@ -86,7 +86,7 @@ export default function SharedWithMePage({
             onClick={async () => {
               setIsRefreshing(true);
               try {
-                await loadShared();
+                await loadShared(false);
               } finally {
                 setTimeout(() => setIsRefreshing(false), 600);
               }

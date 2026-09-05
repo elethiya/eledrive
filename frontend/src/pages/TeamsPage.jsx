@@ -211,9 +211,9 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
     }
   };
 
-  const loadTeamJoinRequests = async (teamId) => {
+  const loadTeamJoinRequests = async (teamId, showLoading = true) => {
     if (!teamId) return;
-    setLoadingJoinRequests(true);
+    if (showLoading) setLoadingJoinRequests(true);
     try {
       const res = await teamAPI.getJoinRequests(teamId);
       setJoinRequests(Array.isArray(res.data) ? res.data : []);
@@ -1343,12 +1343,14 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
       {createModalOpen && (
         <div
           onClick={() => setCreateModalOpen(false)}
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 select-none"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative bg-slate-900 rounded-2xl sm:rounded-3xl max-w-lg w-full border border-slate-800 p-4 sm:p-6 shadow-2xl shadow-black/80 flex flex-col max-h-[90vh] sm:max-h-[85vh] overflow-hidden"
+            className="relative bg-slate-900 rounded-t-3xl sm:rounded-3xl max-w-lg w-full border-t sm:border border-slate-800 p-4 pb-8 sm:p-6 shadow-2xl shadow-black/80 flex flex-col max-h-[90vh] sm:max-h-[85vh] overflow-hidden animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-150"
           >
+            {/* Mobile Drag Handle Indicator */}
+            <div className="w-12 h-1.5 bg-slate-800 rounded-full mx-auto sm:hidden mb-4 relative z-20" />
             {/* Ambient Top Glow */}
             <div
               className="absolute -top-16 -left-16 w-48 h-48 rounded-full blur-3xl pointer-events-none opacity-30 transition-colors duration-500"
@@ -1723,13 +1725,15 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
         });
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md select-none">
-            <div className="relative bg-slate-900 rounded-2xl sm:rounded-3xl max-w-2xl w-full border border-slate-800 shadow-2xl shadow-black/80 overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[85vh]">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-md select-none animate-in fade-in duration-150">
+            <div className="relative bg-slate-900 rounded-t-3xl sm:rounded-3xl max-w-2xl w-full border-t sm:border border-slate-800 shadow-2xl shadow-black/80 overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[85vh] animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-150">
               {/* Ambient Top Glow */}
               <div className="absolute -top-16 -left-16 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
               {/* Modal Header */}
-              <div className="p-3.5 sm:p-5 border-b border-slate-800 bg-slate-950/60 relative z-10 shrink-0">
+              <div className="pt-2 pb-3.5 px-3.5 sm:p-5 border-b border-slate-800 bg-slate-950/60 relative z-10 shrink-0">
+                {/* Mobile Drag Handle Indicator */}
+                <div className="w-12 h-1.5 bg-slate-800 rounded-full mx-auto sm:hidden mb-2.5" />
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
                     <div
@@ -2641,7 +2645,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
               </div>
 
               {/* Modal Footer */}
-              <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-slate-950 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 relative z-10 shrink-0">
+              <div className="p-3.5 pb-8 sm:p-4 border-t border-slate-800 bg-slate-950 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 relative z-10 shrink-0">
                 <div className="text-[11px] text-slate-500 font-mono hidden sm:block">
                   Workspace: <span className="text-slate-400 font-semibold">{activeTeam.name}</span>
                 </div>

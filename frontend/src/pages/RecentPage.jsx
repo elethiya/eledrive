@@ -26,13 +26,13 @@ export default function RecentPage({
   });
 
   useEffect(() => {
-    const handleRefreshEvent = () => loadRecent();
+    const handleRefreshEvent = () => loadRecent(false);
     window.addEventListener('eledrive:refresh_content', handleRefreshEvent);
     return () => window.removeEventListener('eledrive:refresh_content', handleRefreshEvent);
   }, []);
 
-  const loadRecent = async () => {
-    setLoading(true);
+  const loadRecent = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const res = await statsAPI.getRecent();
       if (res.data) {
@@ -70,7 +70,7 @@ export default function RecentPage({
             onClick={async () => {
               setIsRefreshing(true);
               try {
-                await loadRecent();
+                await loadRecent(false);
               } finally {
                 setTimeout(() => setIsRefreshing(false), 600);
               }

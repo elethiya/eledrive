@@ -27,13 +27,13 @@ export default function StarredPage({
   });
 
   useEffect(() => {
-    const handleRefreshEvent = () => loadStarred();
+    const handleRefreshEvent = () => loadStarred(false);
     window.addEventListener('eledrive:refresh_content', handleRefreshEvent);
     return () => window.removeEventListener('eledrive:refresh_content', handleRefreshEvent);
   }, []);
 
-  const loadStarred = async () => {
-    setLoading(true);
+  const loadStarred = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const res = await statsAPI.getStarred();
       if (res.data) setData(res.data);
@@ -85,7 +85,7 @@ export default function StarredPage({
             onClick={async () => {
               setIsRefreshing(true);
               try {
-                await loadStarred();
+                await loadStarred(false);
               } finally {
                 setTimeout(() => setIsRefreshing(false), 600);
               }
