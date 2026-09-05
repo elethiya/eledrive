@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -26,38 +27,28 @@ func NewTeamHandler(cfg *config.Config) *TeamHandler {
 	return &TeamHandler{cfg: cfg}
 }
 
-// ListTeams returns all teams the user belongs to or created, or all teams in workspace if caller is owner
+// ListTeams returns all teams in workspace with caller membership and join request status
 func (h *TeamHandler) ListTeams(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r.Context())
 
-	var rows *sql.Rows
-	var err error
+	query := `
+		SELECT t.id, t.name, t.description, t.avatar_color, t.created_by_user_id,
+		       u.name as creator_name, COALESCE(u.username, '') as creator_username, u.role as creator_role,
+		       (SELECT COUNT(*) FROM main.team_members WHERE team_id = t.id) as members_count,
+		       COALESCE(tm.role, CASE WHEN t.created_by_user_id = ? THEN 'leader' WHEN ? = 'owner' THEN 'owner' ELSE '' END) as user_role,
+		       CASE WHEN tm.user_id IS NOT NULL OR t.created_by_user_id = ? THEN 1 ELSE 0 END as is_member,
+		       COALESCE(tjr.status, '') as join_request_status,
+		       COALESCE(tjr.id, '') as join_request_id,
+		       (SELECT COUNT(*) FROM main.team_join_requests WHERE team_id = t.id AND status = 'pending') as pending_requests,
+		       t.created_at, t.updated_at
+		FROM main.teams t
+		JOIN main.users u ON t.created_by_user_id = u.id
+		LEFT JOIN main.team_members tm ON tm.team_id = t.id AND tm.user_id = ?
+		LEFT JOIN main.team_join_requests tjr ON tjr.team_id = t.id AND tjr.user_id = ?
+		ORDER BY t.updated_at DESC
+	`
 
-	if claims.Role == "owner" {
-		rows, err = db.DB.Query(`
-			SELECT t.id, t.name, t.description, t.avatar_color, t.created_by_user_id, u.name as creator_name, COALESCE(u.username, '') as creator_username, u.role as creator_role,
-			       (SELECT COUNT(*) FROM main.team_members WHERE team_id = t.id) as members_count,
-			       COALESCE(tm.role, CASE WHEN t.created_by_user_id = ? THEN 'leader' ELSE 'owner' END) as user_role,
-			       t.created_at, t.updated_at
-			FROM main.teams t
-			JOIN main.users u ON t.created_by_user_id = u.id
-			LEFT JOIN main.team_members tm ON tm.team_id = t.id AND tm.user_id = ?
-			ORDER BY t.updated_at DESC
-		`, claims.UserID, claims.UserID)
-	} else {
-		rows, err = db.DB.Query(`
-			SELECT t.id, t.name, t.description, t.avatar_color, t.created_by_user_id, u.name as creator_name, COALESCE(u.username, '') as creator_username, u.role as creator_role,
-			       (SELECT COUNT(*) FROM main.team_members WHERE team_id = t.id) as members_count,
-			       COALESCE(tm.role, CASE WHEN t.created_by_user_id = ? THEN 'leader' ELSE 'member' END) as user_role,
-			       t.created_at, t.updated_at
-			FROM main.teams t
-			JOIN main.users u ON t.created_by_user_id = u.id
-			LEFT JOIN main.team_members tm ON tm.team_id = t.id AND tm.user_id = ?
-			WHERE t.created_by_user_id = ? OR tm.user_id = ?
-			ORDER BY t.updated_at DESC
-		`, claims.UserID, claims.UserID, claims.UserID, claims.UserID)
-	}
-
+	rows, err := db.DB.Query(query, claims.UserID, claims.Role, claims.UserID, claims.UserID, claims.UserID)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, "Failed to fetch teams")
 		return
@@ -68,13 +59,18 @@ func (h *TeamHandler) ListTeams(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var tm models.Team
 		var desc sql.NullString
+		var isMemberInt int
 		if err := rows.Scan(
-			&tm.ID, &tm.Name, &desc, &tm.AvatarColor, &tm.CreatedByUserID, &tm.CreatorName, &tm.CreatorUsername, &tm.CreatorRole,
-			&tm.MembersCount, &tm.UserRole, &tm.CreatedAt, &tm.UpdatedAt,
+			&tm.ID, &tm.Name, &desc, &tm.AvatarColor, &tm.CreatedByUserID,
+			&tm.CreatorName, &tm.CreatorUsername, &tm.CreatorRole,
+			&tm.MembersCount, &tm.UserRole, &isMemberInt,
+			&tm.JoinRequestStatus, &tm.JoinRequestID, &tm.PendingRequests,
+			&tm.CreatedAt, &tm.UpdatedAt,
 		); err == nil {
 			if desc.Valid {
 				tm.Description = desc.String
 			}
+			tm.IsMember = isMemberInt == 1
 			teams = append(teams, tm)
 		}
 	}
@@ -826,4 +822,269 @@ func (h *TeamHandler) RemoveTeamShare(w http.ResponseWriter, r *http.Request) {
 	events.Broadcast("team:share_remove", "team", "share_remove", teamID, "", claims.UserID, map[string]interface{}{"share_id": shareID})
 	events.Broadcast("share:delete", "share", "delete", shareID, "", claims.UserID, nil)
 	utils.RespondSuccess(w, http.StatusOK, "Shared resource removed from team", nil)
+}
+
+// RequestToJoinTeam allows a user to request joining a team they are not in
+func (h *TeamHandler) RequestToJoinTeam(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+	teamID := chi.URLParam(r, "id")
+
+	// Check team exists
+	var teamName string
+	err := db.DB.QueryRow("SELECT name FROM main.teams WHERE id = ?", teamID).Scan(&teamName)
+	if err != nil {
+		utils.RespondError(w, http.StatusNotFound, "Team not found")
+		return
+	}
+
+	// Check if already a member
+	var isMember bool
+	var count int
+	_ = db.DB.QueryRow("SELECT COUNT(*) FROM main.team_members WHERE team_id = ? AND user_id = ?", teamID, claims.UserID).Scan(&count)
+	if count > 0 {
+		isMember = true
+	} else {
+		var creatorID string
+		_ = db.DB.QueryRow("SELECT created_by_user_id FROM main.teams WHERE id = ?", teamID).Scan(&creatorID)
+		if creatorID == claims.UserID {
+			isMember = true
+		}
+	}
+
+	if isMember {
+		utils.RespondError(w, http.StatusBadRequest, "You are already a member of this team")
+		return
+	}
+
+	// Get user info
+	var userName, userEmail, userUsername string
+	_ = db.DB.QueryRow("SELECT name, email, COALESCE(username, '') FROM main.users WHERE id = ?", claims.UserID).Scan(&userName, &userEmail, &userUsername)
+	if userName == "" {
+		userName = claims.Username
+	}
+	if userEmail == "" {
+		userEmail = claims.Email
+	}
+	if userUsername == "" {
+		userUsername = claims.Username
+	}
+
+	reqID := uuid.New().String()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	_, err = db.DB.Exec(`
+		INSERT INTO main.team_join_requests (id, team_id, user_id, user_name, user_email, user_username, status, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
+		ON CONFLICT(team_id, user_id) DO UPDATE SET
+			id = excluded.id,
+			status = 'pending',
+			created_at = excluded.created_at,
+			reviewed_at = NULL,
+			reviewed_by = NULL
+	`, reqID, teamID, claims.UserID, userName, userEmail, userUsername, now)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to submit join request")
+		return
+	}
+
+	db.LogActivity(claims.UserID, claims.Username, "request_team_join", "team", teamID, teamName, fmt.Sprintf("Requested to join team '%s'", teamName))
+	events.Broadcast("team:join_request", "team", "request", teamID, "", claims.UserID, map[string]interface{}{
+		"team_id":   teamID,
+		"user_id":   claims.UserID,
+		"user_name": userName,
+		"status":    "pending",
+	})
+
+	utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"id":      reqID,
+		"team_id": teamID,
+		"status":  "pending",
+		"message": "Join request submitted successfully. Awaiting approval from team leader.",
+	})
+}
+
+// CancelJoinRequest allows a user to withdraw their pending join request
+func (h *TeamHandler) CancelJoinRequest(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+	teamID := chi.URLParam(r, "id")
+
+	res, err := db.DB.Exec("DELETE FROM main.team_join_requests WHERE team_id = ? AND user_id = ? AND status = 'pending'", teamID, claims.UserID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to cancel join request")
+		return
+	}
+	rowsAffected, _ := res.RowsAffected()
+	if rowsAffected == 0 {
+		utils.RespondError(w, http.StatusNotFound, "No pending join request found")
+		return
+	}
+
+	events.Broadcast("team:join_request_cancel", "team", "cancel", teamID, "", claims.UserID, map[string]interface{}{
+		"team_id": teamID,
+		"user_id": claims.UserID,
+	})
+
+	utils.RespondJSON(w, http.StatusOK, map[string]string{"message": "Join request cancelled"})
+}
+
+// GetTeamJoinRequests returns all pending join requests for a team (leader/admin only)
+func (h *TeamHandler) GetTeamJoinRequests(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+	teamID := chi.URLParam(r, "id")
+
+	// Verify permissions: caller must be leader, creator, or workspace admin/owner
+	var creatorID string
+	err := db.DB.QueryRow("SELECT created_by_user_id FROM main.teams WHERE id = ?", teamID).Scan(&creatorID)
+	if err != nil {
+		utils.RespondError(w, http.StatusNotFound, "Team not found")
+		return
+	}
+
+	var callerRole string
+	_ = db.DB.QueryRow("SELECT role FROM main.team_members WHERE team_id = ? AND user_id = ?", teamID, claims.UserID).Scan(&callerRole)
+
+	if creatorID != claims.UserID && callerRole != "leader" && claims.Role != "admin" && claims.Role != "owner" {
+		utils.RespondError(w, http.StatusForbidden, "Only team leaders or workspace admins can view join requests")
+		return
+	}
+
+	rows, err := db.DB.Query(`
+		SELECT tjr.id, tjr.team_id, t.name as team_name, tjr.user_id, tjr.user_name, tjr.user_email,
+		       COALESCE(tjr.user_username, '') as user_username, tjr.status, COALESCE(tjr.note, '') as note,
+		       tjr.created_at, tjr.reviewed_at, COALESCE(tjr.reviewed_by, '') as reviewed_by
+		FROM main.team_join_requests tjr
+		JOIN main.teams t ON tjr.team_id = t.id
+		WHERE tjr.team_id = ? AND tjr.status = 'pending'
+		ORDER BY tjr.created_at ASC
+	`, teamID)
+	if err != nil {
+		log.Printf("[ERROR] GetTeamJoinRequests query failed for team %s: %v", teamID, err)
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to fetch join requests")
+		return
+	}
+	defer rows.Close()
+
+	requests := make([]models.TeamJoinRequest, 0)
+	for rows.Next() {
+		var req models.TeamJoinRequest
+		var revAt sql.NullTime
+		if err := rows.Scan(
+			&req.ID, &req.TeamID, &req.TeamName, &req.UserID, &req.UserName, &req.UserEmail,
+			&req.UserUsername, &req.Status, &req.Note, &req.CreatedAt, &revAt, &req.ReviewedBy,
+		); err == nil {
+			if revAt.Valid {
+				req.ReviewedAt = &revAt.Time
+			}
+			requests = append(requests, req)
+		}
+	}
+
+	utils.RespondJSON(w, http.StatusOK, requests)
+}
+
+// ApproveJoinRequest allows team leader or workspace admin to approve a join request
+func (h *TeamHandler) ApproveJoinRequest(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+	teamID := chi.URLParam(r, "id")
+	requestID := chi.URLParam(r, "requestId")
+
+	// Verify permissions
+	var creatorID, teamName string
+	err := db.DB.QueryRow("SELECT created_by_user_id, name FROM main.teams WHERE id = ?", teamID).Scan(&creatorID, &teamName)
+	if err != nil {
+		utils.RespondError(w, http.StatusNotFound, "Team not found")
+		return
+	}
+
+	var callerRole string
+	_ = db.DB.QueryRow("SELECT role FROM main.team_members WHERE team_id = ? AND user_id = ?", teamID, claims.UserID).Scan(&callerRole)
+
+	if creatorID != claims.UserID && callerRole != "leader" && claims.Role != "admin" && claims.Role != "owner" {
+		utils.RespondError(w, http.StatusForbidden, "Only team leaders or workspace admins can approve join requests")
+		return
+	}
+
+	// Fetch request
+	var reqUserID, reqUserName string
+	err = db.DB.QueryRow("SELECT user_id, user_name FROM main.team_join_requests WHERE id = ? AND team_id = ? AND status = 'pending'", requestID, teamID).Scan(&reqUserID, &reqUserName)
+	if err != nil {
+		utils.RespondError(w, http.StatusNotFound, "Pending join request not found")
+		return
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	memberID := uuid.New().String()
+
+	// Insert into team_members
+	_, err = db.DB.Exec(`
+		INSERT INTO main.team_members (id, team_id, user_id, role, joined_at)
+		VALUES (?, ?, ?, 'member', ?)
+		ON CONFLICT(team_id, user_id) DO UPDATE SET role = 'member'
+	`, memberID, teamID, reqUserID, now)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to add member to team")
+		return
+	}
+
+	// Update join request status
+	_, _ = db.DB.Exec("UPDATE main.team_join_requests SET status = 'approved', reviewed_at = ?, reviewed_by = ? WHERE id = ?", now, claims.Username, requestID)
+
+	db.LogActivity(claims.UserID, claims.Username, "approve_team_join", "team", teamID, teamName, fmt.Sprintf("Approved join request of %s to team '%s'", reqUserName, teamName))
+	events.Broadcast("team:join_approved", "team", "join_approved", teamID, "", reqUserID, map[string]interface{}{
+		"team_id":   teamID,
+		"user_id":   reqUserID,
+		"member_id": memberID,
+		"role":      "member",
+	})
+	events.Broadcast("team:member_add", "team", "add", teamID, "", reqUserID, map[string]interface{}{
+		"team_id": teamID,
+		"user_id": reqUserID,
+	})
+
+	utils.RespondJSON(w, http.StatusOK, map[string]string{"message": "Join request approved successfully"})
+}
+
+// RejectJoinRequest allows team leader or workspace admin to reject a join request
+func (h *TeamHandler) RejectJoinRequest(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r.Context())
+	teamID := chi.URLParam(r, "id")
+	requestID := chi.URLParam(r, "requestId")
+
+	// Verify permissions
+	var creatorID, teamName string
+	err := db.DB.QueryRow("SELECT created_by_user_id, name FROM main.teams WHERE id = ?", teamID).Scan(&creatorID, &teamName)
+	if err != nil {
+		utils.RespondError(w, http.StatusNotFound, "Team not found")
+		return
+	}
+
+	var callerRole string
+	_ = db.DB.QueryRow("SELECT role FROM main.team_members WHERE team_id = ? AND user_id = ?", teamID, claims.UserID).Scan(&callerRole)
+
+	if creatorID != claims.UserID && callerRole != "leader" && claims.Role != "admin" && claims.Role != "owner" {
+		utils.RespondError(w, http.StatusForbidden, "Only team leaders or workspace admins can reject join requests")
+		return
+	}
+
+	var reqUserID, reqUserName string
+	err = db.DB.QueryRow("SELECT user_id, user_name FROM main.team_join_requests WHERE id = ? AND team_id = ? AND status = 'pending'", requestID, teamID).Scan(&reqUserID, &reqUserName)
+	if err != nil {
+		utils.RespondError(w, http.StatusNotFound, "Pending join request not found")
+		return
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	_, err = db.DB.Exec("UPDATE main.team_join_requests SET status = 'rejected', reviewed_at = ?, reviewed_by = ? WHERE id = ?", now, claims.Username, requestID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to reject join request")
+		return
+	}
+
+	db.LogActivity(claims.UserID, claims.Username, "reject_team_join", "team", teamID, teamName, fmt.Sprintf("Rejected join request of %s to team '%s'", reqUserName, teamName))
+	events.Broadcast("team:join_rejected", "team", "join_rejected", teamID, "", reqUserID, map[string]interface{}{
+		"team_id": teamID,
+		"user_id": reqUserID,
+	})
+
+	utils.RespondJSON(w, http.StatusOK, map[string]string{"message": "Join request rejected"})
 }

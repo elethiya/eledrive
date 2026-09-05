@@ -30,9 +30,7 @@ export default function MembersPage({ onNavigateView }) {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all'); // 'all' | 'owner' | 'admin' | 'team_member' | 'user'
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'online' | 'offline'
-  const [viewMode, setViewMode] = useState('grouped'); // 'grouped' (categorized list) | 'list' (all accounts list)
+  const [statusCategory, setStatusCategory] = useState('all'); // 'all' | 'online' | 'offline'
   const [selectedMember, setSelectedMember] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
 
@@ -182,17 +180,12 @@ export default function MembersPage({ onNavigateView }) {
     };
   }, [members]);
 
-  // Filtered members
+  // Filtered members based on statusCategory ('all', 'online', 'offline') and search
   const filteredMembers = useMemo(() => {
     return members.filter((m) => {
-      // Category filter
-      if (categoryFilter !== 'all' && m.category !== categoryFilter) {
-        return false;
-      }
-
-      // Status filter
-      if (statusFilter === 'online' && !m.is_online) return false;
-      if (statusFilter === 'offline' && m.is_online) return false;
+      // Status category filter: online or offline
+      if (statusCategory === 'online' && !m.is_online) return false;
+      if (statusCategory === 'offline' && m.is_online) return false;
 
       // Search query
       if (searchQuery.trim()) {
@@ -209,23 +202,10 @@ export default function MembersPage({ onNavigateView }) {
 
       return true;
     });
-  }, [members, categoryFilter, statusFilter, searchQuery]);
+  }, [members, statusCategory, searchQuery]);
 
-  // Grouped members for 'grouped' view mode
-  const groupedCategories = useMemo(() => {
-    const order = ['owner', 'admin', 'team_member', 'user'];
-    return order
-      .map((catKey) => {
-        const items = filteredMembers.filter((m) => m.category === catKey);
-        const meta = getCategoryMeta(catKey);
-        return {
-          key: catKey,
-          meta,
-          items,
-        };
-      })
-      .filter((group) => group.items.length > 0);
-  }, [filteredMembers]);
+  const onlineMembers = useMemo(() => filteredMembers.filter((m) => m.is_online), [filteredMembers]);
+  const offlineMembers = useMemo(() => filteredMembers.filter((m) => !m.is_online), [filteredMembers]);
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950 text-slate-100">
@@ -313,180 +293,58 @@ export default function MembersPage({ onNavigateView }) {
               )}
             </div>
 
-          {/* Controls: Online/Offline Filter + View Mode Toggle */}
+          {/* Controls: Online/Offline Category Tabs */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Online/Offline Status Filter Pills */}
             <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
               <button
                 type="button"
-                onClick={() => setStatusFilter('all')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-                  statusFilter === 'all' ? 'bg-slate-800 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'
+                onClick={() => setStatusCategory('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  statusCategory === 'all' ? 'bg-slate-800 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                All
+                <span>All</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-slate-900 text-slate-400">
+                  {stats.total}
+                </span>
               </button>
               <button
                 type="button"
-                onClick={() => setStatusFilter('online')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                  statusFilter === 'online'
+                onClick={() => setStatusCategory('online')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  statusCategory === 'online'
                     ? 'bg-emerald-600 text-white shadow-xs'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Online ({stats.online})</span>
+                <span>Online</span>
+                <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${statusCategory === 'online' ? 'bg-emerald-700 text-white' : 'bg-slate-900 text-slate-400'}`}>
+                  {stats.online}
+                </span>
               </button>
               <button
                 type="button"
-                onClick={() => setStatusFilter('offline')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-                  statusFilter === 'offline'
+                onClick={() => setStatusCategory('offline')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  statusCategory === 'offline'
                     ? 'bg-slate-800 text-white shadow-xs'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Offline ({stats.offline})
-              </button>
-            </div>
-
-            {/* View Mode Toggle: Grouped List vs All Accounts List */}
-            <div className="hidden sm:flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
-              <button
-                type="button"
-                onClick={() => setViewMode('grouped')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                  viewMode === 'grouped' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'
-                }`}
-                title="Separated by Category groups in list format"
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>Grouped List</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('list')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                  viewMode === 'list' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'
-                }`}
-                title="All accounts in a single list table"
-              >
-                <List className="w-3.5 h-3.5" />
-                <span>All Accounts</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                <span>Offline</span>
+                <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${statusCategory === 'offline' ? 'bg-slate-700 text-white' : 'bg-slate-900 text-slate-400'}`}>
+                  {stats.offline}
+                </span>
               </button>
             </div>
           </div>
         </div>
-
-        {/* Category Tabs Bar (Separated in categories: Owner, Admins, Team Member, User) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1 border-t border-slate-800/80">
-          <button
-            type="button"
-            onClick={() => setCategoryFilter('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
-              categoryFilter === 'all'
-                ? 'bg-blue-600 text-white shadow-xs shadow-blue-600/20'
-                : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
-            }`}
-          >
-            <span>All Members</span>
-            <span
-              className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                categoryFilter === 'all' ? 'bg-blue-700 text-white' : 'bg-slate-800 text-slate-400'
-              }`}
-            >
-              {stats.total}
-            </span>
-          </button>
-
-          {/* Owner Tab */}
-          <button
-            type="button"
-            onClick={() => setCategoryFilter('owner')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
-              categoryFilter === 'owner'
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
-                : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
-            }`}
-          >
-            <Crown className="w-3.5 h-3.5 text-amber-400" />
-            <span>Owner</span>
-            <span
-              className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                categoryFilter === 'owner' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-400'
-              }`}
-            >
-              {stats.ownerCount}
-            </span>
-          </button>
-
-          {/* Admins Tab */}
-          <button
-            type="button"
-            onClick={() => setCategoryFilter('admin')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
-              categoryFilter === 'admin'
-                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-xs'
-                : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
-            <span>Admins</span>
-            <span
-              className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                categoryFilter === 'admin' ? 'bg-purple-500 text-white' : 'bg-slate-800 text-slate-400'
-              }`}
-            >
-              {stats.adminCount}
-            </span>
-          </button>
-
-          {/* Team Member Tab */}
-          <button
-            type="button"
-            onClick={() => setCategoryFilter('team_member')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
-              categoryFilter === 'team_member'
-                ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-xs'
-                : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5 text-blue-400" />
-            <span>Team Member</span>
-            <span
-              className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                categoryFilter === 'team_member' ? 'bg-blue-500 text-white' : 'bg-slate-800 text-slate-400'
-              }`}
-            >
-              {stats.teamMemberCount}
-            </span>
-          </button>
-
-          {/* User Tab */}
-          <button
-            type="button"
-            onClick={() => setCategoryFilter('user')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
-              categoryFilter === 'user'
-                ? 'bg-slate-700 text-slate-100 border border-slate-600 shadow-xs'
-                : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
-            }`}
-          >
-            <User className="w-3.5 h-3.5 text-slate-400" />
-            <span>User</span>
-            <span
-              className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                categoryFilter === 'user' ? 'bg-slate-600 text-white' : 'bg-slate-800 text-slate-400'
-              }`}
-            >
-              {stats.userCount}
-            </span>
-          </button>
-        </div>
       </div>
 
-      {/* Main Members Presentation */}
+
+      {/* Main Members Presentation: Separate Containers for Online and Offline Sections */}
       {loading ? (
         <div className="py-20 text-center space-y-3">
           <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto opacity-75" />
@@ -499,15 +357,14 @@ export default function MembersPage({ onNavigateView }) {
           </div>
           <h3 className="text-sm font-bold text-slate-200">No members match your criteria</h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            Try adjusting your search query, status filter, or category selection.
+            Try adjusting your search query or selecting a different category.
           </p>
-          {(searchQuery || categoryFilter !== 'all' || statusFilter !== 'all') && (
+          {(searchQuery || statusCategory !== 'all') && (
             <button
               type="button"
               onClick={() => {
                 setSearchQuery('');
-                setCategoryFilter('all');
-                setStatusFilter('all');
+                setStatusCategory('all');
               }}
               className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-all inline-block mt-2"
             >
@@ -515,66 +372,98 @@ export default function MembersPage({ onNavigateView }) {
             </button>
           )}
         </div>
-      ) : viewMode === 'grouped' && categoryFilter === 'all' ? (
-        /* 1. Grouped List View: Separated into Owner, Admins, Team Member, User in List Format */
-        <div className="space-y-6">
-          {groupedCategories.map((group) => {
-            const GroupIcon = group.meta.icon;
-            const onlineCount = group.items.filter((m) => m.is_online).length;
-            return (
-              <div key={group.key} className="space-y-2.5">
-                {/* Category Group Header */}
-                <div className="flex items-center justify-between px-1">
-                  <div className="flex items-center gap-2">
-                    <div className={`p-1.5 rounded-lg border ${group.meta.badgeBg}`}>
-                      <GroupIcon className="w-4 h-4" />
-                    </div>
-                    <h2 className="text-sm font-black text-slate-100 tracking-tight flex items-center gap-2">
-                      <span>{group.meta.title}</span>
-                      <span className="text-xs font-semibold text-slate-500">({group.items.length})</span>
-                    </h2>
-                  </div>
-                  <span className="text-[11px] font-mono text-slate-400">
-                    <span className="text-emerald-400 font-semibold">{onlineCount}</span> online
-                  </span>
-                </div>
-
-                {/* Accounts List Table in this Category */}
-                <AccountsTable
-                  members={group.items}
-                  showCategoryColumn={false}
-                  onSelectMember={setSelectedMember}
-                  onCopyEmail={handleCopyEmail}
-                  copiedId={copiedId}
-                  currentUser={currentUser}
-                  getCategoryMeta={getCategoryMeta}
-                />
-              </div>
-            );
-          })}
-        </div>
       ) : (
-        /* 2. All Accounts List View or Single Category Filtered List View */
-        <div className="space-y-2.5">
-          {categoryFilter !== 'all' && (
-            <div className="flex items-center gap-2 px-1 pb-1">
-              <span className="text-xs text-slate-400">
-                Showing {filteredMembers.length} {filteredMembers.length === 1 ? 'account' : 'accounts'} in{' '}
-                <span className="font-bold text-slate-200">
-                  {getCategoryMeta(categoryFilter).title}
-                </span>
-              </span>
-            </div>
+        <div className="space-y-6 pb-6">
+          {/* Online Members Section Container */}
+          {(statusCategory === 'all' || statusCategory === 'online') && (
+            <section className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+              {/* Online Section Header */}
+              <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+                <div className="flex items-center gap-2.5">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+                  </span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-bold text-slate-100 tracking-wide uppercase">
+                        Online Members
+                      </h2>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-mono font-bold border border-emerald-500/30">
+                        {onlineMembers.length}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">Currently active on the workspace</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Responsive Grid: 1 profile (mobile), 2 profiles (tablet), 3 profiles per row (desktop) */}
+              {onlineMembers.length === 0 ? (
+                <div className="py-8 text-center bg-slate-950/40 rounded-xl border border-slate-800/50">
+                  <p className="text-xs text-slate-500 italic">
+                    {searchQuery ? 'No online members match your search' : 'No members currently online'}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
+                  {onlineMembers.map((m) => (
+                    <MemberProfileCard
+                      key={m.id}
+                      m={m}
+                      meta={getCategoryMeta(m.category)}
+                      isCurrent={currentUser?.id === m.id}
+                      onSelectMember={setSelectedMember}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
           )}
-          <AccountsTable
-            members={filteredMembers}
-            showCategoryColumn={categoryFilter === 'all'}
-            onSelectMember={setSelectedMember}
-            onCopyEmail={handleCopyEmail}
-            copiedId={copiedId}
-            currentUser={currentUser}
-            getCategoryMeta={getCategoryMeta}
-          />
+
+          {/* Offline Members Section Container */}
+          {(statusCategory === 'all' || statusCategory === 'offline') && (
+            <section className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+              {/* Offline Section Header */}
+              <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-3 h-3 rounded-full bg-slate-600 inline-block" />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-bold text-slate-100 tracking-wide uppercase">
+                        Offline Members
+                      </h2>
+                      <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-xs font-mono font-bold border border-slate-700">
+                        {offlineMembers.length}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">Currently offline or away</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Responsive Grid: 1 profile (mobile), 2 profiles (tablet), 3 profiles per row (desktop) */}
+              {offlineMembers.length === 0 ? (
+                <div className="py-8 text-center bg-slate-950/40 rounded-xl border border-slate-800/50">
+                  <p className="text-xs text-slate-500 italic">
+                    {searchQuery ? 'No offline members match your search' : 'No offline members'}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
+                  {offlineMembers.map((m) => (
+                    <MemberProfileCard
+                      key={m.id}
+                      m={m}
+                      meta={getCategoryMeta(m.category)}
+                      isCurrent={currentUser?.id === m.id}
+                      onSelectMember={setSelectedMember}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
         </div>
       )}
       </div>
@@ -595,178 +484,86 @@ export default function MembersPage({ onNavigateView }) {
   );
 }
 
-// Subcomponent: Accounts Table List
-function AccountsTable({
-  members,
-  showCategoryColumn = false,
-  onSelectMember,
-  onCopyEmail,
-  copiedId,
-  currentUser,
-  getCategoryMeta,
-}) {
+// Subcomponent: Member Profile Card (Clean list card: No emails/teams, 3 per row on desktop, opens profile floating window)
+function MemberProfileCard({ m, meta, isCurrent, onSelectMember }) {
+  const CategoryIcon = meta.icon;
+
   return (
-    <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs text-slate-300 min-w-[720px]">
-          <thead className="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-800 text-[11px] uppercase tracking-wider">
-            <tr>
-              <th className="py-3 px-4">Account</th>
-              <th className="py-3 px-4">Status</th>
-              {showCategoryColumn && <th className="py-3 px-4">Category</th>}
-              <th className="py-3 px-4">Assigned Teams</th>
-              <th className="py-3 px-4">Email</th>
-              <th className="py-3 px-4 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800/60">
-            {members.map((m) => {
-              const meta = getCategoryMeta(m.category);
-              const CategoryIcon = meta.icon;
-              const isCurrent = currentUser?.id === m.id;
-              return (
-                <tr
-                  key={m.id}
-                  onClick={() => onSelectMember(m)}
-                  className="hover:bg-slate-850/60 transition-colors cursor-pointer group"
-                >
-                  {/* Account Name, Avatar & Username */}
-                  <td className="py-3.5 px-4">
-                    <div className="flex items-center gap-3">
-                      <div className="relative shrink-0">
-                        <div
-                          className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs uppercase shadow-xs"
-                          style={{ backgroundColor: m.avatar_color || '#3b82f6' }}
-                        >
-                          {m.name?.[0] || 'U'}
-                        </div>
-                        {/* Live Online / Offline status dot on avatar */}
-                        <span
-                          className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-slate-900 ${
-                            m.is_online ? 'bg-emerald-400' : 'bg-slate-600'
-                          }`}
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-slate-100 group-hover:text-blue-400 transition-colors truncate">
-                            {m.name}
-                          </span>
-                          {m.category === 'owner' && (
-                            <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" title="Workspace Owner" />
-                          )}
-                          {isCurrent && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30 shrink-0">
-                              You
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[11px] text-slate-400 font-mono block leading-tight">
-                          @{m.username}
-                        </span>
-                      </div>
-                    </div>
-                  </td>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelectMember(m)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelectMember(m);
+        }
+      }}
+      className="p-4 rounded-2xl bg-slate-950/70 hover:bg-slate-900/90 border border-slate-800/80 hover:border-slate-700/80 transition-all duration-200 cursor-pointer group shadow-xs hover:shadow-lg hover:-translate-y-0.5 flex flex-col justify-between gap-3 text-left focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+    >
+      {/* Top: Avatar & User Identity */}
+      <div className="flex items-start gap-3 min-w-0">
+        <div className="relative shrink-0">
+          <div
+            className="w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold text-sm uppercase shadow-xs select-none"
+            style={{ backgroundColor: m.avatar_color || '#3b82f6' }}
+          >
+            {m.name?.[0] || 'U'}
+          </div>
+          {/* Live Online / Offline status dot on avatar */}
+          <span
+            className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-slate-950 ${
+              m.is_online ? 'bg-emerald-400' : 'bg-slate-600'
+            }`}
+          />
+        </div>
 
-                  {/* Active Status: Online or Offline */}
-                  <td className="py-3.5 px-4">
-                    {m.is_online ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[11px] font-semibold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span>Online</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 text-slate-400 border border-slate-700/60 text-[11px] font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                        <span>Offline</span>
-                      </span>
-                    )}
-                  </td>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <h3 className="font-bold text-slate-100 group-hover:text-blue-400 transition-colors truncate text-xs sm:text-sm">
+              {m.name}
+            </h3>
+            {m.category === 'owner' && (
+              <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" title="Workspace Owner" />
+            )}
+            {isCurrent && (
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30 shrink-0">
+                You
+              </span>
+            )}
+          </div>
+          <span className="text-[11px] text-slate-400 font-mono block truncate mt-0.5">
+            @{m.username}
+          </span>
+          <div className="mt-2">
+            <span
+              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[11px] font-bold border ${meta.badgeBg}`}
+            >
+              <CategoryIcon className="w-3 h-3" />
+              <span>{meta.title}</span>
+            </span>
+          </div>
+        </div>
+      </div>
 
-                  {/* Category Column (shown if showCategoryColumn is true) */}
-                  {showCategoryColumn && (
-                    <td className="py-3.5 px-4">
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border ${meta.badgeBg}`}
-                      >
-                        <CategoryIcon className="w-3.5 h-3.5" />
-                        <span>{meta.singular}</span>
-                      </span>
-                    </td>
-                  )}
+      {/* Bottom Bar: Online Status & View Profile link */}
+      <div className="pt-2.5 border-t border-slate-800/70 flex items-center justify-between gap-2">
+        {m.is_online ? (
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 text-[11px] font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Online</span>
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-800/80 text-slate-400 border border-slate-700/60 text-[11px] font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+            <span>Offline</span>
+          </span>
+        )}
 
-                  {/* Assigned Teams */}
-                  <td className="py-3.5 px-4">
-                    {Array.isArray(m.teams) && m.teams.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {m.teams.map((t) => (
-                          <span
-                            key={t.id}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-950 text-slate-300 border border-slate-800"
-                          >
-                            <span
-                              className="w-1.5 h-1.5 rounded-full shrink-0"
-                              style={{ backgroundColor: t.color || '#3b82f6' }}
-                            />
-                            <span className="truncate max-w-[120px]">{t.name}</span>
-                            {t.role === 'leader' && (
-                              <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider ml-0.5">
-                                Leader
-                              </span>
-                            )}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-slate-500 text-[11px] italic">Individual (No Team)</span>
-                    )}
-                  </td>
-
-                  {/* Email with copy button */}
-                  <td className="py-3.5 px-4">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-slate-300 font-mono text-xs truncate max-w-[170px]">
-                        {m.email || '—'}
-                      </span>
-                      {m.email && m.email !== '[Owner Protected]' && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onCopyEmail(m.email, m.id);
-                          }}
-                          className="p-1 text-slate-500 hover:text-slate-300 rounded-lg hover:bg-slate-850 transition-colors"
-                          title="Copy email"
-                        >
-                          {copiedId === m.id ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  </td>
-
-                  {/* Actions */}
-                  <td className="py-3.5 px-4 text-right">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectMember(m);
-                      }}
-                      className="px-2.5 py-1 bg-slate-850 hover:bg-slate-800 text-slate-300 hover:text-white rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1 border border-slate-800 group-hover:border-slate-700"
-                    >
-                      <span>Profile</span>
-                      <ChevronRight className="w-3 h-3 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="flex items-center gap-1 text-xs text-slate-400 group-hover:text-blue-400 font-semibold transition-colors">
+          <span>Profile</span>
+          <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+        </div>
       </div>
     </div>
   );
@@ -775,6 +572,14 @@ function AccountsTable({
 // Subcomponent: Member Details Modal
 function MemberDetailModal({ member, meta, onClose, onCopyEmail, copied, currentUser, onNavigateView }) {
   const CategoryIcon = meta.icon;
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">

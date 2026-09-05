@@ -208,6 +208,21 @@ func migrate() error {
 		reviewed_by TEXT
 	);
 
+	CREATE TABLE IF NOT EXISTS main.team_join_requests (
+		id TEXT PRIMARY KEY,
+		team_id TEXT NOT NULL,
+		user_id TEXT NOT NULL,
+		user_name TEXT NOT NULL,
+		user_email TEXT NOT NULL,
+		user_username TEXT NOT NULL,
+		status TEXT DEFAULT 'pending', -- 'pending', 'approved', 'rejected'
+		note TEXT DEFAULT '',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		reviewed_at DATETIME,
+		reviewed_by TEXT,
+		UNIQUE(team_id, user_id)
+	);
+
 	CREATE INDEX IF NOT EXISTS main.idx_activity_logs_created ON activity_logs(created_at DESC);
 	CREATE INDEX IF NOT EXISTS main.idx_download_logs_target ON download_logs(target_id, downloaded_at DESC);
 	CREATE INDEX IF NOT EXISTS main.idx_download_logs_uuid ON download_logs(secret_uuid);
@@ -217,6 +232,8 @@ func migrate() error {
 	CREATE INDEX IF NOT EXISTS main.idx_password_resets_status ON password_resets(status, created_at DESC);
 	CREATE INDEX IF NOT EXISTS main.idx_team_requests_status ON team_requests(status, created_at DESC);
 	CREATE INDEX IF NOT EXISTS main.idx_team_requests_user ON team_requests(user_id);
+	CREATE INDEX IF NOT EXISTS main.idx_team_join_requests_team ON team_join_requests(team_id, status);
+	CREATE INDEX IF NOT EXISTS main.idx_team_join_requests_user ON team_join_requests(user_id);
 	`
 
 	if _, err := DB.Exec(accountSchema); err != nil {
@@ -380,6 +397,19 @@ func migrate() error {
 		);
 		CREATE INDEX IF NOT EXISTS main.idx_password_resets_status ON password_resets(status, created_at DESC);
 	`)
+
+	// Ensure note exists in team_join_requests and backfill from message if message column was present
+	var tjrNoteCount int
+	_ = DB.QueryRow("SELECT COUNT(*) FROM main.pragma_table_info('team_join_requests') WHERE name='note'").Scan(&tjrNoteCount)
+	if tjrNoteCount == 0 {
+		_, _ = DB.Exec("ALTER TABLE main.team_join_requests ADD COLUMN note TEXT DEFAULT ''")
+		var tjrMsgCount int
+		_ = DB.QueryRow("SELECT COUNT(*) FROM main.pragma_table_info('team_join_requests') WHERE name='message'").Scan(&tjrMsgCount)
+		if tjrMsgCount > 0 {
+			_, _ = DB.Exec("UPDATE main.team_join_requests SET note = message WHERE (note IS NULL OR note = '') AND message IS NOT NULL AND message != ''")
+		}
+	}
+	_, _ = DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS main.idx_team_join_requests_team_user ON team_join_requests(team_id, user_id)")
 
 	// Ensure exactly one owner exists: if no owner exists, promote the first admin
 	var ownerCount int

@@ -63,6 +63,16 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
   const [sortField, setSortField] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
 
+  // Category State: 'my' | 'not_my' | 'all'
+  const [teamCategory, setTeamCategory] = useState('my');
+
+  // Join Request Submissions State
+  const [submittingJoinId, setSubmittingJoinId] = useState(null);
+
+  // Active Team Join Requests (for team leaders / admins)
+  const [joinRequests, setJoinRequests] = useState([]);
+  const [loadingJoinRequests, setLoadingJoinRequests] = useState(false);
+
   // Create Team Modal
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
@@ -85,7 +95,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
 
   // Manage / Details Modal
   const [activeTeam, setActiveTeam] = useState(null);
-  const [activeTab, setActiveTab] = useState('members'); // 'members' | 'shares' | 'settings'
+  const [activeTab, setActiveTab] = useState('members'); // 'members' | 'shares' | 'settings' | 'requests'
   const [loadingTeamDetails, setLoadingTeamDetails] = useState(false);
   const [addMemberQuery, setAddMemberQuery] = useState('');
   const [newMemberRole, setNewMemberRole] = useState('member'); // 'member' | 'leader'
@@ -129,6 +139,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
     loadTeams(false);
     if (activeTeam?.id) {
       loadTeamShares(activeTeam.id, false);
+      loadTeamJoinRequests(activeTeam.id);
     }
     loadMyRequests();
   });
@@ -200,19 +211,106 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
     }
   };
 
+  const loadTeamJoinRequests = async (teamId) => {
+    if (!teamId) return;
+    setLoadingJoinRequests(true);
+    try {
+      const res = await teamAPI.getJoinRequests(teamId);
+      setJoinRequests(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error('Failed to load team join requests:', err);
+      setJoinRequests([]);
+    } finally {
+      setLoadingJoinRequests(false);
+    }
+  };
+
+  const handleRequestToJoin = async (team) => {
+    if (!team?.id) return;
+    setSubmittingJoinId(team.id);
+    try {
+      await teamAPI.requestToJoin(team.id);
+      toast.success(`Request to join "${team.name}" sent! Team leaders will review it.`);
+      await loadTeams(false);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to submit join request');
+    } finally {
+      setSubmittingJoinId(null);
+    }
+  };
+
+  const handleCancelJoinRequest = async (team) => {
+    if (!team?.id) return;
+    const ok = await confirm({
+      title: 'Cancel Join Request',
+      message: `Are you sure you want to cancel your request to join "${team.name}"?`,
+      confirmText: 'Cancel Request',
+      variant: 'warning',
+    });
+    if (!ok) return;
+
+    setSubmittingJoinId(team.id);
+    try {
+      await teamAPI.cancelJoinRequest(team.id);
+      toast.info(`Cancelled join request for "${team.name}"`);
+      await loadTeams(false);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to cancel join request');
+    } finally {
+      setSubmittingJoinId(null);
+    }
+  };
+
+  const handleApproveJoinRequest = async (request) => {
+    if (!activeTeam?.id || !request?.id) return;
+    try {
+      await teamAPI.approveJoinRequest(activeTeam.id, request.id);
+      toast.success(`Approved ${request.user_name || 'member'} to join ${activeTeam.name}!`);
+      await refreshActiveTeam();
+      await loadTeamJoinRequests(activeTeam.id);
+      loadTeams(false);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to approve join request');
+    }
+  };
+
+  const handleRejectJoinRequest = async (request) => {
+    if (!activeTeam?.id || !request?.id) return;
+    const ok = await confirm({
+      title: 'Reject Join Request',
+      message: `Are you sure you want to reject the join request from ${request.user_name || request.user_email}?`,
+      confirmText: 'Reject Request',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    try {
+      await teamAPI.rejectJoinRequest(activeTeam.id, request.id);
+      toast.info(`Join request for ${request.user_name || 'user'} rejected`);
+      await loadTeamJoinRequests(activeTeam.id);
+      loadTeams(false);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to reject join request');
+    }
+  };
+
   const refreshActiveTeam = async () => {
     if (!activeTeam?.id) return;
     setIsRefreshingTeam(true);
     try {
-      const [teamRes, sharesRes] = await Promise.all([
+      const [teamRes, sharesRes, requestsRes] = await Promise.all([
         teamAPI.getTeam(activeTeam.id),
         teamAPI.getTeamShares(activeTeam.id),
+        teamAPI.getJoinRequests(activeTeam.id).catch(() => ({ data: [] })),
       ]);
       if (teamRes.data) {
         setActiveTeam(teamRes.data);
       }
       if (sharesRes.data) {
         setTeamShares(Array.isArray(sharesRes.data) ? sharesRes.data : []);
+      }
+      if (requestsRes.data) {
+        setJoinRequests(Array.isArray(requestsRes.data) ? requestsRes.data : []);
       }
       toast.success('Team details refreshed');
     } catch (err) {
@@ -237,6 +335,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
         setMemberRoleFilter('all');
         setTransferOwnerId('');
         loadTeamShares(teamId, true);
+        loadTeamJoinRequests(teamId);
       }
     } catch (err) {
       toast.error(err.response?.data?.error || err.message);
@@ -481,12 +580,28 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
   };
 
   const safeTeams = Array.isArray(teams) ? teams : [];
-  const filteredTeams = safeTeams.filter(
-    (t) =>
-      t &&
-      (((t.name || '').toLowerCase().includes(searchQuery.toLowerCase())) ||
-        ((t.description || '').toLowerCase().includes(searchQuery.toLowerCase())))
-  );
+
+  const myTeams = useMemo(() => safeTeams.filter((t) => !!t.is_member), [safeTeams]);
+  const notMyTeams = useMemo(() => safeTeams.filter((t) => !t.is_member), [safeTeams]);
+
+  const categoryTeams = useMemo(() => {
+    if (teamCategory === 'my') return myTeams;
+    if (teamCategory === 'not_my') return notMyTeams;
+    return safeTeams;
+  }, [teamCategory, myTeams, notMyTeams, safeTeams]);
+
+  const filteredTeams = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return categoryTeams;
+    return categoryTeams.filter(
+      (t) =>
+        t &&
+        ((t.name || '').toLowerCase().includes(q) ||
+          (t.description || '').toLowerCase().includes(q) ||
+          (t.creator_name || '').toLowerCase().includes(q) ||
+          (t.creator_username || '').toLowerCase().includes(q))
+    );
+  }, [categoryTeams, searchQuery]);
 
   const filteredCreateUsers = useMemo(() => {
     if (!createMemberSearch.trim()) return availableUsers;
@@ -539,8 +654,13 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                 <span className="hidden sm:inline">Teams & Workspaces</span>
               </h1>
               <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 shrink-0">
-                {teams.length} {teams.length === 1 ? 'Team' : 'Teams'}
+                {safeTeams.length} {safeTeams.length === 1 ? 'Team' : 'Teams'}
               </span>
+              {myTeams.length > 0 && (
+                <span className="hidden xs:inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30 shrink-0">
+                  <span>{myTeams.length} Joined</span>
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-400 hidden sm:block truncate mt-0.5">
               Create project teams, organize teammates, and collaborate with unified permissions
@@ -630,24 +750,91 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
           </div>
         )}
 
-        {/* Search Bar */}
-        <div className="w-full max-w-md relative">
-          <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
-          <input
-            type="text"
-            placeholder="Search teams by name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-hidden focus:border-blue-500 transition-colors shadow-inner"
-          />
-          {searchQuery && (
+        {/* Controls: Search Bar and Category Tabs (My Teams vs Not My Teams) */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          {/* Search Bar */}
+          <div className="w-full max-w-md relative">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search teams by name, description, or creator..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors shadow-inner"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300 transition-colors"
+                title="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Categories: My Teams / Not My Teams */}
+          <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800 shrink-0 self-start sm:self-auto overflow-x-auto">
             <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300 transition-colors"
+              type="button"
+              onClick={() => setTeamCategory('my')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                teamCategory === 'my'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
             >
-              <X className="w-3.5 h-3.5" />
+              <Users className="w-3.5 h-3.5" />
+              <span>My Teams</span>
+              <span
+                className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                  teamCategory === 'my' ? 'bg-blue-700 text-white' : 'bg-slate-800 text-slate-400'
+                }`}
+              >
+                {myTeams.length}
+              </span>
             </button>
-          )}
+
+            <button
+              type="button"
+              onClick={() => setTeamCategory('not_my')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                teamCategory === 'not_my'
+                  ? 'bg-purple-600 text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Not My Teams</span>
+              <span
+                className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                  teamCategory === 'not_my' ? 'bg-purple-700 text-white' : 'bg-slate-800 text-slate-400'
+                }`}
+              >
+                {notMyTeams.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setTeamCategory('all')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                teamCategory === 'all'
+                  ? 'bg-slate-800 text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span>All</span>
+              <span
+                className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                  teamCategory === 'all' ? 'bg-slate-700 text-slate-200' : 'bg-slate-850 text-slate-400'
+                }`}
+              >
+                {safeTeams.length}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Loading State */}
@@ -658,21 +845,61 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
         ) : filteredTeams.length === 0 ? (
           <div className="h-80 flex flex-col items-center justify-center text-center max-w-sm mx-auto p-4">
             <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-slate-900 border border-slate-800 text-blue-400 flex items-center justify-center mb-4 shadow-xl">
-              <Users className="w-7 h-7 sm:w-8 sm:h-8" />
+              {teamCategory === 'not_my' ? (
+                <UserPlus className="w-7 h-7 sm:w-8 sm:h-8 text-purple-400" />
+              ) : (
+                <Users className="w-7 h-7 sm:w-8 sm:h-8 text-blue-400" />
+              )}
             </div>
             <h3 className="text-sm sm:text-base font-bold text-slate-100 mb-1">
-              {searchQuery ? 'No teams match your search' : 'No teams created yet'}
+              {searchQuery
+                ? 'No teams match your search'
+                : teamCategory === 'my'
+                ? "You Haven't Joined Any Teams Yet"
+                : teamCategory === 'not_my'
+                ? 'No Other Teams Available'
+                : 'No Teams Created Yet'}
             </h3>
             <p className="text-xs text-slate-400 mb-5">
-              Create a team to easily organize teammates and share folders with everyone at once.
+              {searchQuery
+                ? 'Try refining your search query or clear the filter.'
+                : teamCategory === 'my'
+                ? 'Discover and request to join existing workspaces under "Not My Teams", or create your own.'
+                : teamCategory === 'not_my'
+                ? 'You are already a member of all active workspaces in this organization.'
+                : 'Create a team to easily organize teammates and share folders with everyone at once.'}
             </p>
-            <button
-              onClick={handleOpenCreateModal}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-md"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{isAdminOrOwner ? 'Create Your First Team' : 'Request Your First Team'}</span>
-            </button>
+
+            <div className="flex items-center gap-2 flex-wrap justify-center">
+              {teamCategory === 'my' && notMyTeams.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setTeamCategory('not_my')}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Browse Available Teams ({notMyTeams.length})</span>
+                </button>
+              )}
+              {teamCategory === 'not_my' && (
+                <button
+                  type="button"
+                  onClick={() => setTeamCategory('my')}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-md transition-colors"
+                >
+                  <Users className="w-4 h-4" />
+                  <span>View My Teams</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleOpenCreateModal}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-md transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span>{isAdminOrOwner ? 'Create Team' : 'Request Team'}</span>
+              </button>
+            </div>
           </div>
         ) : (
           <div className="space-y-3 min-w-0">
@@ -692,7 +919,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
               </button>
 
               <div className="flex items-center gap-3 lg:gap-4 xl:gap-6 shrink-0">
-                <span className="w-20 xl:w-24 text-center">Role</span>
+                <span className="w-24 xl:w-28 text-center">Status / Role</span>
 
                 <button
                   onClick={() => handleHeaderSort('members')}
@@ -716,7 +943,7 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                   )}
                 </button>
 
-                <span className="w-28 xl:w-64 text-right pr-2">Actions</span>
+                <span className="w-32 xl:w-64 text-right pr-2">Actions</span>
               </div>
             </div>
 
@@ -724,11 +951,15 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
             <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3">
               {sortedTeams.map((t) => {
                 const isLeader = t.user_role === 'leader' || t.created_by_user_id === user?.id;
+                const isMember = !!t.is_member;
+
                 return (
                   <div
                     key={t.id}
-                    onClick={() => handleOpenTeam(t.id, 'members')}
-                    className="p-3.5 sm:p-4 bg-slate-900/80 hover:bg-slate-850 active:bg-slate-800 rounded-2xl border border-slate-800/80 shadow-xs transition-all cursor-pointer flex flex-col justify-between select-none group space-y-3"
+                    onClick={isMember ? () => handleOpenTeam(t.id, 'members') : undefined}
+                    className={`p-3.5 sm:p-4 bg-slate-900/80 rounded-2xl border border-slate-800/80 shadow-xs transition-all flex flex-col justify-between select-none group space-y-3 ${
+                      isMember ? 'cursor-pointer hover:bg-slate-850 active:bg-slate-800' : 'cursor-default'
+                    }`}
                   >
                     <div className="space-y-2">
                       <div className="flex items-start justify-between gap-2.5">
@@ -741,18 +972,35 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-bold text-slate-100 group-hover:text-blue-400 transition-colors truncate text-xs sm:text-sm">
+                              <span className={`font-bold transition-colors truncate text-xs sm:text-sm ${
+                                isMember ? 'text-slate-100 group-hover:text-blue-400' : 'text-slate-200'
+                              }`}>
                                 {t.name}
                               </span>
-                              <span
-                                className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0 ${
-                                  isLeader
-                                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                                    : 'bg-slate-800 text-slate-400 border-slate-700'
-                                }`}
-                              >
-                                {isLeader ? 'Leader' : 'Member'}
-                              </span>
+                              {isMember ? (
+                                <span
+                                  className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0 ${
+                                    isLeader
+                                      ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                                  }`}
+                                >
+                                  {isLeader ? 'Leader' : 'Member'}
+                                </span>
+                              ) : t.join_request_status === 'pending' ? (
+                                <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded border bg-amber-500/15 text-amber-300 border-amber-500/30 shrink-0 flex items-center gap-1">
+                                  <Clock className="w-2.5 h-2.5 animate-pulse" />
+                                  <span>Pending Approval</span>
+                                </span>
+                              ) : t.join_request_status === 'rejected' ? (
+                                <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded border bg-rose-500/15 text-rose-300 border-rose-500/30 shrink-0">
+                                  Declined
+                                </span>
+                              ) : (
+                                <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded border bg-purple-500/15 text-purple-300 border-purple-500/30 shrink-0">
+                                  Not Joined
+                                </span>
+                              )}
                             </div>
                             {(t.creator_name || t.creator_username) && (
                               <p className="text-[10px] text-slate-500 font-mono truncate mt-0.5">
@@ -771,44 +1019,116 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                       <p className="text-[11px] sm:text-xs text-slate-400 line-clamp-2">
                         {t.description || 'No description provided.'}
                       </p>
+
+                      {/* Pending Join Requests notice for Leaders */}
+                      {isMember && (isLeader || isAdminOrOwner) && t.pending_requests > 0 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenTeam(t.id, 'requests');
+                          }}
+                          className="w-full flex items-center justify-between p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 transition-colors text-[11px] font-semibold"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <UserCheck className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                            <span>{t.pending_requests} Pending Join {t.pending_requests === 1 ? 'Request' : 'Requests'}</span>
+                          </span>
+                          <span className="text-[10px] font-bold underline">Review →</span>
+                        </button>
+                      )}
                     </div>
 
-                    {/* Quick Action Buttons */}
-                    <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-800/80">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenTeam(t.id, 'members');
-                        }}
-                        className="flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg bg-slate-800/90 active:bg-blue-600 text-slate-200 active:text-white text-[11px] font-semibold transition-colors"
-                      >
-                        <Users className="w-3 h-3 text-blue-400" />
-                        <span>Members</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenTeam(t.id, 'shares');
-                        }}
-                        className="flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg bg-slate-800/90 active:bg-emerald-600 text-slate-200 active:text-white text-[11px] font-semibold transition-colors"
-                      >
-                        <FolderOpen className="w-3 h-3 text-emerald-400" />
-                        <span>Shares</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenTeam(t.id, 'settings');
-                        }}
-                        className="flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg bg-slate-800/90 active:bg-purple-600 text-slate-200 active:text-white text-[11px] font-semibold transition-colors"
-                      >
-                        <Settings className="w-3 h-3 text-purple-400" />
-                        <span>Settings</span>
-                      </button>
-                    </div>
+                    {/* Quick Action Buttons for Members / Non-Members */}
+                    {isMember ? (
+                      <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-800/80">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenTeam(t.id, 'members');
+                          }}
+                          className="flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg bg-slate-800/90 active:bg-blue-600 text-slate-200 active:text-white text-[11px] font-semibold transition-colors"
+                        >
+                          <Users className="w-3 h-3 text-blue-400" />
+                          <span>Members</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenTeam(t.id, 'shares');
+                          }}
+                          className="flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg bg-slate-800/90 active:bg-emerald-600 text-slate-200 active:text-white text-[11px] font-semibold transition-colors"
+                        >
+                          <FolderOpen className="w-3 h-3 text-emerald-400" />
+                          <span>Shares</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenTeam(t.id, 'settings');
+                          }}
+                          className="flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg bg-slate-800/90 active:bg-purple-600 text-slate-200 active:text-white text-[11px] font-semibold transition-colors"
+                        >
+                          <Settings className="w-3 h-3 text-purple-400" />
+                          <span>Settings</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="pt-2 border-t border-slate-800/80">
+                        {t.join_request_status === 'pending' ? (
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="flex items-center gap-1.5 text-[11px] text-amber-400 font-medium">
+                              <Clock className="w-3.5 h-3.5 animate-pulse" />
+                              <span>Requested (Pending)</span>
+                            </span>
+                            <button
+                              type="button"
+                              disabled={submittingJoinId === t.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCancelJoinRequest(t);
+                              }}
+                              className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 text-[11px] font-semibold border border-slate-700 hover:border-rose-500/30 transition-colors disabled:opacity-50"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>Cancel</span>
+                            </button>
+                          </div>
+                        ) : t.join_request_status === 'rejected' ? (
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] text-rose-400">Declined</span>
+                            <button
+                              type="button"
+                              disabled={submittingJoinId === t.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRequestToJoin(t);
+                              }}
+                              className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-semibold shadow-xs transition-colors disabled:opacity-50"
+                            >
+                              <UserPlus className="w-3.5 h-3.5" />
+                              <span>Re-request</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={submittingJoinId === t.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRequestToJoin(t);
+                            }}
+                            className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-600/20 transition-all disabled:opacity-50"
+                          >
+                            <UserPlus className="w-4 h-4" />
+                            <span>Request to Join Team</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -818,11 +1138,17 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
             <div className="hidden lg:block space-y-1.5">
               {sortedTeams.map((t) => {
                 const isLeader = t.user_role === 'leader' || t.created_by_user_id === user?.id;
+                const isMember = !!t.is_member;
+
                 return (
                   <div
                     key={t.id}
-                    onClick={() => handleOpenTeam(t.id, 'members')}
-                    className="group flex items-center justify-between px-4 py-3 bg-slate-900/70 hover:bg-slate-850 active:bg-slate-800 rounded-xl border border-slate-800/80 hover:border-slate-700 hover:shadow-xs transition-all select-none cursor-pointer text-xs text-slate-200"
+                    onClick={isMember ? () => handleOpenTeam(t.id, 'members') : undefined}
+                    className={`group flex items-center justify-between px-4 py-3 bg-slate-900/70 rounded-xl border border-slate-800/80 transition-all select-none text-xs text-slate-200 ${
+                      isMember
+                        ? 'hover:bg-slate-850 active:bg-slate-800 hover:border-slate-700 hover:shadow-xs cursor-pointer'
+                        : 'cursor-default bg-slate-900/40 hover:bg-slate-900/60'
+                    }`}
                   >
                     {/* Team info: Avatar + Name + Description */}
                     <div className="flex items-center gap-3.5 flex-1 min-w-0 pr-2 lg:pr-4">
@@ -835,7 +1161,9 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-slate-100 group-hover:text-blue-400 transition-colors truncate">
+                          <span className={`font-semibold transition-colors truncate ${
+                            isMember ? 'text-slate-100 group-hover:text-blue-400' : 'text-slate-200'
+                          }`}>
                             {t.name}
                           </span>
                           {(t.creator_name || t.creator_username) && (
@@ -856,17 +1184,47 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
 
                     {/* Meta and actions */}
                     <div className="flex items-center gap-3 lg:gap-4 xl:gap-6 shrink-0 text-slate-400">
-                      {/* Role Pill */}
-                      <div className="w-20 xl:w-24 justify-center flex">
-                        <span
-                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-                            isLeader
-                              ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                              : 'bg-slate-800 text-slate-400 border-slate-700'
-                          }`}
-                        >
-                          {isLeader ? 'Leader' : 'Member'}
-                        </span>
+                      {/* Role / Status Pill */}
+                      <div className="w-24 xl:w-28 justify-center flex flex-col items-center gap-1">
+                        {isMember ? (
+                          <>
+                            <span
+                              className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                                isLeader
+                                  ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                  : 'bg-slate-800 text-slate-400 border-slate-700'
+                              }`}
+                            >
+                              {isLeader ? 'Leader' : 'Member'}
+                            </span>
+                            {(isLeader || isAdminOrOwner) && t.pending_requests > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenTeam(t.id, 'requests');
+                                }}
+                                className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 transition-colors animate-pulse"
+                                title="View pending join requests"
+                              >
+                                {t.pending_requests} pending
+                              </button>
+                            )}
+                          </>
+                        ) : t.join_request_status === 'pending' ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-amber-500/15 text-amber-300 border-amber-500/30 flex items-center gap-1">
+                            <Clock className="w-2.5 h-2.5 animate-pulse" />
+                            <span>Pending</span>
+                          </span>
+                        ) : t.join_request_status === 'rejected' ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-rose-500/15 text-rose-300 border-rose-500/30">
+                            Declined
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-purple-500/15 text-purple-300 border-purple-500/30">
+                            Not Joined
+                          </span>
+                        )}
                       </div>
 
                       {/* Members Count */}
@@ -881,45 +1239,96 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                       </span>
 
                       {/* Action Buttons */}
-                      <div className="w-28 xl:w-64 flex items-center justify-end gap-1.5 shrink-0">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenTeam(t.id, 'members');
-                          }}
-                          className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shrink-0"
-                          title="View & manage members"
-                        >
-                          <Users className="w-3.5 h-3.5" />
-                          <span className="hidden xl:inline">Members</span>
-                        </button>
+                      <div className="w-32 xl:w-64 flex items-center justify-end gap-1.5 shrink-0">
+                        {isMember ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenTeam(t.id, 'members');
+                              }}
+                              className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shrink-0"
+                              title="View & manage members"
+                            >
+                              <Users className="w-3.5 h-3.5" />
+                              <span className="hidden xl:inline">Members</span>
+                            </button>
 
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenTeam(t.id, 'shares');
-                          }}
-                          className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shrink-0"
-                          title="View shared folders & files"
-                        >
-                          <FolderOpen className="w-3.5 h-3.5" />
-                          <span className="hidden xl:inline">Shares</span>
-                        </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenTeam(t.id, 'shares');
+                              }}
+                              className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shrink-0"
+                              title="View shared folders & files"
+                            >
+                              <FolderOpen className="w-3.5 h-3.5" />
+                              <span className="hidden xl:inline">Shares</span>
+                            </button>
 
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenTeam(t.id, 'settings');
-                          }}
-                          className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-purple-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shrink-0"
-                          title="Team settings & danger zone"
-                        >
-                          <Settings className="w-3.5 h-3.5" />
-                          <span className="hidden xl:inline">Settings</span>
-                        </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenTeam(t.id, 'settings');
+                              }}
+                              className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-purple-600 hover:text-white text-slate-300 text-[11px] font-semibold transition-colors shrink-0"
+                              title="Team settings & danger zone"
+                            >
+                              <Settings className="w-3.5 h-3.5" />
+                              <span className="hidden xl:inline">Settings</span>
+                            </button>
+                          </>
+                        ) : t.join_request_status === 'pending' ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="hidden xl:flex items-center gap-1 text-[11px] text-amber-400 font-medium truncate">
+                              <Clock className="w-3.5 h-3.5 animate-pulse shrink-0" />
+                              <span>Pending Review</span>
+                            </span>
+                            <button
+                              type="button"
+                              disabled={submittingJoinId === t.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCancelJoinRequest(t);
+                              }}
+                              className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 text-[11px] font-semibold border border-slate-700 hover:border-rose-500/30 transition-colors disabled:opacity-50 shrink-0"
+                              title="Cancel join request"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span className="hidden xl:inline">Cancel Request</span>
+                              <span className="xl:hidden">Cancel</span>
+                            </button>
+                          </div>
+                        ) : t.join_request_status === 'rejected' ? (
+                          <button
+                            type="button"
+                            disabled={submittingJoinId === t.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRequestToJoin(t);
+                            }}
+                            className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold shadow-md shadow-blue-600/20 transition-all disabled:opacity-50 shrink-0"
+                          >
+                            <UserPlus className="w-3.5 h-3.5" />
+                            <span>Re-request</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={submittingJoinId === t.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRequestToJoin(t);
+                            }}
+                            className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold shadow-md shadow-blue-600/20 transition-all disabled:opacity-50 shrink-0"
+                          >
+                            <UserPlus className="w-3.5 h-3.5" />
+                            <span>Request to Join</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1430,6 +1839,27 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                     <span className="sm:hidden">Settings</span>
                     <span className="hidden sm:inline">Team Settings</span>
                   </button>
+
+                  {canManage && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('requests')}
+                      className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+                        activeTab === 'requests'
+                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-xs'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
+                      }`}
+                    >
+                      <UserCheck className="w-3.5 h-3.5" />
+                      <span className="sm:hidden">Requests</span>
+                      <span className="hidden sm:inline">Join Requests</span>
+                      {joinRequests.length > 0 && (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 font-bold font-mono">
+                          {joinRequests.length}
+                        </span>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -2098,6 +2528,114 @@ export default function TeamsPage({ onOpenFolder, onOpenFile, onOpenPreview }) {
                         )}
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* TAB 4: JOIN REQUESTS (Leader / Admin) */}
+                {activeTab === 'requests' && canManage && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                          <UserCheck className="w-4 h-4 text-amber-400" />
+                          <span>Pending Join Requests</span>
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[11px] font-bold">
+                            {joinRequests.length}
+                          </span>
+                        </h4>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Review workspace members requesting to join this team. Approving grants them access to shared team resources.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => loadTeamJoinRequests(activeTeam.id)}
+                        disabled={loadingJoinRequests}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 text-xs font-semibold transition-colors shrink-0 disabled:opacity-50"
+                        title="Refresh requests"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${loadingJoinRequests ? 'animate-spin text-blue-400' : ''}`} />
+                        <span className="hidden sm:inline">Refresh</span>
+                      </button>
+                    </div>
+
+                    {loadingJoinRequests ? (
+                      <div className="h-44 flex items-center justify-center text-xs text-slate-500">
+                        Loading join requests...
+                      </div>
+                    ) : joinRequests.length === 0 ? (
+                      <div className="p-8 sm:p-12 rounded-2xl bg-slate-950/60 border border-slate-800/80 flex flex-col items-center justify-center text-center">
+                        <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-850 flex items-center justify-center text-slate-500 mb-3 shadow-inner">
+                          <UserCheck className="w-6 h-6 text-slate-400" />
+                        </div>
+                        <h5 className="text-xs font-bold text-slate-200">No Pending Requests</h5>
+                        <p className="text-[11px] text-slate-400 mt-1 max-w-sm">
+                          When users from the "Not My Teams" directory request to join this workspace, their requests will appear here for team leaders to approve or reject.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {joinRequests.map((req) => (
+                          <div
+                            key={req.id}
+                            className="p-3.5 sm:p-4 rounded-2xl bg-slate-950/80 border border-slate-800/80 hover:border-slate-700/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-10 h-10 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold text-sm shrink-0">
+                                {(req.user_name || req.user_email || 'U').charAt(0).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-bold text-slate-200 truncate">
+                                    {req.user_name}
+                                  </span>
+                                  {req.user_username && (
+                                    <span className="text-[11px] text-slate-400 font-mono">
+                                      @{req.user_username}
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-850 text-slate-400 border border-slate-750">
+                                    {req.user_role || 'member'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-1">
+                                  <span className="truncate">{req.user_email}</span>
+                                  <span>•</span>
+                                  <span className="font-mono text-slate-500 shrink-0">
+                                    Requested {formatDate(req.created_at)}
+                                  </span>
+                                </div>
+                                {req.note && (
+                                  <p className="text-[11px] text-slate-300 mt-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800/80 italic">
+                                    "{req.note}"
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60 w-full sm:w-auto justify-end">
+                              <button
+                                type="button"
+                                onClick={() => handleRejectJoinRequest(req)}
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-850 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/30 text-xs font-semibold transition-colors"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                <span>Reject</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleApproveJoinRequest(req)}
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-colors"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Approve Member</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

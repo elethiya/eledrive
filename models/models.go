@@ -260,19 +260,38 @@ type SecurityStats struct {
 }
 
 type Team struct {
-	ID              string       `json:"id"`
-	Name            string       `json:"name"`
-	Description     string       `json:"description"`
-	AvatarColor     string       `json:"avatar_color"`
-	CreatedByUserID string       `json:"created_by_user_id"`
-	CreatorName     string       `json:"creator_name,omitempty"`
-	CreatorUsername string       `json:"creator_username,omitempty"`
-	CreatorRole     string       `json:"creator_role,omitempty"`
-	MembersCount    int          `json:"members_count"`
-	UserRole        string       `json:"user_role,omitempty"` // "leader", "member", or "owner"
-	CreatedAt       time.Time    `json:"created_at"`
-	UpdatedAt       time.Time    `json:"updated_at"`
-	Members         []TeamMember `json:"members,omitempty"`
+	ID                string       `json:"id"`
+	Name              string       `json:"name"`
+	Description       string       `json:"description"`
+	AvatarColor       string       `json:"avatar_color"`
+	CreatedByUserID   string       `json:"created_by_user_id"`
+	CreatorName       string       `json:"creator_name,omitempty"`
+	CreatorUsername   string       `json:"creator_username,omitempty"`
+	CreatorRole       string       `json:"creator_role,omitempty"`
+	MembersCount      int          `json:"members_count"`
+	UserRole          string       `json:"user_role,omitempty"` // "leader", "member", or "owner"
+	IsMember          bool         `json:"is_member"`
+	JoinRequestStatus string       `json:"join_request_status,omitempty"` // "pending", "rejected", or ""
+	JoinRequestID     string       `json:"join_request_id,omitempty"`
+	PendingRequests   int          `json:"pending_requests,omitempty"`
+	CreatedAt         time.Time    `json:"created_at"`
+	UpdatedAt         time.Time    `json:"updated_at"`
+	Members           []TeamMember `json:"members,omitempty"`
+}
+
+type TeamJoinRequest struct {
+	ID           string     `json:"id"`
+	TeamID       string     `json:"team_id"`
+	TeamName     string     `json:"team_name,omitempty"`
+	UserID       string     `json:"user_id"`
+	UserName     string     `json:"user_name"`
+	UserEmail    string     `json:"user_email"`
+	UserUsername string     `json:"user_username"`
+	Status       string     `json:"status"` // "pending", "approved", "rejected"
+	Note         string     `json:"note,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	ReviewedAt   *time.Time `json:"reviewed_at,omitempty"`
+	ReviewedBy   string     `json:"reviewed_by,omitempty"`
 }
 
 type TeamMember struct {
