@@ -91,9 +91,34 @@ export function RealtimeProvider({ children }) {
     let cancelSchedule = false;
     let cleanupPageLoad = null;
 
-    // Explicitly close EventSource before unload/pagehide so Firefox doesn't abort
-    // the channel during page navigation/reload and log "connection was interrupted while page was loading"
+    // Webhook-driven presence reporter: instant notifications for online/offline states
+    const reportPresence = (status) => {
+      if (!userId) return;
+      try {
+        const payload = JSON.stringify({
+          event: 'presence:update',
+          target: 'user',
+          action: status,
+          user_id: userId,
+          data: { online: status === 'online', user_id: userId },
+        });
+        if (typeof navigator !== 'undefined' && navigator.sendBeacon && status === 'offline') {
+          const blob = new Blob([payload], { type: 'application/json' });
+          navigator.sendBeacon('/api/webhook', blob);
+        } else {
+          fetch('/api/webhook', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            keepalive: true,
+          }).catch(() => {});
+        }
+      } catch {}
+    };
+
+    // Explicitly close EventSource and declare offline via webhook beacon before unload/pagehide
     const handleBeforeUnload = () => {
+      reportPresence('offline');
       if (eventSourceRef.current) {
         try {
           eventSourceRef.current.close();
@@ -104,8 +129,8 @@ export function RealtimeProvider({ children }) {
     window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('pagehide', handleBeforeUnload);
 
-    // HTTP polling fallback for environments where SSE is blocked by ad blockers or browser policies
-    const pollOnce = async () => {
+    // One-time sync check for recovery when reconnecting
+    const syncOnce = async () => {
       if (isUnmounted || !userId) return;
       try {
         const since = lastEventTimestampRef.current || (Date.now() - 5000);
@@ -141,31 +166,17 @@ export function RealtimeProvider({ children }) {
         eventSourceRef.current = null;
       }
 
-      // Run poll immediately
-      pollOnce();
+      // Sync missed events once on fallback activation
+      syncOnce();
 
-      // Poll periodically every 4.5 seconds
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = setInterval(pollOnce, 4500);
-
-      // Re-poll immediately on window focus or tab visibility change
-      const handleVisibilityOrFocus = () => {
-        if (!document.hidden) {
-          pollOnce();
-        }
-      };
-
-      window.addEventListener('focus', handleVisibilityOrFocus);
-      document.addEventListener('visibilitychange', handleVisibilityOrFocus);
-
-      // After 60s, attempt to softly re-test SSE in case restriction was transient
+      // Soft re-test of SSE stream after 15 seconds
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = setTimeout(() => {
         if (!isUnmounted && userId) {
           isPollingFallbackRef.current = false;
           connectStream();
         }
-      }, 60000);
+      }, 15000);
     };
 
     const connectStream = () => {
@@ -194,6 +205,7 @@ export function RealtimeProvider({ children }) {
               pollIntervalRef.current = null;
             }
             setIsConnected(true);
+            reportPresence('online');
           }
         };
 
@@ -206,6 +218,7 @@ export function RealtimeProvider({ children }) {
               pollIntervalRef.current = null;
             }
             setIsConnected(true);
+            reportPresence('online');
           }
         });
 
@@ -286,6 +299,7 @@ export function RealtimeProvider({ children }) {
     return () => {
       isUnmounted = true;
       cancelSchedule = true;
+      reportPresence('offline');
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('pagehide', handleBeforeUnload);
       if (cleanupPageLoad) cleanupPageLoad();

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"eledrive/config"
+	"eledrive/models"
 	"eledrive/utils"
 	"github.com/google/uuid"
 	_ "modernc.org/sqlite"
@@ -230,6 +231,16 @@ func migrate() error {
 		UNIQUE(team_id, user_id)
 	);
 
+	CREATE TABLE IF NOT EXISTS main.forensic_access_grants (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL,
+		granted_by_user_id TEXT NOT NULL,
+		expires_at DATETIME, -- NULL indicates permanent access forever
+		notes TEXT DEFAULT '',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
 	CREATE INDEX IF NOT EXISTS main.idx_activity_logs_created ON activity_logs(created_at DESC);
 	CREATE INDEX IF NOT EXISTS main.idx_download_logs_target ON download_logs(target_id, downloaded_at DESC);
 	CREATE INDEX IF NOT EXISTS main.idx_download_logs_uuid ON download_logs(secret_uuid);
@@ -241,6 +252,8 @@ func migrate() error {
 	CREATE INDEX IF NOT EXISTS main.idx_team_requests_user ON team_requests(user_id);
 	CREATE INDEX IF NOT EXISTS main.idx_team_join_requests_team ON team_join_requests(team_id, status);
 	CREATE INDEX IF NOT EXISTS main.idx_team_join_requests_user ON team_join_requests(user_id);
+	CREATE INDEX IF NOT EXISTS main.idx_forensic_grants_user ON forensic_access_grants(user_id);
+	CREATE INDEX IF NOT EXISTS main.idx_forensic_grants_expires ON forensic_access_grants(expires_at);
 	`
 
 	if _, err := DB.Exec(accountSchema); err != nil {
@@ -460,6 +473,7 @@ func EnsureDefaultSettings() {
 		"forensic_watermarking_enabled":  "true",
 		"steganographic_canary_enabled":  "true",
 		"log_forensic_downloads":         "true",
+		"forensic_access_policy":        "owner_only",
 		"maintenance_mode":               "false",
 		"maintenance_notice":             "Platform is currently undergoing scheduled maintenance. Please check back shortly.",
 		"allow_zip_downloads":            "true",
@@ -517,3 +531,57 @@ func GetPublicSharingSettings() (allowShares bool, requirePW bool, defaultExpiry
 	}
 	return allowShares, requirePW, defaultExpiryDays
 }
+
+// CheckForensicAccess checks whether a given user is authorized to use forensic leak detection tools
+func CheckForensicAccess(userID, userRole string) (bool, string, *models.ForensicAccessGrant) {
+	if DB == nil {
+		return false, "database_offline", nil
+	}
+	if userRole == "owner" {
+		return true, "owner", nil
+	}
+
+	var policy string
+	_ = DB.QueryRow("SELECT value FROM main.system_settings WHERE key = 'forensic_access_policy'").Scan(&policy)
+	if policy == "" {
+		policy = "owner_only"
+	}
+
+	if policy == "all_users" {
+		return true, "all_users", nil
+	}
+	if (policy == "admins" || policy == "owner_and_admins") && userRole == "admin" {
+		return true, "admin", nil
+	}
+
+	// Check if there is an active specific grant for this user
+	if userID != "" {
+		rows, err := DB.Query(`
+			SELECT id, user_id, granted_by_user_id, expires_at, COALESCE(notes, ''), created_at
+			FROM main.forensic_access_grants
+			WHERE user_id = ?
+			ORDER BY created_at DESC
+		`, userID)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var g models.ForensicAccessGrant
+				var exp sql.NullTime
+				if err := rows.Scan(&g.ID, &g.UserID, &g.GrantedByUserID, &exp, &g.Notes, &g.CreatedAt); err == nil {
+					if exp.Valid {
+						g.ExpiresAt = &exp.Time
+						if exp.Time.Before(time.Now()) {
+							g.IsExpired = true
+							continue // expired, check if another grant exists
+						}
+					}
+					// If exp is not valid (NULL), it means access is forever!
+					return true, "granted", &g
+				}
+			}
+		}
+	}
+
+	return false, "denied", nil
+}
+

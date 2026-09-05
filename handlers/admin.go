@@ -1,12 +1,9 @@
 package handlers
 
 import (
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -419,6 +416,7 @@ func (h *AdminHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		ForensicWatermarkingEnabled: true,
 		SteganographicCanaryEnabled: true,
 		LogForensicDownloads:        true,
+		ForensicAccessPolicy:        "owner_only",
 		MaintenanceMode:             false,
 		MaintenanceNotice:           "Platform is currently undergoing scheduled maintenance. Please check back shortly.",
 		AllowZipDownloads:           true,
@@ -486,6 +484,10 @@ func (h *AdminHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 					settings.SteganographicCanaryEnabled = (v == "true" || v == "1")
 				case "log_forensic_downloads":
 					settings.LogForensicDownloads = (v == "true" || v == "1")
+				case "forensic_access_policy":
+					if v != "" {
+						settings.ForensicAccessPolicy = v
+					}
 				case "maintenance_mode":
 					settings.MaintenanceMode = (v == "true" || v == "1")
 				case "maintenance_notice":
@@ -550,6 +552,7 @@ func (h *AdminHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		"forensic_watermarking_enabled":  strconv.FormatBool(req.ForensicWatermarkingEnabled),
 		"steganographic_canary_enabled":  strconv.FormatBool(req.SteganographicCanaryEnabled),
 		"log_forensic_downloads":         strconv.FormatBool(req.LogForensicDownloads),
+		"forensic_access_policy":        req.ForensicAccessPolicy,
 		"maintenance_mode":               strconv.FormatBool(req.MaintenanceMode),
 		"maintenance_notice":             req.MaintenanceNotice,
 		"allow_zip_downloads":            strconv.FormatBool(req.AllowZipDownloads),
@@ -589,366 +592,13 @@ type InspectLeakRequest struct {
 
 // InspectLeak analyzes a suspect file or secret UUID to uncover who leaked it
 func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetUserClaims(r.Context())
-	actorID := ""
-	actorName := "Admin"
-	if claims != nil {
-		actorID = claims.UserID
-		if claims.Username != "" {
-			actorName = claims.Username
-		} else if claims.Email != "" {
-			actorName = claims.Email
-		}
-	}
-
-	var suspectBytes []byte
-	var queryStr string
-	var suspectFileName string
-
-	// Check if file was uploaded in multipart form
-	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
-		err := r.ParseMultipartForm(50 * 1024 * 1024) // up to 50MB for inspection
-		if err == nil && r.MultipartForm != nil {
-			if files := r.MultipartForm.File["file"]; len(files) > 0 {
-				suspectFileName = files[0].Filename
-				f, err := files[0].Open()
-				if err == nil {
-					suspectBytes, _ = io.ReadAll(f)
-					f.Close()
-				}
-			}
-			if q := r.FormValue("query"); q != "" {
-				queryStr = strings.TrimSpace(q)
-			}
-		}
-	} else {
-		var req InspectLeakRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
-			queryStr = strings.TrimSpace(req.Query)
-		}
-	}
-
-	var checksum string
-	if len(suspectBytes) > 0 {
-		hSum := sha256.New()
-		hSum.Write(suspectBytes)
-		checksum = hex.EncodeToString(hSum.Sum(nil))
-	}
-
-	result := &models.ForensicInspectionResult{
-		Matched:          false,
-		RiskAssessment:   "NOT_FOUND",
-		OriginalFilename: suspectFileName,
-		SHA256Checksum:   checksum,
-		DownloadHistory:  []models.DownloadRecord{},
-	}
-
-	var foundSecretUUID string
-
-	// 1. If physical file bytes were provided, extract embedded forensic metadata from file
-	if len(suspectBytes) > 0 {
-		extracted, err := utils.ExtractForensicWatermark(suspectBytes, h.cfg.JWTSecret)
-		if err == nil && extracted != nil && extracted.SecretUUID != "" {
-			result = extracted
-			foundSecretUUID = extracted.SecretUUID
-			if result.OriginalFilename == "" && suspectFileName != "" {
-				result.OriginalFilename = suspectFileName
-			}
-			if result.SHA256Checksum == "" && checksum != "" {
-				result.SHA256Checksum = checksum
-			}
-		}
-	}
-
-	// 2. If no watermark extracted from file, or if queryStr was provided, use queryStr
-	if foundSecretUUID == "" && queryStr != "" {
-		foundSecretUUID = queryStr
-	}
-
-	// If neither watermark nor secret UUID could be found, log failed/untracked scan and return
-	if foundSecretUUID == "" {
-		targetName := suspectFileName
-		if targetName == "" {
-			targetName = queryStr
-		}
-		if targetName == "" {
-			targetName = "Unidentified Asset"
-		}
-
-		db.LogActivity(
-			actorID,
-			actorName,
-			"forensic_inspect",
-			"failed_scan",
-			"untracked",
-			targetName,
-			fmt.Sprintf("Forensic analysis run by @%s on '%s': INVALID / UNTRACKED (No forensic watermark signature detected)", actorName, targetName),
-		)
-
-		result.Matched = false
-		result.OriginalFilename = targetName
-		result.RiskAssessment = "INVALID_OR_UNTRACKED"
-		result.MetadataSummary = "No valid cryptographic forensic watermark or Secret UUID detected in suspect asset."
-		result.DownloadHistory = []models.DownloadRecord{}
-
-		utils.RespondJSON(w, http.StatusOK, result)
-		return
-	}
-
-	// 3. Query files table in database
-	var fileID, fileName, ownerID, uploaderName, uploaderEmail, uploaderUsername, mimeType string
-	var fileSize int64
-	var uploadedAt time.Time
-	var forensicMeta sql.NullString
-
-	err := db.DB.QueryRow(`
-		SELECT f.id, f.name, f.owner_id, COALESCE(u.name, 'Workspace User'), COALESCE(u.email, 'unknown@eledrive.local'), COALESCE(u.username, 'user'), f.size, f.mime_type, f.created_at, f.forensic_meta
-		FROM files f
-		LEFT JOIN users u ON f.owner_id = u.id
-		WHERE f.secret_uuid = ? OR f.id = ? OR LOWER(f.name) = LOWER(?)
-		LIMIT 1
-	`, foundSecretUUID, foundSecretUUID, foundSecretUUID).Scan(
-		&fileID, &fileName, &ownerID, &uploaderName, &uploaderEmail, &uploaderUsername, &fileSize, &mimeType, &uploadedAt, &forensicMeta,
-	)
-
-	if err == nil {
-		result.Matched = true
-		result.SecretUUID = foundSecretUUID
-		result.OriginalFilename = fileName
-		result.FileType = mimeType
-		result.FileSize = fileSize
-		result.UploaderID = ownerID
-		result.UploaderName = uploaderName
-		result.UploaderEmail = uploaderEmail
-		result.UploaderUsername = uploaderUsername
-		result.UploadedAt = &uploadedAt
-		result.TargetID = fileID
-		result.IsFolder = false
-		result.RiskAssessment = "LEAK_IDENTIFIED"
-		result.SignatureValid = true
-		if result.SHA256Checksum == "" && checksum != "" {
-			result.SHA256Checksum = checksum
-		}
-
-		if result.LeakerIdentified {
-			if result.AccessType == "BROWSER_VIEW" {
-				result.MetadataSummary = fmt.Sprintf("CONFIRMED LEAK: Loaded in browser preview by %s (@%s - %s) on %s and exfiltrated via right-click save or browser tool.", result.LeakerName, result.LeakerUsername, result.LeakerEmail, result.AccessedAt.Format("2006-01-02 15:04:05 MST"))
-			} else if result.AccessType == "DIRECT_DOWNLOAD" {
-				result.MetadataSummary = fmt.Sprintf("CONFIRMED LEAK: Directly downloaded from workspace by %s (@%s - %s) on %s.", result.LeakerName, result.LeakerUsername, result.LeakerEmail, result.AccessedAt.Format("2006-01-02 15:04:05 MST"))
-			}
-		} else {
-			result.MetadataSummary = fmt.Sprintf("Asset registered in workspace (Owner: %s). To pinpoint the exact leaker, upload the suspect leaked file to verify its embedded cryptographic access trailer.", uploaderName)
-			result.ExfiltrationVerdict = "No physical suspect file uploaded for cryptographic trailer extraction. Showing registered workspace details and download/view history."
-		}
-
-		// Fetch download & view history for this file
-		result.DownloadHistory = h.getDownloadHistory(fileID, foundSecretUUID)
-
-		// Record in audit log
-		logMsg := fmt.Sprintf("Forensic analysis run by @%s: Asset matched! Uploader: %s (@%s), UUID: %s", actorName, uploaderName, uploaderUsername, foundSecretUUID)
-		if result.LeakerIdentified {
-			logMsg = fmt.Sprintf("Forensic analysis run by @%s: EXACT LEAKER IDENTIFIED! User: %s (@%s), Method: %s, Asset: %s, UUID: %s", actorName, result.LeakerName, result.LeakerUsername, result.ExfiltrationMethod, fileName, foundSecretUUID)
-		}
-		db.LogActivity(actorID, actorName, "forensic_inspect", "file", fileID, fileName, logMsg)
-
-		utils.RespondJSON(w, http.StatusOK, result)
-		return
-	}
-
-	// 4. Query folders table
-	var folderID, folderName, fOwnerID, fUploaderName, fUploaderEmail, fUploaderUsername string
-	var fUploadedAt time.Time
-
-	err = db.DB.QueryRow(`
-		SELECT f.id, f.name, f.owner_id, COALESCE(u.name, 'Workspace User'), COALESCE(u.email, 'unknown@eledrive.local'), COALESCE(u.username, 'user'), f.created_at
-		FROM folders f
-		LEFT JOIN users u ON f.owner_id = u.id
-		WHERE f.secret_uuid = ? OR f.id = ? OR LOWER(f.name) = LOWER(?) OR LOWER(f.name || '.zip') = LOWER(?)
-		LIMIT 1
-	`, foundSecretUUID, foundSecretUUID, foundSecretUUID, foundSecretUUID).Scan(
-		&folderID, &folderName, &fOwnerID, &fUploaderName, &fUploaderEmail, &fUploaderUsername, &fUploadedAt,
-	)
-
-	if err == nil {
-		result.Matched = true
-		result.SecretUUID = foundSecretUUID
-		result.OriginalFilename = folderName + ".zip"
-		result.FileType = "application/zip (Folder Archive)"
-		if len(suspectBytes) > 0 {
-			result.FileSize = int64(len(suspectBytes))
-		}
-		result.UploaderID = fOwnerID
-		result.UploaderName = fUploaderName
-		result.UploaderEmail = fUploaderEmail
-		result.UploaderUsername = fUploaderUsername
-		result.UploadedAt = &fUploadedAt
-		result.TargetID = folderID
-		result.IsFolder = true
-		result.RiskAssessment = "LEAK_IDENTIFIED"
-		result.SignatureValid = true
-		if result.SHA256Checksum == "" && checksum != "" {
-			result.SHA256Checksum = checksum
-		}
-
-		if result.LeakerIdentified {
-			result.MetadataSummary = fmt.Sprintf("CONFIRMED LEAK: Folder archive downloaded by %s (@%s - %s) on %s.", result.LeakerName, result.LeakerUsername, result.LeakerEmail, result.AccessedAt.Format("2006-01-02 15:04:05 MST"))
-		} else {
-			result.MetadataSummary = fmt.Sprintf("Folder archive cryptographically verified. Originally created by %s (%s).", fUploaderName, fUploaderEmail)
-			result.ExfiltrationVerdict = "No suspect file uploaded for cryptographic trailer extraction. Showing registered folder details."
-		}
-
-		result.DownloadHistory = h.getDownloadHistory(folderID, foundSecretUUID)
-
-		logMsg := fmt.Sprintf("Forensic analysis run by @%s: Leaked folder matched! Creator: %s (@%s), UUID: %s", actorName, fUploaderName, fUploaderUsername, foundSecretUUID)
-		if result.LeakerIdentified {
-			logMsg = fmt.Sprintf("Forensic analysis run by @%s: EXACT LEAKER IDENTIFIED for folder! User: %s (@%s), UUID: %s", actorName, result.LeakerName, result.LeakerUsername, foundSecretUUID)
-		}
-		db.LogActivity(actorID, actorName, "forensic_inspect", "folder", folderID, folderName, logMsg)
-
-		utils.RespondJSON(w, http.StatusOK, result)
-		return
-	}
-
-	// 5. If metadata was extracted from file trailer itself even if deleted from DB
-	if result.UploaderEmail != "" || result.LeakerEmail != "" {
-		result.Matched = true
-		result.RiskAssessment = "LEAK_IDENTIFIED"
-		if len(suspectBytes) > 0 && result.FileSize == 0 {
-			result.FileSize = int64(len(suspectBytes))
-		}
-		if result.SHA256Checksum == "" && checksum != "" {
-			result.SHA256Checksum = checksum
-		}
-		if result.MetadataSummary == "" {
-			result.MetadataSummary = fmt.Sprintf("Forensic metadata embedded inside file confirms uploader %s and leaker %s.", result.UploaderName, result.LeakerName)
-		}
-
-		// Record in audit log
-		db.LogActivity(
-			actorID,
-			actorName,
-			"forensic_inspect",
-			"forensic",
-			foundSecretUUID,
-			result.OriginalFilename,
-			fmt.Sprintf("Forensic trailer analysis by @%s: Confirmed leaker %s (%s) [UUID: %s]", actorName, result.LeakerName, result.LeakerEmail, foundSecretUUID),
-		)
-
-		utils.RespondJSON(w, http.StatusOK, result)
-		return
-	}
-
-	// 6. Log unmatched forensic scan to activity audit logs
-	targetName := suspectFileName
-	if targetName == "" {
-		targetName = queryStr
-	}
-	if targetName == "" {
-		targetName = foundSecretUUID
-	}
-
-	db.LogActivity(
-		actorID,
-		actorName,
-		"forensic_inspect",
-		"unmatched_asset",
-		foundSecretUUID,
-		targetName,
-		fmt.Sprintf("Forensic analysis run by @%s for '%s' [Secret UUID: %s - No matching workspace asset found in database]", actorName, targetName, foundSecretUUID),
-	)
-
-	result.Matched = false
-	result.SecretUUID = foundSecretUUID
-	result.OriginalFilename = targetName
-	if result.SHA256Checksum == "" && checksum != "" {
-		result.SHA256Checksum = checksum
-	}
-	result.RiskAssessment = "UNMATCHED_ASSET"
-	result.MetadataSummary = fmt.Sprintf("Secret UUID '%s' detected, but no matching active asset was found in workspace database.", foundSecretUUID)
-	result.DownloadHistory = []models.DownloadRecord{}
-
-	utils.RespondJSON(w, http.StatusOK, result)
-}
-
-func (h *AdminHandler) getDownloadHistory(targetID, secretUUID string) []models.DownloadRecord {
-	history := make([]models.DownloadRecord, 0)
-	rows, err := db.DB.Query(`
-		SELECT id, target_type, target_id, COALESCE(secret_uuid, ''), user_id, user_name, user_email, ip_address, user_agent, COALESCE(access_type, 'download'), downloaded_at
-		FROM download_logs
-		WHERE target_id = ? OR secret_uuid = ?
-		ORDER BY downloaded_at DESC
-		LIMIT 50
-	`, targetID, secretUUID)
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var rec models.DownloadRecord
-			if err := rows.Scan(&rec.ID, &rec.TargetType, &rec.TargetID, &rec.SecretUUID, &rec.UserID, &rec.UserName, &rec.UserEmail, &rec.IPAddress, &rec.UserAgent, &rec.AccessType, &rec.DownloadedAt); err == nil {
-				history = append(history, rec)
-			}
-		}
-		if err := rows.Err(); err != nil {
-			_ = err
-		}
-	}
-	return history
+	fh := NewForensicHandler(h.cfg)
+	fh.Inspect(w, r)
 }
 
 func (h *AdminHandler) GetSecurityStats(w http.ResponseWriter, r *http.Request) {
-	var stats models.SecurityStats
-	_ = db.DB.QueryRow("SELECT COUNT(*) FROM files WHERE secret_uuid IS NOT NULL AND secret_uuid != ''").Scan(&stats.TotalTrackedFiles)
-	_ = db.DB.QueryRow("SELECT COUNT(*) FROM folders WHERE secret_uuid IS NOT NULL AND secret_uuid != ''").Scan(&stats.TotalTrackedFolders)
-	_ = db.DB.QueryRow("SELECT COUNT(*) FROM download_logs").Scan(&stats.TotalDownloadsLogged)
-
-	// Recent downloads
-	stats.RecentDownloads = make([]models.DownloadRecord, 0)
-	rows, err := db.DB.Query(`
-		SELECT id, target_type, target_id, COALESCE(secret_uuid, ''), user_id, user_name, user_email, ip_address, user_agent, downloaded_at
-		FROM download_logs
-		ORDER BY downloaded_at DESC LIMIT 20
-	`)
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var rec models.DownloadRecord
-			if err := rows.Scan(&rec.ID, &rec.TargetType, &rec.TargetID, &rec.SecretUUID, &rec.UserID, &rec.UserName, &rec.UserEmail, &rec.IPAddress, &rec.UserAgent, &rec.DownloadedAt); err == nil {
-				stats.RecentDownloads = append(stats.RecentDownloads, rec)
-			}
-		}
-		if err := rows.Err(); err != nil {
-			_ = err
-		}
-	}
-
-	// Recent tracked files
-	stats.RecentTrackedFiles = make([]models.File, 0)
-	fRows, err := db.DB.Query(`
-		SELECT f.id, f.name, f.original_name, f.folder_id, f.owner_id, u.name, u.email,
-		       f.size, f.mime_type, f.extension, f.secret_uuid, f.created_at, f.updated_at
-		FROM files f
-		JOIN users u ON f.owner_id = u.id
-		WHERE f.is_trashed = 0 AND f.secret_uuid IS NOT NULL AND f.secret_uuid != ''
-		ORDER BY f.created_at DESC LIMIT 10
-	`)
-	if err == nil {
-		defer fRows.Close()
-		for fRows.Next() {
-			var fl models.File
-			var pID sql.NullString
-			if err := fRows.Scan(&fl.ID, &fl.Name, &fl.OriginalName, &pID, &fl.OwnerID, &fl.OwnerName, &fl.OwnerEmail,
-				&fl.Size, &fl.MimeType, &fl.Extension, &fl.SecretUUID, &fl.CreatedAt, &fl.UpdatedAt); err == nil {
-				if pID.Valid {
-					fl.FolderID = &pID.String
-				}
-				stats.RecentTrackedFiles = append(stats.RecentTrackedFiles, fl)
-			}
-		}
-		if err := fRows.Err(); err != nil {
-			_ = err
-		}
-	}
-
-	utils.RespondJSON(w, http.StatusOK, stats)
+	fh := NewForensicHandler(h.cfg)
+	fh.GetStats(w, r)
 }
 
 func (h *AdminHandler) ListPasswordResets(w http.ResponseWriter, r *http.Request) {

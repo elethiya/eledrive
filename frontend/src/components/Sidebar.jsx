@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   HardDrive,
   Users,
@@ -17,9 +17,11 @@ import {
   ShieldCheck,
   Crown,
   X,
+  Fingerprint,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useRealtimeEvent, useRealtime } from '../context/RealtimeContext';
+import { forensicAPI } from '../api/client';
 import { formatBytes } from '../utils/formatters';
 
 export default function Sidebar({
@@ -41,6 +43,33 @@ export default function Sidebar({
   useRealtimeEvent(['file', 'trash', 'storage', 'sync'], () => {
     if (refreshUser) refreshUser();
   });
+
+  // Check forensic permissions for current user
+  const [forensicAccess, setForensicAccess] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    forensicAPI
+      .getAccess()
+      .then((res) => {
+        if (mounted && res.data) setForensicAccess(res.data);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
+
+  useRealtimeEvent(['user', 'sync'], () => {
+    forensicAPI
+      .getAccess()
+      .then((res) => {
+        if (res.data) setForensicAccess(res.data);
+      })
+      .catch(() => {});
+  });
+
+  const canAccessForensics = user?.role === 'owner' || forensicAccess?.has_access;
 
   const used = user?.storage_used || 0;
   const limit = user?.storage_limit || 10 * 1024 * 1024 * 1024;
@@ -223,6 +252,30 @@ export default function Sidebar({
           })}
 
           <div className="my-3 border-t border-slate-800/80" />
+
+          {/* Forensics Detective Navigation */}
+          {(canAccessForensics || user?.role === 'owner' || user?.role === 'admin') && (
+            <button
+              onClick={() => handleNavClick('forensics')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                currentView === 'forensics'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-xs'
+                  : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Fingerprint
+                  className={`w-4 h-4 ${
+                    currentView === 'forensics' ? 'text-emerald-400' : 'text-emerald-500/70'
+                  }`}
+                />
+                <span>Forensics</span>
+              </div>
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                PRO
+              </span>
+            </button>
+          )}
 
           {/* Profile Navigation */}
           <button

@@ -42,6 +42,7 @@ import {
   ChevronRight,
   Sliders,
   CheckCircle2,
+  ShieldAlert,
 } from 'lucide-react';
 import { adminAPI } from '../api/client';
 
@@ -67,7 +68,7 @@ export default function AdminPage({ onBackToDrive }) {
   const { user } = useAuth();
   const confirm = useConfirm();
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState('users'); // 'users' | 'security' | 'logs' | 'settings'
+  const [activeTab, setActiveTab] = useState('users'); // 'users' | 'logs' | 'settings'
 
   // Admin Stats
   const [stats, setStats] = useState(null);
@@ -75,51 +76,6 @@ export default function AdminPage({ onBackToDrive }) {
   const [isRefreshingStats, setIsRefreshingStats] = useState(false);
   const [isRefreshingUsers, setIsRefreshingUsers] = useState(false);
   const [isRefreshingLogs, setIsRefreshingLogs] = useState(false);
-
-  // Security & Forensic Leak Tracker
-  const [securityStats, setSecurityStats] = useState(null);
-  const [loadingSecurityStats, setLoadingSecurityStats] = useState(false);
-  const [inspectQuery, setInspectQuery] = useState('');
-  const [inspectFile, setInspectFile] = useState(null);
-  const [inspecting, setInspecting] = useState(false);
-  const [inspectionResult, setInspectionResult] = useState(null);
-  const [inspectError, setInspectError] = useState('');
-  const [copiedUUID, setCopiedUUID] = useState('');
-  const fileDropRef = useRef(null);
-  const [isForensicDragOver, setIsForensicDragOver] = useState(false);
-
-  const handleForensicDragOver = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isForensicDragOver) {
-      setIsForensicDragOver(true);
-    }
-  };
-
-  const handleForensicDragEnter = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsForensicDragOver(true);
-  };
-
-  const handleForensicDragLeave = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.currentTarget.contains(e.relatedTarget)) return;
-    setIsForensicDragOver(false);
-  };
-
-  const handleForensicDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsForensicDragOver(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const droppedFile = e.dataTransfer.files[0];
-      setInspectFile(droppedFile);
-      setInspectError('');
-      toast.info(`Loaded suspect file: ${droppedFile.name}`);
-    }
-  };
 
   // Users Tab
   const [users, setUsers] = useState([]);
@@ -196,6 +152,7 @@ export default function AdminPage({ onBackToDrive }) {
     forensic_watermarking_enabled: true,
     steganographic_canary_enabled: true,
     log_forensic_downloads: true,
+    forensic_access_policy: 'owner_only',
     maintenance_mode: false,
     maintenance_notice: 'Platform is currently undergoing scheduled maintenance. Please check back shortly.',
     allow_zip_downloads: true,
@@ -216,18 +173,6 @@ export default function AdminPage({ onBackToDrive }) {
       console.error(e);
     } finally {
       setLoadingStats(false);
-    }
-  };
-
-  const loadSecurityStats = async () => {
-    setLoadingSecurityStats(true);
-    try {
-      const res = await adminAPI.getSecurityStats();
-      if (res.data) setSecurityStats(res.data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingSecurityStats(false);
     }
   };
 
@@ -373,6 +318,7 @@ export default function AdminPage({ onBackToDrive }) {
           forensic_watermarking_enabled: res.data.forensic_watermarking_enabled ?? true,
           steganographic_canary_enabled: res.data.steganographic_canary_enabled ?? true,
           log_forensic_downloads: res.data.log_forensic_downloads ?? true,
+          forensic_access_policy: res.data.forensic_access_policy || 'owner_only',
           maintenance_mode: res.data.maintenance_mode ?? false,
           maintenance_notice: res.data.maintenance_notice || 'Platform is currently undergoing scheduled maintenance. Please check back shortly.',
           allow_zip_downloads: res.data.allow_zip_downloads ?? true,
@@ -390,7 +336,6 @@ export default function AdminPage({ onBackToDrive }) {
       loadUsers();
       loadLogs();
       loadSettings();
-      loadSecurityStats();
       loadPasswordResets();
       loadTeamRequests();
     }
@@ -439,48 +384,6 @@ export default function AdminPage({ onBackToDrive }) {
       </div>
     );
   }
-
-  const handleCopyUUID = (uuid) => {
-    navigator.clipboard.writeText(uuid);
-    setCopiedUUID(uuid);
-    setTimeout(() => setCopiedUUID(''), 2500);
-  };
-
-  const handleRunForensicInspection = async (e) => {
-    if (e) e.preventDefault();
-    if (!inspectFile && !inspectQuery.trim()) {
-      setInspectError('Please select a suspect file to analyze or enter a Secret UUID.');
-      return;
-    }
-
-    setInspecting(true);
-    setInspectError('');
-    setInspectionResult(null);
-
-    try {
-      let res;
-      if (inspectFile) {
-        const formData = new FormData();
-        formData.append('file', inspectFile);
-        if (inspectQuery.trim()) {
-          formData.append('query', inspectQuery.trim());
-        }
-        res = await adminAPI.inspectLeak(formData);
-      } else {
-        res = await adminAPI.inspectLeak({ query: inspectQuery.trim() });
-      }
-
-      if (res.data) {
-        setInspectionResult(res.data);
-      }
-      loadLogs();
-    } catch (err) {
-      setInspectError(err.response?.data?.error || err.message || 'Forensic analysis failed to find matching asset.');
-      loadLogs();
-    } finally {
-      setInspecting(false);
-    }
-  };
 
   const openCategoryModal = (catId) => {
     if (!isOwner && catId !== 'maintenance') {
@@ -693,7 +596,6 @@ export default function AdminPage({ onBackToDrive }) {
                   loadStats(),
                   loadUsers(),
                   loadLogs(),
-                  loadSecurityStats(),
                   loadTeamRequests(),
                 ]);
               } finally {
@@ -829,22 +731,6 @@ export default function AdminPage({ onBackToDrive }) {
                 {pendingTeamRequests.length}
               </span>
             )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('security')}
-            className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
-              activeTab === 'security'
-                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/30'
-                : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
-            }`}
-          >
-            <Fingerprint className="w-4 h-4 text-emerald-400" />
-            <span className="hidden sm:inline">Forensic </span>
-            <span>Leak Tracker</span>
-            <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-mono border border-emerald-500/30 hidden xs:inline">
-              NEW
-            </span>
           </button>
 
           <button
@@ -1547,782 +1433,6 @@ export default function AdminPage({ onBackToDrive }) {
                           </React.Fragment>
                         );
                       })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: FORENSIC LEAK TRACKER & WATERMARK DETECTIVE */}
-        {activeTab === 'security' && (
-          <div className="space-y-4 sm:space-y-6 min-w-0">
-            {/* Explainer Hero Card */}
-            <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/40 border border-emerald-500/20 shadow-xl relative overflow-hidden min-w-0">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 min-w-0">
-                <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/10">
-                    <Fingerprint className="w-5 h-5 sm:w-6 sm:h-6" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-sm sm:text-base font-bold text-slate-100 flex flex-wrap items-center gap-2">
-                      <span className="truncate">Cryptographic Forensic Leak Tracker</span>
-                      <span className="text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
-                        100% Attributed
-                      </span>
-                    </h2>
-                    <p className="text-xs text-slate-400 max-w-2xl mt-1 leading-relaxed break-words">
-                      Every file, folder, image, video, and archive uploaded to EleDrive is injected with a permanent, tamper-proof forensic signature, embedded metadata atom, and secret cryptographic UUID. Even if an exfiltrated file is renamed, cropped, edited, or converted, its embedded signature remains detectable to identify the exact leaker.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between sm:justify-end gap-3 w-full md:w-auto pt-3 md:pt-0 border-t md:border-t-0 border-slate-800/80 shrink-0">
-                  <div className="text-left md:text-right">
-                    <div className="text-[11px] sm:text-xs font-bold text-slate-300">Total Downloads Logged</div>
-                    <div className="text-base sm:text-lg font-mono font-black text-emerald-400">
-                      {securityStats?.total_downloads_logged ?? 0} events
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 4 Pillars of Protection Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-slate-800/80">
-                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 min-w-0 overflow-hidden">
-                  <div className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5 mb-1 truncate">
-                    <Lock className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">Steganographic Trailer</span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 leading-relaxed break-words">
-                    Appended HMAC signed block surviving crops, hex tampering, and re-encodes.
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 min-w-0 overflow-hidden">
-                  <div className="text-[11px] font-bold text-blue-400 flex items-center gap-1.5 mb-1 truncate">
-                    <Shield className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">Secret UUID Binding</span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 leading-relaxed break-words">
-                    Every asset receives a unique 128-bit cryptographic identifier tied to uploader & download logs.
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 min-w-0 overflow-hidden">
-                  <div className="text-[11px] font-bold text-purple-400 flex items-center gap-1.5 mb-1 truncate">
-                    <Archive className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">Steganographic ZIP Archives</span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 leading-relaxed break-words">
-                    Folder ZIP downloads automatically embed cryptographic forensic trailers and comment signatures.
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 min-w-0 overflow-hidden">
-                  <div className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5 mb-1 truncate">
-                    <Lock className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">100% Invisible Digital Trap</span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 leading-relaxed break-words">
-                    Completely hidden from users during normal browsing; only revealed when scanned by admin.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Interactive Leak Detective Form */}
-            <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-4 sm:space-y-5 min-w-0 overflow-hidden">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2 min-w-0">
-                <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-                  <FileSearch className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400 shrink-0" />
-                  <h3 className="text-xs sm:text-sm font-bold text-slate-100 truncate">
-                    Inspect Suspect File or Secret UUID
-                  </h3>
-                </div>
-                <span className="text-[10px] sm:text-[11px] text-slate-400 truncate">
-                  Uncover origin, uploader identity & full download trail
-                </span>
-              </div>
-
-              <form onSubmit={handleRunForensicInspection} className="space-y-3.5 sm:space-y-4 min-w-0">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 min-w-0">
-                  {/* File Upload Zone */}
-                  <div className="min-w-0">
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5 sm:mb-2 truncate">
-                      Upload Leaked File / Media (Image, Video, Document, Archive):
-                    </label>
-                    <div
-                      onClick={() => fileDropRef.current?.click()}
-                      onDragOver={handleForensicDragOver}
-                      onDragEnter={handleForensicDragEnter}
-                      onDragLeave={handleForensicDragLeave}
-                      onDrop={handleForensicDrop}
-                      className={`relative border-2 border-dashed rounded-2xl p-3 sm:p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[110px] sm:min-h-[120px] min-w-0 overflow-hidden ${
-                        isForensicDragOver
-                          ? 'border-blue-400 bg-blue-500/20 ring-4 ring-blue-500/20 shadow-lg shadow-blue-500/20 scale-[1.01]'
-                          : 'border-slate-700 hover:border-blue-500 bg-slate-950/40 hover:bg-slate-950/80'
-                      }`}
-                    >
-                      <input
-                        ref={fileDropRef}
-                        type="file"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            setInspectFile(e.target.files[0]);
-                            setInspectError('');
-                          }
-                        }}
-                      />
-                      {isForensicDragOver ? (
-                        <div className="flex flex-col items-center justify-center pointer-events-none animate-pulse text-blue-400 py-2 min-w-0">
-                          <UploadCloud className="w-8 h-8 mb-1.5 animate-bounce shrink-0" />
-                          <span className="text-xs font-bold text-blue-300 truncate">Release file to inspect</span>
-                          <span className="text-[10px] text-blue-400/80 truncate">Extract binary trailer & metadata</span>
-                        </div>
-                      ) : inspectFile ? (
-                        <div className="flex items-center gap-2.5 sm:gap-3 text-left w-full justify-between min-w-0">
-                          <div className="flex items-center gap-2.5 truncate min-w-0 flex-1">
-                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
-                              <FileCode className="w-4 h-4 sm:w-5 sm:h-5" />
-                            </div>
-                            <div className="truncate min-w-0 flex-1">
-                              <p className="text-xs font-bold text-slate-200 truncate" title={inspectFile.name}>{inspectFile.name}</p>
-                              <p className="text-[10px] text-slate-400 truncate">{formatBytes(inspectFile.size)}</p>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(ev) => {
-                              ev.stopPropagation();
-                              setInspectFile(null);
-                            }}
-                            className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 shrink-0"
-                            title="Remove file"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center min-w-0 max-w-full px-2">
-                          <UploadCloud className="w-5 h-5 sm:w-6 sm:h-6 text-slate-500 mb-1 sm:mb-1.5 shrink-0" />
-                          <span className="text-xs font-medium text-slate-300 truncate max-w-full">
-                            Drop suspect file here or <span className="text-blue-400 underline">browse</span>
-                          </span>
-                          <span className="text-[10px] text-slate-500 mt-0.5 sm:mt-1 truncate max-w-full">
-                            Extracts binary forensic trailer & embedded metadata
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Secret UUID Manual Input */}
-                  <div className="min-w-0">
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5 sm:mb-2 truncate">
-                      Or Enter Secret UUID / Filename Query:
-                    </label>
-                    <div className="space-y-2 min-w-0">
-                      <div className="relative min-w-0">
-                        <Fingerprint className="w-4 h-4 absolute left-3 top-3 text-slate-500 shrink-0" />
-                        <input
-                          type="text"
-                          placeholder="e.g. 7f8b2c4e-1234-5678-abcd-0987654321fe"
-                          value={inspectQuery}
-                          onChange={(e) => setInspectQuery(e.target.value)}
-                          className="w-full pl-9 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-hidden focus:border-blue-500 min-w-0"
-                        />
-                      </div>
-                      <p className="text-[11px] text-slate-500 break-words">
-                        Matches against all past and current assets, even if the filename was changed.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {inspectError && (
-                  <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2 min-w-0">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span className="break-words min-w-0 flex-1">{inspectError}</span>
-                  </div>
-                )}
-
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5 sm:gap-3 pt-2">
-                  {(inspectFile || inspectQuery) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInspectFile(null);
-                        setInspectQuery('');
-                        setInspectionResult(null);
-                        setInspectError('');
-                      }}
-                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold text-center whitespace-nowrap"
-                    >
-                      Clear
-                    </button>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={inspecting}
-                    className="flex items-center justify-center gap-2 px-5 sm:px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50 whitespace-nowrap"
-                  >
-                    {inspecting ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
-                        <span>Analyzing Cryptographic Watermark...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FileSearch className="w-4 h-4 shrink-0" />
-                        <span>Run Forensic Analysis</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-
-              {/* Inspection Result Dossier */}
-              {inspectionResult && (
-                <div className={`mt-4 sm:mt-6 p-3.5 sm:p-6 rounded-2xl bg-slate-950 border ${
-                  inspectionResult.matched 
-                    ? 'border-emerald-500/30' 
-                    : inspectionResult.risk_assessment === 'UNMATCHED_ASSET'
-                      ? 'border-amber-500/30'
-                      : 'border-rose-500/30'
-                } shadow-2xl space-y-4 sm:space-y-5 animate-in fade-in zoom-in-95 duration-200 min-w-0 overflow-hidden`}>
-                  {/* Banner */}
-                  <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-xl min-w-0 ${
-                    inspectionResult.matched 
-                      ? 'bg-emerald-500/10 border border-emerald-500/20' 
-                      : inspectionResult.risk_assessment === 'UNMATCHED_ASSET'
-                        ? 'bg-amber-500/10 border border-amber-500/20'
-                        : 'bg-rose-500/10 border border-rose-500/20'
-                  }`}>
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shrink-0 ${
-                        inspectionResult.matched 
-                          ? 'bg-emerald-500/20 text-emerald-400' 
-                          : inspectionResult.risk_assessment === 'UNMATCHED_ASSET'
-                            ? 'bg-amber-500/20 text-amber-400'
-                            : 'bg-rose-500/20 text-rose-400'
-                      }`}>
-                        {inspectionResult.matched ? (
-                          <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6" />
-                        ) : inspectionResult.risk_assessment === 'UNMATCHED_ASSET' ? (
-                          <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6" />
-                        ) : (
-                          <XCircle className="w-5 h-5 sm:w-6 sm:h-6" />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className={`text-[11px] sm:text-xs font-bold uppercase tracking-wider truncate ${
-                          inspectionResult.matched 
-                            ? 'text-emerald-300' 
-                            : inspectionResult.risk_assessment === 'UNMATCHED_ASSET'
-                              ? 'text-amber-300'
-                              : 'text-rose-300'
-                        }`}>
-                          {inspectionResult.matched 
-                            ? 'Cryptographic Match Verified' 
-                            : inspectionResult.risk_assessment === 'UNMATCHED_ASSET'
-                              ? 'Forensic Signature Found — Unmatched Workspace Asset'
-                              : 'No Forensic Watermark Detected'}
-                        </div>
-                        <div className="text-xs sm:text-sm font-black text-slate-100 truncate" title={inspectionResult.matched ? `Origin Asset Identified: ${inspectionResult.original_filename}` : `Scanned Target: ${inspectionResult.original_filename || 'Suspect Asset'}`}>
-                          {inspectionResult.matched 
-                            ? `Origin Asset Identified: ${inspectionResult.original_filename}` 
-                            : `Scanned Target: ${inspectionResult.original_filename || 'Suspect Asset'}`}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
-                      <span className={`text-[10px] font-mono px-2 py-1 rounded bg-slate-900 border whitespace-nowrap ${
-                        inspectionResult.matched 
-                          ? 'border-emerald-500/30 text-emerald-400' 
-                          : inspectionResult.risk_assessment === 'UNMATCHED_ASSET'
-                            ? 'border-amber-500/30 text-amber-400'
-                            : 'border-rose-500/30 text-rose-400'
-                      }`}>
-                        {inspectionResult.matched 
-                          ? 'HMAC-SHA256: VALID' 
-                          : inspectionResult.risk_assessment === 'UNMATCHED_ASSET'
-                            ? 'STATUS: UNMATCHED'
-                            : 'STATUS: INVALID / UNTRACKED'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {inspectionResult.matched ? (
-                    <>
-                      {/* Confirmed Leaker & Exfiltration Breach Attribution Card */}
-                      {inspectionResult.leaker_identified && (
-                        <div className={`p-4 sm:p-5 rounded-2xl border min-w-0 overflow-hidden relative ${
-                          inspectionResult.access_type === 'BROWSER_VIEW'
-                            ? 'bg-gradient-to-br from-rose-950/40 via-slate-900 to-amber-950/30 border-rose-500/40 shadow-lg shadow-rose-950/30'
-                            : inspectionResult.access_type === 'DIRECT_DOWNLOAD'
-                              ? 'bg-gradient-to-br from-blue-950/40 via-slate-900 to-indigo-950/30 border-blue-500/40 shadow-lg shadow-blue-950/30'
-                              : 'bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-900 border-emerald-500/40'
-                        }`}>
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-800/80">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 ${
-                                inspectionResult.access_type === 'BROWSER_VIEW'
-                                  ? 'bg-rose-500/20 text-rose-400'
-                                  : 'bg-blue-500/20 text-blue-400'
-                              }`}>
-                                <Fingerprint className="w-5 h-5" />
-                              </div>
-                              <div className="min-w-0">
-                                <h4 className="text-xs sm:text-sm font-black text-slate-100 uppercase tracking-wider truncate flex items-center gap-2">
-                                  Exact Leaker Pinpointed
-                                </h4>
-                                <p className="text-[11px] text-slate-400 truncate">
-                                  Embedded cryptographic signature identified the exact individual who exfiltrated this asset
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="shrink-0">
-                              {inspectionResult.access_type === 'BROWSER_VIEW' ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                                  <Eye className="w-3.5 h-3.5" />
-                                  BROWSER LOAD / RIGHT-CLICK CAPTURE
-                                </span>
-                              ) : inspectionResult.access_type === 'DIRECT_DOWNLOAD' ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                                  <Download className="w-3.5 h-3.5" />
-                                  DIRECT FILE DOWNLOAD
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                                  <UserCheck className="w-3.5 h-3.5" />
-                                  ORIGINAL WORKSPACE UPLOADER
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Leaker Profile & Details Grid */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 pt-3.5 min-w-0">
-                            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 min-w-0">
-                              <span className="text-[10px] uppercase font-bold text-slate-500 block truncate mb-1">
-                                Identified Leaker
-                              </span>
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm text-white shrink-0 ${
-                                  inspectionResult.access_type === 'BROWSER_VIEW' ? 'bg-rose-600' : 'bg-blue-600'
-                                }`}>
-                                  {inspectionResult.leaker_name?.charAt(0).toUpperCase() || 'U'}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="text-xs font-bold text-slate-100 truncate" title={inspectionResult.leaker_name}>
-                                    {inspectionResult.leaker_name}
-                                  </div>
-                                  <div className="text-[11px] text-slate-400 truncate" title={inspectionResult.leaker_username ? `@${inspectionResult.leaker_username}` : inspectionResult.leaker_email}>
-                                    {inspectionResult.leaker_username ? `@${inspectionResult.leaker_username}` : inspectionResult.leaker_email}
-                                  </div>
-                                  <div className="text-[10px] font-mono text-slate-500 mt-0.5 truncate">
-                                    ID: {inspectionResult.leaker_id}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 min-w-0">
-                              <span className="text-[10px] uppercase font-bold text-slate-500 block truncate mb-1">
-                                Exfiltration Method
-                              </span>
-                              <div className="text-xs font-bold text-slate-200 truncate">
-                                {inspectionResult.access_type === 'BROWSER_VIEW' ? (
-                                  <span className="text-rose-400 font-black">Browser Preview Capture</span>
-                                ) : inspectionResult.access_type === 'DIRECT_DOWNLOAD' ? (
-                                  <span className="text-blue-400 font-black">Direct File Download</span>
-                                ) : (
-                                  <span className="text-emerald-400 font-black">Workspace Master Origin</span>
-                                )}
-                              </div>
-                              <p className="text-[10px] text-slate-400 mt-1 leading-snug">
-                                {inspectionResult.access_type === 'BROWSER_VIEW'
-                                  ? 'Opened in browser; saved via right-click or browser extension'
-                                  : inspectionResult.access_type === 'DIRECT_DOWNLOAD'
-                                    ? 'Downloaded directly from workspace file action'
-                                    : 'Exfiltrated directly from master workspace storage'}
-                              </p>
-                            </div>
-
-                            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 min-w-0">
-                              <span className="text-[10px] uppercase font-bold text-slate-500 block truncate mb-1">
-                                Exact Access / Leak Time
-                              </span>
-                              <div className="text-xs font-bold text-slate-200 truncate">
-                                {inspectionResult.accessed_at ? formatDate(inspectionResult.accessed_at) : 'N/A'}
-                              </div>
-                              <div className="text-[10px] font-mono text-slate-400 truncate mt-0.5">
-                                {inspectionResult.accessed_at ? new Date(inspectionResult.accessed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}
-                              </div>
-                            </div>
-
-                            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 min-w-0">
-                              <span className="text-[10px] uppercase font-bold text-slate-500 block truncate mb-1">
-                                Client IP & Network
-                              </span>
-                              <div className="text-xs font-mono font-bold text-slate-200 truncate">
-                                {inspectionResult.client_ip || 'N/A'}
-                              </div>
-                              <div className="text-[10px] text-slate-400 truncate mt-0.5" title={inspectionResult.user_agent}>
-                                {inspectionResult.user_agent || 'Standard Client'}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Breach Narrative Finding */}
-                          {inspectionResult.exfiltration_verdict && (
-                            <div className={`mt-3.5 p-3 rounded-xl border text-xs leading-relaxed flex items-start gap-2.5 ${
-                              inspectionResult.access_type === 'BROWSER_VIEW'
-                                ? 'bg-rose-950/30 border-rose-500/30 text-rose-200'
-                                : 'bg-blue-950/30 border-blue-500/30 text-blue-200'
-                            }`}>
-                              <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${
-                                inspectionResult.access_type === 'BROWSER_VIEW' ? 'text-rose-400' : 'text-blue-400'
-                              }`} />
-                              <div className="min-w-0 flex-1">
-                                <span className="font-bold uppercase tracking-wider block text-[10px] mb-0.5">
-                                  Forensic Attribution Analysis:
-                                </span>
-                                <p className="font-medium break-words">
-                                  {inspectionResult.exfiltration_verdict}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Attributed Original Uploader and Forensic Signature Cards */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 min-w-0">
-                        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3 min-w-0 overflow-hidden">
-                          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5 truncate">
-                            <UserCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                            <span className="truncate">Origin Asset Creator</span>
-                          </h4>
-
-                          <div className="flex items-center gap-3 pt-1 min-w-0">
-                            <div className="w-11 h-11 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-base shadow-md shrink-0">
-                              {inspectionResult.uploader_name?.charAt(0).toUpperCase() || 'U'}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-sm font-bold text-slate-100 truncate" title={inspectionResult.uploader_name}>
-                                {inspectionResult.uploader_name}
-                              </div>
-                              <div className="text-xs text-slate-400 truncate" title={`@${inspectionResult.uploader_username} • ${inspectionResult.uploader_email}`}>
-                                @{inspectionResult.uploader_username} • {inspectionResult.uploader_email}
-                              </div>
-                              <div className="text-[10px] font-mono text-slate-500 mt-0.5 truncate">
-                                User ID: {inspectionResult.uploader_id}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="pt-2 border-t border-slate-800/80 grid grid-cols-2 gap-2 text-[11px] min-w-0">
-                            <div className="min-w-0">
-                              <span className="text-slate-500 block truncate">Uploaded Date:</span>
-                              <span className="text-slate-300 font-medium truncate block">
-                                {inspectionResult.uploaded_at ? formatDate(inspectionResult.uploaded_at) : 'N/A'}
-                              </span>
-                            </div>
-                            <div className="min-w-0">
-                              <span className="text-slate-500 block truncate">File Size:</span>
-                              <span className="text-slate-300 font-medium truncate block">
-                                {formatBytes(inspectionResult.file_size)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3 min-w-0 overflow-hidden">
-                          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5 truncate">
-                            <Shield className="w-4 h-4 text-blue-400 shrink-0" />
-                            <span className="truncate">Forensic Signature Details</span>
-                          </h4>
-
-                          <div className="space-y-2 text-xs min-w-0">
-                            <div className="min-w-0">
-                              <span className="text-[10px] text-slate-500 uppercase font-semibold block truncate">
-                                Secret Tracking UUID:
-                              </span>
-                              <div className="flex items-center gap-2 mt-0.5 min-w-0">
-                                <span className="font-mono text-xs text-blue-300 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 select-all truncate min-w-0 flex-1" title={inspectionResult.secret_uuid}>
-                                  {inspectionResult.secret_uuid}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyUUID(inspectionResult.secret_uuid)}
-                                  className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 shrink-0"
-                                  title="Copy Secret UUID"
-                                >
-                                  {copiedUUID === inspectionResult.secret_uuid ? (
-                                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                  ) : (
-                                    <Copy className="w-3.5 h-3.5" />
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-
-                            {inspectionResult.sha256_checksum && (
-                              <div className="min-w-0">
-                                <span className="text-[10px] text-slate-500 uppercase font-semibold block truncate">
-                                  SHA256 File Checksum:
-                                </span>
-                                <span className="font-mono text-[11px] text-slate-400 break-all select-all block bg-slate-950 p-2 rounded-lg border border-slate-800 mt-0.5">
-                                  {inspectionResult.sha256_checksum}
-                                </span>
-                              </div>
-                            )}
-
-                            <div className="pt-2 min-w-0">
-                              <span className="text-[10px] text-slate-500 uppercase font-semibold block mb-0.5 truncate">
-                                Forensic Status Summary:
-                              </span>
-                              <p className="text-xs text-emerald-300 font-medium break-words leading-relaxed">
-                                {inspectionResult.metadata_summary}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Exfiltration & Download History Table */}
-                      <div className="space-y-3 pt-2 min-w-0">
-                        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2 truncate">
-                          <Download className="w-4 h-4 text-indigo-400 shrink-0" />
-                          <span className="truncate">Chain of Custody & Access Trail ({inspectionResult.download_history?.length || 0} events)</span>
-                        </h4>
-
-                        {(!inspectionResult.download_history || inspectionResult.download_history.length === 0) ? (
-                          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center text-xs text-slate-500 break-words">
-                            No external access records found for this asset. The file was likely exfiltrated directly by the uploader.
-                          </div>
-                        ) : (
-                          <div className="overflow-x-auto rounded-xl border border-slate-800">
-                            <table className="w-full text-left text-xs text-slate-300 min-w-[620px]">
-                              <thead className="bg-slate-900 text-slate-400 font-semibold border-b border-slate-800">
-                                <tr>
-                                  <th className="py-2.5 px-3 whitespace-nowrap">User</th>
-                                  <th className="py-2.5 px-3 whitespace-nowrap">Access Type</th>
-                                  <th className="py-2.5 px-3 whitespace-nowrap">IP Address</th>
-                                  <th className="py-2.5 px-3 whitespace-nowrap">Client / Browser</th>
-                                  <th className="py-2.5 px-3 whitespace-nowrap">Accessed At</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-800/60 bg-slate-950/60">
-                                {inspectionResult.download_history.map((dl) => {
-                                  const isLeakerRow = inspectionResult.leaker_id && dl.user_id === inspectionResult.leaker_id;
-                                  return (
-                                    <tr key={dl.id} className={`hover:bg-slate-900/60 ${isLeakerRow ? 'bg-rose-950/25 border-l-2 border-rose-500' : ''}`}>
-                                      <td className="py-2.5 px-3 max-w-[180px]">
-                                        <div className="flex items-center gap-1.5 truncate">
-                                          <div className="font-semibold text-slate-200 truncate" title={dl.user_name}>{dl.user_name}</div>
-                                          {isLeakerRow && (
-                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                                              LEAKER
-                                            </span>
-                                          )}
-                                        </div>
-                                        <div className="text-[10px] text-slate-500 truncate" title={dl.user_email}>{dl.user_email}</div>
-                                      </td>
-                                      <td className="py-2.5 px-3 whitespace-nowrap">
-                                        {dl.access_type === 'view' ? (
-                                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
-                                            <Eye className="w-3 h-3" /> Browser Preview
-                                          </span>
-                                        ) : (
-                                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20">
-                                            <Download className="w-3 h-3" /> Direct Download
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td className="py-2.5 px-3 font-mono text-blue-400 text-[11px] whitespace-nowrap">
-                                        {dl.ip_address}
-                                      </td>
-                                      <td className="py-2.5 px-3 text-[11px] text-slate-400 truncate max-w-[200px]" title={dl.user_agent}>
-                                        {dl.user_agent || 'Standard HTTP Client'}
-                                      </td>
-                                      <td className="py-2.5 px-3 text-[11px] text-slate-400 whitespace-nowrap">
-                                        {formatDate(dl.downloaded_at)}
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    /* Unmatched / Invalid Investigation Dossier */
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 min-w-0">
-                      <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3 min-w-0 overflow-hidden">
-                        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5 truncate">
-                          <FileSearch className="w-4 h-4 text-amber-400 shrink-0" />
-                          <span className="truncate">Inspection Verdict & Status</span>
-                        </h4>
-
-                        <div className="space-y-2.5 text-xs pt-1 min-w-0">
-                          <div className="min-w-0">
-                            <span className="text-[10px] text-slate-500 uppercase font-semibold block truncate">
-                              Scanned Target:
-                            </span>
-                            <span className="text-sm font-bold text-slate-200 block truncate" title={inspectionResult.original_filename || 'Uploaded File / Query'}>
-                              {inspectionResult.original_filename || 'Uploaded File / Query'}
-                            </span>
-                          </div>
-
-                          <div className="min-w-0">
-                            <span className="text-[10px] text-slate-500 uppercase font-semibold block mb-1 truncate">
-                              Analysis Details:
-                            </span>
-                            <p className="text-xs text-slate-300 leading-relaxed bg-slate-950 p-3 rounded-lg border border-slate-800/80 break-words">
-                              {inspectionResult.metadata_summary}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3 min-w-0 overflow-hidden">
-                        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5 truncate">
-                          <Shield className="w-4 h-4 text-blue-400 shrink-0" />
-                          <span className="truncate">Cryptographic & Audit Signature</span>
-                        </h4>
-
-                        <div className="space-y-2.5 text-xs min-w-0">
-                          {inspectionResult.secret_uuid && (
-                            <div className="min-w-0">
-                              <span className="text-[10px] text-slate-500 uppercase font-semibold block truncate">
-                                Detected Secret UUID:
-                              </span>
-                              <div className="flex items-center gap-2 mt-0.5 min-w-0">
-                                <span className="font-mono text-xs text-amber-300 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 select-all truncate min-w-0 flex-1" title={inspectionResult.secret_uuid}>
-                                  {inspectionResult.secret_uuid}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyUUID(inspectionResult.secret_uuid)}
-                                  className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 shrink-0"
-                                  title="Copy Secret UUID"
-                                >
-                                  {copiedUUID === inspectionResult.secret_uuid ? (
-                                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                  ) : (
-                                    <Copy className="w-3.5 h-3.5" />
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-                          )}
-
-                          {inspectionResult.sha256_checksum && (
-                            <div className="min-w-0">
-                              <span className="text-[10px] text-slate-500 uppercase font-semibold block truncate">
-                                SHA256 Checksum:
-                              </span>
-                              <span className="font-mono text-[11px] text-slate-400 break-all select-all block bg-slate-950 p-2 rounded-lg border border-slate-800 mt-0.5">
-                                {inspectionResult.sha256_checksum}
-                              </span>
-                            </div>
-                          )}
-
-                          <div className="pt-2 border-t border-slate-800 flex items-center gap-2 text-[11px] text-emerald-400 min-w-0">
-                            <Check className="w-3.5 h-3.5 shrink-0" />
-                            <span className="break-words min-w-0 flex-1">This scan has been permanently recorded in the Security Audit Logs.</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Recent Forensic Tracked Files List */}
-            <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-3.5 sm:space-y-4 min-w-0 overflow-hidden">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0">
-                <div className="min-w-0">
-                  <h3 className="text-xs sm:text-sm font-bold text-slate-100 flex items-center gap-2 truncate">
-                    <Fingerprint className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span className="truncate">Recently Protected & Tracked Files</span>
-                  </h3>
-                  <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">
-                    Assets carrying active Secret UUIDs and HMAC signatures
-                  </p>
-                </div>
-                <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/20 self-start sm:self-auto shrink-0 whitespace-nowrap">
-                  {securityStats?.total_tracked_files ?? 0} Protected Files
-                </span>
-              </div>
-
-              <div className="overflow-x-auto rounded-xl sm:rounded-2xl border border-slate-800">
-                <table className="w-full text-left text-xs text-slate-300 min-w-[720px]">
-                  <thead className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800">
-                    <tr>
-                      <th className="py-3 px-4 whitespace-nowrap">File Name</th>
-                      <th className="py-3 px-4 whitespace-nowrap">Uploader</th>
-                      <th className="py-3 px-4 whitespace-nowrap">Secret UUID</th>
-                      <th className="py-3 px-4 whitespace-nowrap">Size</th>
-                      <th className="py-3 px-4 whitespace-nowrap">Uploaded</th>
-                      <th className="py-3 px-4 text-right whitespace-nowrap">Inspect</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 bg-slate-900/40">
-                    {(!securityStats?.recent_tracked_files || securityStats.recent_tracked_files.length === 0) ? (
-                      <tr>
-                        <td colSpan={6} className="py-8 text-center text-slate-500">
-                          No tracked files uploaded yet.
-                        </td>
-                      </tr>
-                    ) : (
-                      securityStats.recent_tracked_files.map((f) => (
-                        <tr key={f.id} className="hover:bg-slate-850/60 transition-colors">
-                          <td className="py-3 px-4 font-semibold text-slate-200 max-w-[200px]">
-                            <span className="block truncate" title={f.name}>{f.name}</span>
-                          </td>
-                          <td className="py-3 px-4 text-[11px] text-slate-300 max-w-[180px]">
-                            <span className="block truncate font-medium" title={f.owner_name}>{f.owner_name}</span>
-                            <span className="block text-[10px] text-slate-500 truncate" title={f.owner_email}>{f.owner_email}</span>
-                          </td>
-                          <td className="py-3 px-4 font-mono text-[11px] text-blue-400 whitespace-nowrap">
-                            <div className="flex items-center gap-1.5">
-                              <span title={f.secret_uuid}>{f.secret_uuid?.slice(0, 16)}...</span>
-                              <button
-                                onClick={() => handleCopyUUID(f.secret_uuid)}
-                                className="text-slate-500 hover:text-slate-300 shrink-0"
-                                title="Copy UUID"
-                              >
-                                <Copy className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 text-[11px] text-slate-400 whitespace-nowrap">
-                            {formatBytes(f.size)}
-                          </td>
-                          <td className="py-3 px-4 text-[11px] text-slate-400 whitespace-nowrap">
-                            {formatDate(f.created_at)}
-                          </td>
-                          <td className="py-3 px-4 text-right whitespace-nowrap">
-                            <button
-                              onClick={() => {
-                                setInspectQuery(f.secret_uuid);
-                                setInspectFile(null);
-                                window.scrollTo({ top: 300, behavior: 'smooth' });
-                              }}
-                              className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[11px] font-semibold transition-colors"
-                            >
-                              Load In Scanner
-                            </button>
-                          </td>
-                        </tr>
-                      ))
                     )}
                   </tbody>
                 </table>
@@ -3701,6 +2811,34 @@ export default function AdminPage({ onBackToDrive }) {
                                 <span className="text-emerald-400 font-bold font-mono">ACTIVE</span>
                               </div>
                             </div>
+                          </div>
+
+                          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Crown className="w-4 h-4 text-amber-400" />
+                                <span className="text-xs font-bold text-amber-300">Forensic Tools Access Authorization</span>
+                              </div>
+                              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold">
+                                Owner Exclusive
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-400">
+                              Define which administrative role is authorized to access the Forensic Leak Tracker tab and execute forensic leak inspections.
+                            </p>
+                            <select
+                              value={draftSettings.forensic_access_policy || 'owner_only'}
+                              onChange={(e) =>
+                                setDraftSettings({
+                                  ...draftSettings,
+                                  forensic_access_policy: e.target.value,
+                                })
+                              }
+                              className="w-full text-xs p-2.5 bg-slate-950 border border-amber-500/40 text-amber-200 font-semibold rounded-xl focus:border-amber-400 focus:outline-none cursor-pointer"
+                            >
+                              <option value="owner_only">Workspace Owner Only (Strict)</option>
+                              <option value="owner_and_admins">Workspace Owner & Administrators</option>
+                            </select>
                           </div>
                         </div>
                       )}

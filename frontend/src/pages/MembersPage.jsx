@@ -61,42 +61,34 @@ export default function MembersPage({ onNavigateView }) {
     loadMembers(false);
   }, [loadMembers]);
 
-  // Real-time presence updates: instant switch when users go online / offline
+  // Real-time presence updates: instant switch when users go online / offline via webhook & SSE
   useRealtimeEvent(['presence', 'user', 'team'], (event) => {
     if (!event) return;
 
-    // Direct presence update event
-    if (event.type === 'presence:update' && event.id) {
-      const isOnline = event.action === 'online';
-      setMembers((prev) =>
-        prev.map((m) => (m.id === event.id ? { ...m, is_online: isOnline, last_seen: Date.now() } : m))
-      );
-    } else {
-      // Reload on user or team changes
-      loadMembers(false);
+    // Direct presence update event via webhook or SSE
+    if (
+      event.type === 'presence:update' ||
+      event.type === 'presence' ||
+      (event.target === 'user' && (event.action === 'online' || event.action === 'offline'))
+    ) {
+      const targetId = event.id || event.user_id || event.payload?.user_id;
+      if (targetId) {
+        let isOnline = event.action === 'online';
+        if (event.payload && typeof event.payload.online === 'boolean') {
+          isOnline = event.payload.online;
+        }
+        setMembers((prev) =>
+          prev.map((m) =>
+            m.id === targetId ? { ...m, is_online: isOnline, last_seen: isOnline ? Date.now() : m.last_seen } : m
+          )
+        );
+        return;
+      }
     }
-  });
 
-  // Periodic subtle presence polling fallback (every 20s)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      memberAPI
-        .getPresence()
-        .then((res) => {
-          const data = res?.data !== undefined ? res.data : res;
-          if (data && data.presence) {
-            setMembers((prev) =>
-              prev.map((m) => ({
-                ...m,
-                is_online: !!data.presence[m.id],
-              }))
-            );
-          }
-        })
-        .catch(() => {});
-    }, 20000);
-    return () => clearInterval(interval);
-  }, []);
+    // Reload on other user or team structure changes
+    loadMembers(false);
+  });
 
   // Copy email to clipboard helper
   const handleCopyEmail = (email, id) => {

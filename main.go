@@ -84,6 +84,7 @@ func main() {
 	profileHandler := handlers.NewProfileHandler()
 	adminHandler := handlers.NewAdminHandler(cfg, storageService)
 	teamHandler := handlers.NewTeamHandler(cfg)
+	forensicHandler := handlers.NewForensicHandler(cfg)
 
 	r := chi.NewRouter()
 
@@ -225,6 +226,15 @@ func main() {
 			auth.Delete("/teams/{id}", teamHandler.DeleteTeam)
 			auth.Get("/team-members/available", teamHandler.GetAvailableUsers)
 
+			// Security & Forensic Leak Tracker (Standalone & Admin compatible)
+			auth.Get("/forensics/access", forensicHandler.GetAccess)
+			auth.Get("/forensics/stats", forensicHandler.GetStats)
+			auth.Post("/forensics/inspect", forensicHandler.Inspect)
+			auth.Post("/forensics/policy", forensicHandler.UpdatePolicy)
+			auth.Get("/forensics/grants", forensicHandler.ListGrants)
+			auth.Post("/forensics/grants", forensicHandler.CreateOrUpdateGrant)
+			auth.Delete("/forensics/grants/{id}", forensicHandler.RevokeGrant)
+
 			// Admin Panel Routes
 			auth.Group(func(admin chi.Router) {
 				admin.Use(adminHandler.RequireAdmin)
@@ -248,7 +258,7 @@ func main() {
 				admin.Post("/admin/team-requests/{id}/approve", adminHandler.ApproveTeamRequest)
 				admin.Post("/admin/team-requests/{id}/reject", adminHandler.RejectTeamRequest)
 
-				// Security & Forensic Leak Tracker
+				// Legacy Security & Forensic Leak Tracker endpoints
 				admin.Post("/admin/security/inspect", adminHandler.InspectLeak)
 				admin.Get("/admin/security/stats", adminHandler.GetSecurityStats)
 			})
@@ -261,7 +271,7 @@ func main() {
 		fileServer := http.FileServer(http.Dir(frontendDist))
 		spaHandler := func(w http.ResponseWriter, r *http.Request) {
 			path := filepath.Join(frontendDist, r.URL.Path)
-			if _, err := os.Stat(path); os.IsNotExist(err) || strings.HasPrefix(r.URL.Path, "/share/") || strings.HasPrefix(r.URL.Path, "/admin") {
+			if _, err := os.Stat(path); os.IsNotExist(err) || strings.HasPrefix(r.URL.Path, "/share/") || strings.HasPrefix(r.URL.Path, "/admin") || strings.HasPrefix(r.URL.Path, "/forensics") {
 				http.ServeFile(w, r, filepath.Join(frontendDist, "index.html"))
 				return
 			}

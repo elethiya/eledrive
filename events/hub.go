@@ -128,6 +128,22 @@ func (h *Hub) RecordActiveUser(userID string) {
 	h.lastSeenUsers[userID] = time.Now()
 }
 
+// SetUserPresence updates user online/offline status via webhook or direct event
+func (h *Hub) SetUserPresence(userID string, online bool) {
+	if userID == "" {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if online {
+		h.activeUsers[userID] = 1
+		h.lastSeenUsers[userID] = time.Now()
+	} else {
+		delete(h.activeUsers, userID)
+		h.lastSeenUsers[userID] = time.Now().Add(-1 * time.Hour)
+	}
+}
+
 // IsUserOnline returns true if user currently has an active connection or activity within 45 seconds
 func (h *Hub) IsUserOnline(userID string) bool {
 	if userID == "" {
@@ -301,8 +317,39 @@ func HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		action = "refresh"
 	}
 
+	targetUserID := payload.UserID
+	if targetUserID == "" && payload.ID != "" && payload.Target == "user" {
+		targetUserID = payload.ID
+	}
+	if payload.ID == "" && targetUserID != "" {
+		payload.ID = targetUserID
+	}
+
+	// Handle real-time presence webhooks (replaces polling)
+	if payload.Event == "presence:update" || payload.Event == "presence" || (payload.Target == "user" && (payload.Action == "online" || payload.Action == "offline")) {
+		isOnline := payload.Action == "online"
+		if dataMap, ok := payload.Data.(map[string]interface{}); ok {
+			if onVal, exists := dataMap["online"]; exists {
+				if onBool, ok := onVal.(bool); ok {
+					isOnline = onBool
+				}
+			}
+		}
+		if targetUserID != "" && GlobalHub != nil {
+			GlobalHub.SetUserPresence(targetUserID, isOnline)
+		}
+		if payload.Data == nil {
+			payload.Data = map[string]interface{}{
+				"user_id": targetUserID,
+				"online":  isOnline,
+			}
+		}
+		eventType = "presence:update"
+		target = "user"
+	}
+
 	// Broadcast webhook event to all connected realtime clients
-	Broadcast(eventType, target, action, payload.ID, payload.FolderID, payload.UserID, payload.Data)
+	Broadcast(eventType, target, action, payload.ID, payload.FolderID, targetUserID, payload.Data)
 
 	utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"success":     true,

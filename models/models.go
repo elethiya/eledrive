@@ -185,6 +185,7 @@ type SystemSettings struct {
 	ForensicWatermarkingEnabled bool   `json:"forensic_watermarking_enabled"`
 	SteganographicCanaryEnabled bool   `json:"steganographic_canary_enabled"`
 	LogForensicDownloads        bool   `json:"log_forensic_downloads"`
+	ForensicAccessPolicy        string `json:"forensic_access_policy"`
 	MaintenanceMode             bool   `json:"maintenance_mode"`
 	MaintenanceNotice           string `json:"maintenance_notice"`
 	AllowZipDownloads           bool   `json:"allow_zip_downloads"`
@@ -272,6 +273,41 @@ type SecurityStats struct {
 	TotalDownloadsLogged int              `json:"total_downloads_logged"`
 	RecentDownloads      []DownloadRecord `json:"recent_downloads"`
 	RecentTrackedFiles   []File           `json:"recent_tracked_files"`
+}
+
+type ForensicAccessGrant struct {
+	ID              string     `json:"id"`
+	UserID          string     `json:"user_id"`
+	UserName        string     `json:"user_name,omitempty"`
+	UserEmail       string     `json:"user_email,omitempty"`
+	UserUsername    string     `json:"user_username,omitempty"`
+	AvatarColor     string     `json:"avatar_color,omitempty"`
+	UserRole        string     `json:"user_role,omitempty"`
+	GrantedByUserID string     `json:"granted_by_user_id"`
+	GrantedByName   string     `json:"granted_by_name,omitempty"`
+	ExpiresAt       *time.Time `json:"expires_at,omitempty"`
+	IsExpired       bool       `json:"is_expired"`
+	Notes           string     `json:"notes"`
+	CreatedAt       time.Time  `json:"created_at"`
+}
+
+type ForensicAccessStatus struct {
+	HasAccess   bool                 `json:"has_access"`
+	Reason      string               `json:"reason"` // "owner", "admin", "all_users", "granted", "denied"
+	Policy      string               `json:"policy"`
+	IsOwner     bool                 `json:"is_owner"`
+	ExpiresAt   *time.Time           `json:"expires_at,omitempty"`
+	ActiveGrant *ForensicAccessGrant `json:"active_grant,omitempty"`
+}
+
+type CreateForensicGrantRequest struct {
+	UserID    string  `json:"user_id"`
+	ExpiresAt *string `json:"expires_at,omitempty"` // RFC3339 string or empty/null for forever
+	Notes     string  `json:"notes"`
+}
+
+type UpdateForensicPolicyRequest struct {
+	Policy string `json:"policy"` // "owner_only", "admins", "all_users", "custom"
 }
 
 type Team struct {

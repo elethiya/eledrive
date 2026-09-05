@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { HardDrive, ArrowRight, Lock, Mail, KeyRound, CheckCircle2, ArrowLeft, Send } from 'lucide-react';
+import { HardDrive, ArrowRight, Lock, Mail, KeyRound, CheckCircle2, ArrowLeft, Send, AlertTriangle, Wrench } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../api/client';
 import RegistrationReviewScreen from '../components/RegistrationReviewScreen';
 
-export default function LoginPage({ onNavigateRegister }) {
+export default function LoginPage({ onNavigateRegister, maintenanceInfo }) {
   const { login } = useAuth();
   const [emailOrUser, setEmailOrUser] = useState('');
   const [password, setPassword] = useState('');
@@ -233,6 +233,31 @@ export default function LoginPage({ onNavigateRegister }) {
           </div>
         ) : (
           <>
+            {/* Maintenance Mode Warning Banner */}
+            {maintenanceInfo?.isActive && (
+              <div className="mb-5 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 shadow-xl shadow-amber-500/5 space-y-2 animate-in fade-in zoom-in-95 duration-300">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0">
+                    <Wrench className="w-4 h-4 animate-pulse" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Maintenance In Progress</span>
+                      <span className="px-1.5 py-0.2 rounded bg-amber-500/25 text-amber-300 text-[10px] font-mono font-bold">ACTIVE</span>
+                    </div>
+                    <div className="text-[11px] text-amber-300/80 mt-0.5">Admin & Owner Access Only</div>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-300 bg-slate-950/60 border border-amber-500/20 rounded-xl p-3 leading-relaxed font-sans">
+                  {maintenanceInfo.notice || 'Platform is currently undergoing scheduled maintenance. Please check back shortly.'}
+                </p>
+                <div className="text-[10px] text-amber-400/90 flex items-center gap-1.5 pt-0.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>Regular user accounts are temporarily restricted from signing in.</span>
+                </div>
+              </div>
+            )}
+
             <h2 className="text-lg font-bold text-slate-100 mb-1">Welcome back</h2>
             <p className="text-xs text-slate-400 mb-6">
               Sign in to access your projects, shared folders, and drive.

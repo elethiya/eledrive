@@ -193,6 +193,23 @@ export const webhookAPI = {
   trigger: (data) => api.post('/webhook', data),
 };
 
+export const forensicAPI = {
+  getAccess: () => api.get('/forensics/access'),
+  getStats: () => api.get('/forensics/stats'),
+  inspect: (formDataOrJson) => {
+    if (formDataOrJson instanceof FormData) {
+      return api.post('/forensics/inspect', formDataOrJson, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.post('/forensics/inspect', formDataOrJson);
+  },
+  updatePolicy: (policy) => api.post('/forensics/policy', { policy }),
+  getGrants: () => api.get('/forensics/grants'),
+  createGrant: (data) => api.post('/forensics/grants', data),
+  revokeGrant: (id) => api.delete(`/forensics/grants/${id}`),
+};
+
 /**
  * Downloads a file from a URL with full real-time progress, speed tracking, and abort support.
  */

@@ -12,6 +12,7 @@ import StarredPage from './pages/StarredPage';
 import TrashPage from './pages/TrashPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
+import ForensicPage from './pages/ForensicPage';
 import PublicSharePage from './pages/PublicSharePage';
 import TeamsPage from './pages/TeamsPage';
 import MembersPage from './pages/MembersPage';
@@ -31,7 +32,7 @@ import { Search, X, Wrench, AlertTriangle, RefreshCw } from 'lucide-react';
 import FileCard from './components/FileCard';
 import { folderAPI, fileAPI, systemAPI, downloadWithProgress } from './api/client';
 
-const VALID_VIEWS = ['drive', 'teams', 'members', 'shared', 'recent', 'starred', 'trash', 'profile', 'admin'];
+const VALID_VIEWS = ['drive', 'teams', 'members', 'shared', 'recent', 'starred', 'trash', 'profile', 'admin', 'forensics'];
 
 function parseNavigationFromLocation() {
   const path = window.location.pathname;
@@ -43,6 +44,7 @@ function parseNavigationFromLocation() {
 
   // Check URL paths
   if (path === '/admin' || path.startsWith('/admin/')) return { view: 'admin', folderId: '' };
+  if (path === '/forensics' || path.startsWith('/forensics/')) return { view: 'forensics', folderId: '' };
   if (path === '/teams' || path.startsWith('/teams/')) return { view: 'teams', folderId: '' };
   if (path === '/members' || path.startsWith('/members/')) return { view: 'members', folderId: '' };
   if (path.startsWith('/shared/folder/')) {
@@ -631,9 +633,19 @@ function AppContent() {
 
   if (!user) {
     if (authView === 'register') {
-      return <RegisterPage onNavigateLogin={() => setAuthView('login')} />;
+      return (
+        <RegisterPage
+          onNavigateLogin={() => setAuthView('login')}
+          maintenanceInfo={maintenanceInfo}
+        />
+      );
     }
-    return <LoginPage onNavigateRegister={() => setAuthView('register')} />;
+    return (
+      <LoginPage
+        onNavigateRegister={() => setAuthView('register')}
+        maintenanceInfo={maintenanceInfo}
+      />
+    );
   }
 
   // Active Maintenance Mode Barrier for regular users
@@ -1053,6 +1065,10 @@ function AppContent() {
               {currentView === 'trash' && <TrashPage />}
 
               {currentView === 'profile' && <ProfilePage />}
+
+              {currentView === 'forensics' && (
+                <ForensicPage onNavigateView={(view) => setCurrentView(view)} />
+              )}
             </>
           )}
         </div>
