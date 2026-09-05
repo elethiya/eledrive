@@ -267,35 +267,34 @@ export default function MembersPage({ onNavigateView }) {
       </div>
 
       {/* Scrollable Body Content */}
-      <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 space-y-6">
         {/* Filter and Control Bar */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 space-y-3 shadow-sm">
-          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-            {/* Search Input */}
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
-              <input
-                type="text"
-                placeholder="Search members by name, @username, email, or team..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300 p-0.5"
-                  title="Clear search"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          {/* Search Input */}
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search members by name, @username, email, or team..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 bg-transparent border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300 p-0.5"
+                title="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
           {/* Controls: Online/Offline Category Tabs */}
           <div className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <div className="flex items-center bg-transparent p-1 rounded-xl border border-slate-800">
               <button
                 type="button"
                 onClick={() => setStatusCategory('all')}
@@ -341,7 +340,6 @@ export default function MembersPage({ onNavigateView }) {
             </div>
           </div>
         </div>
-      </div>
 
 
       {/* Main Members Presentation: Separate Containers for Online and Offline Sections */}
@@ -376,7 +374,7 @@ export default function MembersPage({ onNavigateView }) {
         <div className="space-y-6 pb-6">
           {/* Online Members Section Container */}
           {(statusCategory === 'all' || statusCategory === 'online') && (
-            <section className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+            <section className="space-y-4">
               {/* Online Section Header */}
               <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
                 <div className="flex items-center gap-2.5">
@@ -389,7 +387,7 @@ export default function MembersPage({ onNavigateView }) {
                       <h2 className="text-sm font-bold text-slate-100 tracking-wide uppercase">
                         Online Members
                       </h2>
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-mono font-bold border border-emerald-500/30">
+                      <span className="px-2 py-0.5 rounded-full bg-transparent text-emerald-400 text-xs font-mono font-bold border border-emerald-500/30">
                         {onlineMembers.length}
                       </span>
                     </div>
@@ -400,7 +398,7 @@ export default function MembersPage({ onNavigateView }) {
 
               {/* Responsive Grid: 1 profile (mobile), 2 profiles (tablet), 3 profiles per row (desktop) */}
               {onlineMembers.length === 0 ? (
-                <div className="py-8 text-center bg-slate-950/40 rounded-xl border border-slate-800/50">
+                <div className="py-8 text-center border border-dashed border-slate-800/60 rounded-2xl">
                   <p className="text-xs text-slate-500 italic">
                     {searchQuery ? 'No online members match your search' : 'No members currently online'}
                   </p>
@@ -423,7 +421,7 @@ export default function MembersPage({ onNavigateView }) {
 
           {/* Offline Members Section Container */}
           {(statusCategory === 'all' || statusCategory === 'offline') && (
-            <section className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+            <section className="space-y-4">
               {/* Offline Section Header */}
               <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
                 <div className="flex items-center gap-2.5">
@@ -433,7 +431,7 @@ export default function MembersPage({ onNavigateView }) {
                       <h2 className="text-sm font-bold text-slate-100 tracking-wide uppercase">
                         Offline Members
                       </h2>
-                      <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-xs font-mono font-bold border border-slate-700">
+                      <span className="px-2 py-0.5 rounded-full bg-transparent text-slate-400 text-xs font-mono font-bold border border-slate-700">
                         {offlineMembers.length}
                       </span>
                     </div>
@@ -444,7 +442,7 @@ export default function MembersPage({ onNavigateView }) {
 
               {/* Responsive Grid: 1 profile (mobile), 2 profiles (tablet), 3 profiles per row (desktop) */}
               {offlineMembers.length === 0 ? (
-                <div className="py-8 text-center bg-slate-950/40 rounded-xl border border-slate-800/50">
+                <div className="py-8 text-center border border-dashed border-slate-800/60 rounded-2xl">
                   <p className="text-xs text-slate-500 italic">
                     {searchQuery ? 'No offline members match your search' : 'No offline members'}
                   </p>
@@ -499,7 +497,7 @@ function MemberProfileCard({ m, meta, isCurrent, onSelectMember }) {
           onSelectMember(m);
         }
       }}
-      className="p-4 rounded-2xl bg-slate-950/70 hover:bg-slate-900/90 border border-slate-800/80 hover:border-slate-700/80 transition-all duration-200 cursor-pointer group shadow-xs hover:shadow-lg hover:-translate-y-0.5 flex flex-col justify-between gap-3 text-left focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+      className="p-4 rounded-2xl bg-transparent hover:bg-slate-900/50 border border-slate-800/80 hover:border-slate-700/80 transition-all duration-200 cursor-pointer group shadow-xs hover:shadow-lg hover:-translate-y-0.5 flex flex-col justify-between gap-3 text-left focus:outline-none focus:ring-1 focus:ring-blue-500/50"
     >
       {/* Top: Avatar & User Identity */}
       <div className="flex items-start gap-3 min-w-0">
