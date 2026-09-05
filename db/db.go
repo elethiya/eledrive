@@ -162,6 +162,7 @@ func migrate() error {
 		user_email TEXT,
 		ip_address TEXT,
 		user_agent TEXT,
+		access_type TEXT DEFAULT 'download', -- 'download' or 'view'
 		downloaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
@@ -416,6 +417,13 @@ func migrate() error {
 		}
 	}
 	_, _ = DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS main.idx_team_join_requests_team_user ON team_join_requests(team_id, user_id)")
+
+	// Ensure access_type exists in download_logs
+	var dlAccessTypeCount int
+	_ = DB.QueryRow("SELECT COUNT(*) FROM main.pragma_table_info('download_logs') WHERE name='access_type'").Scan(&dlAccessTypeCount)
+	if dlAccessTypeCount == 0 {
+		_, _ = DB.Exec("ALTER TABLE main.download_logs ADD COLUMN access_type TEXT DEFAULT 'download'")
+	}
 
 	// Ensure exactly one owner exists: if no owner exists, promote the first admin
 	var ownerCount int

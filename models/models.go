@@ -228,27 +228,42 @@ type DownloadRecord struct {
 	UserEmail    string    `json:"user_email"`
 	IPAddress    string    `json:"ip_address"`
 	UserAgent    string    `json:"user_agent"`
+	AccessType   string    `json:"access_type"` // "download" or "view"
 	DownloadedAt time.Time `json:"downloaded_at"`
 }
 
 type ForensicInspectionResult struct {
-	Matched          bool             `json:"matched"`
-	SecretUUID       string           `json:"secret_uuid"`
-	OriginalFilename string           `json:"original_filename"`
-	FileType         string           `json:"file_type"`
-	FileSize         int64            `json:"file_size"`
-	UploaderID       string           `json:"uploader_id"`
-	UploaderName     string           `json:"uploader_name"`
-	UploaderEmail    string           `json:"uploader_email"`
-	UploaderUsername string           `json:"uploader_username"`
-	UploadedAt       *time.Time       `json:"uploaded_at,omitempty"`
-	SignatureValid   bool             `json:"signature_valid"`
-	SHA256Checksum   string           `json:"sha256_checksum,omitempty"`
-	DownloadHistory  []DownloadRecord `json:"download_history"`
-	TargetID         string           `json:"target_id,omitempty"`
-	IsFolder         bool             `json:"is_folder"`
-	RiskAssessment   string           `json:"risk_assessment"` // "LEAK_IDENTIFIED", "NOT_FOUND", "AUTHENTIC"
-	MetadataSummary  string           `json:"metadata_summary"`
+	Matched             bool             `json:"matched"`
+	SecretUUID          string           `json:"secret_uuid"`
+	OriginalFilename    string           `json:"original_filename"`
+	FileType            string           `json:"file_type"`
+	FileSize            int64            `json:"file_size"`
+	UploaderID          string           `json:"uploader_id"`
+	UploaderName        string           `json:"uploader_name"`
+	UploaderEmail       string           `json:"uploader_email"`
+	UploaderUsername    string           `json:"uploader_username"`
+	UploadedAt          *time.Time       `json:"uploaded_at,omitempty"`
+	SignatureValid      bool             `json:"signature_valid"`
+	SHA256Checksum      string           `json:"sha256_checksum,omitempty"`
+	DownloadHistory     []DownloadRecord `json:"download_history"`
+	TargetID            string           `json:"target_id,omitempty"`
+	IsFolder            bool             `json:"is_folder"`
+	RiskAssessment      string           `json:"risk_assessment"` // "LEAK_IDENTIFIED", "NOT_FOUND", "AUTHENTIC"
+	MetadataSummary     string           `json:"metadata_summary"`
+
+	// Pinpointed Leaker Attribution
+	LeakerIdentified    bool       `json:"leaker_identified"`
+	LeakerID            string     `json:"leaker_id,omitempty"`
+	LeakerName          string     `json:"leaker_name,omitempty"`
+	LeakerEmail         string     `json:"leaker_email,omitempty"`
+	LeakerUsername      string     `json:"leaker_username,omitempty"`
+	AccessType          string     `json:"access_type,omitempty"` // "BROWSER_VIEW", "DIRECT_DOWNLOAD", or "WORKSPACE_ORIGIN"
+	AccessedAt          *time.Time `json:"accessed_at,omitempty"`
+	ClientIP            string     `json:"client_ip,omitempty"`
+	UserAgent           string     `json:"user_agent,omitempty"`
+	SessionUUID         string     `json:"session_uuid,omitempty"`
+	ExfiltrationMethod  string     `json:"exfiltration_method,omitempty"`
+	ExfiltrationVerdict string     `json:"exfiltration_verdict,omitempty"`
 }
 
 type SecurityStats struct {

@@ -676,10 +676,23 @@ func (h *FolderHandler) DownloadZip(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", zipFilename))
 
-	utils.LogDownloadEvent(db.DB, "folder", folderID, f.SecretUUID, claims.UserID, claims.Username, claims.Email, r.RemoteAddr, r.UserAgent())
+	clientIP := utils.GetClientIP(r)
+	userAgent := r.UserAgent()
+
+	recipientID := claims.UserID
+	recipientUsername := claims.Username
+	recipientEmail := claims.Email
+	recipientName := claims.Username
+	var uName sql.NullString
+	_ = db.DB.QueryRow("SELECT name FROM users WHERE id = ?", claims.UserID).Scan(&uName)
+	if uName.Valid && uName.String != "" {
+		recipientName = uName.String
+	}
+
+	utils.LogDownloadEvent(db.DB, "folder", folderID, f.SecretUUID, recipientID, recipientName, recipientEmail, clientIP, userAgent, "download")
 	db.LogActivity(claims.UserID, claims.Username, "download", "folder", folderID, f.Name, fmt.Sprintf("Downloaded folder ZIP archive [Secret UUID: %s]", f.SecretUUID))
 
-	err = h.storage.ZipFolder(folderID, f.Name, w)
+	err = h.storage.ZipFolder(folderID, f.Name, w, recipientID, recipientName, recipientEmail, recipientUsername, clientIP, userAgent)
 	if err != nil {
 		// Cannot change headers once streaming starts, but logged
 		return

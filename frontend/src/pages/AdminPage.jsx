@@ -1854,12 +1854,156 @@ export default function AdminPage({ onBackToDrive }) {
 
                   {inspectionResult.matched ? (
                     <>
-                      {/* Attributed Leaker Information Card */}
+                      {/* Confirmed Leaker & Exfiltration Breach Attribution Card */}
+                      {inspectionResult.leaker_identified && (
+                        <div className={`p-4 sm:p-5 rounded-2xl border min-w-0 overflow-hidden relative ${
+                          inspectionResult.access_type === 'BROWSER_VIEW'
+                            ? 'bg-gradient-to-br from-rose-950/40 via-slate-900 to-amber-950/30 border-rose-500/40 shadow-lg shadow-rose-950/30'
+                            : inspectionResult.access_type === 'DIRECT_DOWNLOAD'
+                              ? 'bg-gradient-to-br from-blue-950/40 via-slate-900 to-indigo-950/30 border-blue-500/40 shadow-lg shadow-blue-950/30'
+                              : 'bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-900 border-emerald-500/40'
+                        }`}>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-800/80">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 ${
+                                inspectionResult.access_type === 'BROWSER_VIEW'
+                                  ? 'bg-rose-500/20 text-rose-400'
+                                  : 'bg-blue-500/20 text-blue-400'
+                              }`}>
+                                <Fingerprint className="w-5 h-5" />
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="text-xs sm:text-sm font-black text-slate-100 uppercase tracking-wider truncate flex items-center gap-2">
+                                  Exact Leaker Pinpointed
+                                </h4>
+                                <p className="text-[11px] text-slate-400 truncate">
+                                  Embedded cryptographic signature identified the exact individual who exfiltrated this asset
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="shrink-0">
+                              {inspectionResult.access_type === 'BROWSER_VIEW' ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                  <Eye className="w-3.5 h-3.5" />
+                                  BROWSER LOAD / RIGHT-CLICK CAPTURE
+                                </span>
+                              ) : inspectionResult.access_type === 'DIRECT_DOWNLOAD' ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                  <Download className="w-3.5 h-3.5" />
+                                  DIRECT FILE DOWNLOAD
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                  <UserCheck className="w-3.5 h-3.5" />
+                                  ORIGINAL WORKSPACE UPLOADER
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Leaker Profile & Details Grid */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 pt-3.5 min-w-0">
+                            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 min-w-0">
+                              <span className="text-[10px] uppercase font-bold text-slate-500 block truncate mb-1">
+                                Identified Leaker
+                              </span>
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm text-white shrink-0 ${
+                                  inspectionResult.access_type === 'BROWSER_VIEW' ? 'bg-rose-600' : 'bg-blue-600'
+                                }`}>
+                                  {inspectionResult.leaker_name?.charAt(0).toUpperCase() || 'U'}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-xs font-bold text-slate-100 truncate" title={inspectionResult.leaker_name}>
+                                    {inspectionResult.leaker_name}
+                                  </div>
+                                  <div className="text-[11px] text-slate-400 truncate" title={inspectionResult.leaker_username ? `@${inspectionResult.leaker_username}` : inspectionResult.leaker_email}>
+                                    {inspectionResult.leaker_username ? `@${inspectionResult.leaker_username}` : inspectionResult.leaker_email}
+                                  </div>
+                                  <div className="text-[10px] font-mono text-slate-500 mt-0.5 truncate">
+                                    ID: {inspectionResult.leaker_id}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 min-w-0">
+                              <span className="text-[10px] uppercase font-bold text-slate-500 block truncate mb-1">
+                                Exfiltration Method
+                              </span>
+                              <div className="text-xs font-bold text-slate-200 truncate">
+                                {inspectionResult.access_type === 'BROWSER_VIEW' ? (
+                                  <span className="text-rose-400 font-black">Browser Preview Capture</span>
+                                ) : inspectionResult.access_type === 'DIRECT_DOWNLOAD' ? (
+                                  <span className="text-blue-400 font-black">Direct File Download</span>
+                                ) : (
+                                  <span className="text-emerald-400 font-black">Workspace Master Origin</span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-slate-400 mt-1 leading-snug">
+                                {inspectionResult.access_type === 'BROWSER_VIEW'
+                                  ? 'Opened in browser; saved via right-click or browser extension'
+                                  : inspectionResult.access_type === 'DIRECT_DOWNLOAD'
+                                    ? 'Downloaded directly from workspace file action'
+                                    : 'Exfiltrated directly from master workspace storage'}
+                              </p>
+                            </div>
+
+                            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 min-w-0">
+                              <span className="text-[10px] uppercase font-bold text-slate-500 block truncate mb-1">
+                                Exact Access / Leak Time
+                              </span>
+                              <div className="text-xs font-bold text-slate-200 truncate">
+                                {inspectionResult.accessed_at ? formatDate(inspectionResult.accessed_at) : 'N/A'}
+                              </div>
+                              <div className="text-[10px] font-mono text-slate-400 truncate mt-0.5">
+                                {inspectionResult.accessed_at ? new Date(inspectionResult.accessed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}
+                              </div>
+                            </div>
+
+                            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 min-w-0">
+                              <span className="text-[10px] uppercase font-bold text-slate-500 block truncate mb-1">
+                                Client IP & Network
+                              </span>
+                              <div className="text-xs font-mono font-bold text-slate-200 truncate">
+                                {inspectionResult.client_ip || 'N/A'}
+                              </div>
+                              <div className="text-[10px] text-slate-400 truncate mt-0.5" title={inspectionResult.user_agent}>
+                                {inspectionResult.user_agent || 'Standard Client'}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Breach Narrative Finding */}
+                          {inspectionResult.exfiltration_verdict && (
+                            <div className={`mt-3.5 p-3 rounded-xl border text-xs leading-relaxed flex items-start gap-2.5 ${
+                              inspectionResult.access_type === 'BROWSER_VIEW'
+                                ? 'bg-rose-950/30 border-rose-500/30 text-rose-200'
+                                : 'bg-blue-950/30 border-blue-500/30 text-blue-200'
+                            }`}>
+                              <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${
+                                inspectionResult.access_type === 'BROWSER_VIEW' ? 'text-rose-400' : 'text-blue-400'
+                              }`} />
+                              <div className="min-w-0 flex-1">
+                                <span className="font-bold uppercase tracking-wider block text-[10px] mb-0.5">
+                                  Forensic Attribution Analysis:
+                                </span>
+                                <p className="font-medium break-words">
+                                  {inspectionResult.exfiltration_verdict}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Attributed Original Uploader and Forensic Signature Cards */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 min-w-0">
                         <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3 min-w-0 overflow-hidden">
                           <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5 truncate">
                             <UserCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                            <span className="truncate">Attributed Original Uploader</span>
+                            <span className="truncate">Origin Asset Creator</span>
                           </h4>
 
                           <div className="flex items-center gap-3 pt-1 min-w-0">
@@ -1938,7 +2082,7 @@ export default function AdminPage({ onBackToDrive }) {
 
                             <div className="pt-2 min-w-0">
                               <span className="text-[10px] text-slate-500 uppercase font-semibold block mb-0.5 truncate">
-                                Forensic Verdict:
+                                Forensic Status Summary:
                               </span>
                               <p className="text-xs text-emerald-300 font-medium break-words leading-relaxed">
                                 {inspectionResult.metadata_summary}
@@ -1952,42 +2096,64 @@ export default function AdminPage({ onBackToDrive }) {
                       <div className="space-y-3 pt-2 min-w-0">
                         <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2 truncate">
                           <Download className="w-4 h-4 text-indigo-400 shrink-0" />
-                          <span className="truncate">Chain of Custody & Download Trail ({inspectionResult.download_history?.length || 0} events)</span>
+                          <span className="truncate">Chain of Custody & Access Trail ({inspectionResult.download_history?.length || 0} events)</span>
                         </h4>
 
                         {(!inspectionResult.download_history || inspectionResult.download_history.length === 0) ? (
                           <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center text-xs text-slate-500 break-words">
-                            No external download records found for this asset. The file was likely exfiltrated directly by the uploader.
+                            No external access records found for this asset. The file was likely exfiltrated directly by the uploader.
                           </div>
                         ) : (
                           <div className="overflow-x-auto rounded-xl border border-slate-800">
                             <table className="w-full text-left text-xs text-slate-300 min-w-[620px]">
                               <thead className="bg-slate-900 text-slate-400 font-semibold border-b border-slate-800">
                                 <tr>
-                                  <th className="py-2.5 px-3 whitespace-nowrap">Downloader</th>
+                                  <th className="py-2.5 px-3 whitespace-nowrap">User</th>
+                                  <th className="py-2.5 px-3 whitespace-nowrap">Access Type</th>
                                   <th className="py-2.5 px-3 whitespace-nowrap">IP Address</th>
                                   <th className="py-2.5 px-3 whitespace-nowrap">Client / Browser</th>
-                                  <th className="py-2.5 px-3 whitespace-nowrap">Downloaded At</th>
+                                  <th className="py-2.5 px-3 whitespace-nowrap">Accessed At</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-800/60 bg-slate-950/60">
-                                {inspectionResult.download_history.map((dl) => (
-                                  <tr key={dl.id} className="hover:bg-slate-900/60">
-                                    <td className="py-2.5 px-3 max-w-[180px]">
-                                      <div className="font-semibold text-slate-200 truncate" title={dl.user_name}>{dl.user_name}</div>
-                                      <div className="text-[10px] text-slate-500 truncate" title={dl.user_email}>{dl.user_email}</div>
-                                    </td>
-                                    <td className="py-2.5 px-3 font-mono text-blue-400 text-[11px] whitespace-nowrap">
-                                      {dl.ip_address}
-                                    </td>
-                                    <td className="py-2.5 px-3 text-[11px] text-slate-400 truncate max-w-[200px]" title={dl.user_agent}>
-                                      {dl.user_agent || 'Standard HTTP Client'}
-                                    </td>
-                                    <td className="py-2.5 px-3 text-[11px] text-slate-400 whitespace-nowrap">
-                                      {formatDate(dl.downloaded_at)}
-                                    </td>
-                                  </tr>
-                                ))}
+                                {inspectionResult.download_history.map((dl) => {
+                                  const isLeakerRow = inspectionResult.leaker_id && dl.user_id === inspectionResult.leaker_id;
+                                  return (
+                                    <tr key={dl.id} className={`hover:bg-slate-900/60 ${isLeakerRow ? 'bg-rose-950/25 border-l-2 border-rose-500' : ''}`}>
+                                      <td className="py-2.5 px-3 max-w-[180px]">
+                                        <div className="flex items-center gap-1.5 truncate">
+                                          <div className="font-semibold text-slate-200 truncate" title={dl.user_name}>{dl.user_name}</div>
+                                          {isLeakerRow && (
+                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                              LEAKER
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="text-[10px] text-slate-500 truncate" title={dl.user_email}>{dl.user_email}</div>
+                                      </td>
+                                      <td className="py-2.5 px-3 whitespace-nowrap">
+                                        {dl.access_type === 'view' ? (
+                                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                                            <Eye className="w-3 h-3" /> Browser Preview
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20">
+                                            <Download className="w-3 h-3" /> Direct Download
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="py-2.5 px-3 font-mono text-blue-400 text-[11px] whitespace-nowrap">
+                                        {dl.ip_address}
+                                      </td>
+                                      <td className="py-2.5 px-3 text-[11px] text-slate-400 truncate max-w-[200px]" title={dl.user_agent}>
+                                        {dl.user_agent || 'Standard HTTP Client'}
+                                      </td>
+                                      <td className="py-2.5 px-3 text-[11px] text-slate-400 whitespace-nowrap">
+                                        {formatDate(dl.downloaded_at)}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
                               </tbody>
                             </table>
                           </div>

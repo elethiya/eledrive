@@ -396,12 +396,25 @@ func (h *PublicShareHandler) DownloadPublic(w http.ResponseWriter, r *http.Reque
 	// Increment download count
 	_, _ = db.DB.Exec("UPDATE share_links SET download_count = download_count + 1 WHERE id = ?", link.ID)
 
+	clientIP := utils.GetClientIP(r)
+	userAgent := r.UserAgent()
+
+	isInline := r.URL.Query().Get("inline") == "1"
+	disposition := "attachment"
+	accessType := "DIRECT_DOWNLOAD"
+	dbAccessType := "download"
+	if isInline {
+		disposition = "inline"
+		accessType = "BROWSER_VIEW"
+		dbAccessType = "view"
+	}
+
 	if link.TargetType == "file" {
-		var name, storagePath, mimeType, secretUUID string
+		var name, storagePath, mimeType, secretUUID, ownerID string
 		var size int64
 		var updatedAt time.Time
-		err := db.DB.QueryRow("SELECT name, storage_path, mime_type, size, COALESCE(secret_uuid, ''), updated_at FROM files WHERE id = ?", link.TargetID).
-			Scan(&name, &storagePath, &mimeType, &size, &secretUUID, &updatedAt)
+		err := db.DB.QueryRow("SELECT name, storage_path, mime_type, size, COALESCE(secret_uuid, ''), owner_id, updated_at FROM files WHERE id = ?", link.TargetID).
+			Scan(&name, &storagePath, &mimeType, &size, &secretUUID, &ownerID, &updatedAt)
 		if err != nil {
 			utils.RespondError(w, http.StatusNotFound, "File not found")
 			return
@@ -415,12 +428,42 @@ func (h *PublicShareHandler) DownloadPublic(w http.ResponseWriter, r *http.Reque
 		}
 		defer file.Close()
 
-		utils.LogDownloadEvent(db.DB, "file", link.TargetID, secretUUID, "public_guest", "Public Link Visitor", link.Token, r.RemoteAddr, r.UserAgent())
+		if secretUUID == "" {
+			secretUUID = utils.GenerateSecretUUID()
+			_, _ = db.DB.Exec("UPDATE files SET secret_uuid = ? WHERE id = ?", secretUUID, link.TargetID)
+		}
 
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", name))
+		guestName := fmt.Sprintf("Public Link Visitor (%s)", clientIP)
+		guestEmail := fmt.Sprintf("token:%s", link.Token)
+
+		_, trailerBytes := utils.BuildAccessForensicTrailer(
+			secretUUID,
+			ownerID,
+			"Workspace User",
+			"unknown@eledrive.local",
+			"",
+			"public_guest",
+			guestName,
+			guestEmail,
+			"public_guest",
+			accessType,
+			clientIP,
+			userAgent,
+			name,
+			h.cfg.JWTSecret,
+		)
+
+		watermarkedReader, err := utils.NewWatermarkedReadSeeker(file, trailerBytes)
+		if err != nil {
+			utils.RespondError(w, http.StatusInternalServerError, "Failed to stream watermarked asset")
+			return
+		}
+
+		utils.LogDownloadEvent(db.DB, "file", link.TargetID, secretUUID, "public_guest", guestName, guestEmail, clientIP, userAgent, dbAccessType)
+
+		w.Header().Set("Content-Disposition", fmt.Sprintf("%s; filename=\"%s\"", disposition, name))
 		w.Header().Set("Content-Type", mimeType)
-		w.Header().Set("Content-Length", fmt.Sprintf("%d", size))
-		http.ServeContent(w, r, name, updatedAt, file)
+		http.ServeContent(w, r, name, updatedAt, watermarkedReader)
 		return
 	}
 
@@ -437,11 +480,14 @@ func (h *PublicShareHandler) DownloadPublic(w http.ResponseWriter, r *http.Reque
 		_, _ = db.DB.Exec("UPDATE folders SET secret_uuid = ? WHERE id = ?", secretUUID, link.TargetID)
 	}
 
-	utils.LogDownloadEvent(db.DB, "folder", link.TargetID, secretUUID, "public_guest", "Public Link Visitor", link.Token, r.RemoteAddr, r.UserAgent())
+	guestName := fmt.Sprintf("Public Link Visitor (%s)", clientIP)
+	guestEmail := fmt.Sprintf("token:%s", link.Token)
+
+	utils.LogDownloadEvent(db.DB, "folder", link.TargetID, secretUUID, "public_guest", guestName, guestEmail, clientIP, userAgent, "download")
 
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.zip\"", folderName))
-	_ = h.storage.ZipFolder(link.TargetID, folderName, w)
+	_ = h.storage.ZipFolder(link.TargetID, folderName, w, "public_guest", guestName, guestEmail, "public_guest", clientIP, userAgent)
 }
 
 // UploadPublic allows team members or guests to upload files directly into a shared folder if permission is upload_and_view

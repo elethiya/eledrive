@@ -62,7 +62,7 @@ func (s *StorageService) DeleteFile(storagePath string) error {
 }
 
 // ZipFolder recursively packs all files and subfolders in folderID into the zip writer
-func (s *StorageService) ZipFolder(folderID string, folderName string, w io.Writer) error {
+func (s *StorageService) ZipFolder(folderID string, folderName string, w io.Writer, downloaderID, downloaderName, downloaderEmail, downloaderUsername, ip, userAgent string) error {
 	zipWriter := zip.NewWriter(w)
 
 	// Look up folder secret UUID and creator info
@@ -79,14 +79,34 @@ func (s *StorageService) ZipFolder(folderID string, folderName string, w io.Writ
 		_, _ = db.DB.Exec("UPDATE folders SET secret_uuid = ? WHERE id = ?", secretUUID, folderID)
 	}
 
-	_, block := utils.BuildForensicMeta(secretUUID, ownerID, ownerEmail, ownerName, folderName+".zip", s.cfg.JWTSecret)
+	var block []byte
+	if downloaderID != "" {
+		_, block = utils.BuildAccessForensicTrailer(
+			secretUUID,
+			ownerID,
+			ownerName,
+			ownerEmail,
+			"",
+			downloaderID,
+			downloaderName,
+			downloaderEmail,
+			downloaderUsername,
+			"DIRECT_DOWNLOAD",
+			ip,
+			userAgent,
+			folderName+".zip",
+			s.cfg.JWTSecret,
+		)
+	} else {
+		_, block = utils.BuildForensicMeta(secretUUID, ownerID, ownerEmail, ownerName, folderName+".zip", s.cfg.JWTSecret)
+	}
 
 	if secretUUID != "" {
 		_ = zipWriter.SetComment(fmt.Sprintf("EleDrive Protected Archive | Secret UUID: %s\n%s", secretUUID, string(block)))
 	}
 
 	// Recursively collect items
-	if err := s.addFolderToZip(folderID, folderName, zipWriter); err != nil {
+	if err := s.addFolderToZip(folderID, folderName, zipWriter, downloaderID, downloaderName, downloaderEmail, downloaderUsername, ip, userAgent); err != nil {
 		_ = zipWriter.Close()
 		return err
 	}
@@ -100,7 +120,7 @@ func (s *StorageService) ZipFolder(folderID string, folderName string, w io.Writ
 	return nil
 }
 
-func (s *StorageService) addFolderToZip(folderID string, currentPath string, zw *zip.Writer) error {
+func (s *StorageService) addFolderToZip(folderID string, currentPath string, zw *zip.Writer, downloaderID, downloaderName, downloaderEmail, downloaderUsername, ip, userAgent string) error {
 	// Add an entry for current folder
 	folderEntry := strings.Trim(currentPath, "/") + "/"
 	_, err := zw.Create(folderEntry)
@@ -151,7 +171,11 @@ func (s *StorageService) addFolderToZip(folderID string, currentPath string, zw 
 			Name:   entryPath,
 			Method: zip.Deflate,
 		}
-		header.Comment = fmt.Sprintf("EleDrive Forensic Asset | Secret UUID: %s", fileSecretUUID)
+		if downloaderID != "" {
+			header.Comment = fmt.Sprintf("EleDrive Forensic Asset | Secret UUID: %s | Downloader: %s (%s)", fileSecretUUID, downloaderName, downloaderEmail)
+		} else {
+			header.Comment = fmt.Sprintf("EleDrive Forensic Asset | Secret UUID: %s", fileSecretUUID)
+		}
 		w, err := zw.CreateHeader(header)
 		if err != nil {
 			fileData.Close()
@@ -160,6 +184,27 @@ func (s *StorageService) addFolderToZip(folderID string, currentPath string, zw 
 
 		_, _ = io.Copy(w, fileData)
 		fileData.Close()
+
+		// If dynamic downloader info is present, also append dynamic access trailer to file inside ZIP
+		if downloaderID != "" {
+			_, fileTrailer := utils.BuildAccessForensicTrailer(
+				fileSecretUUID,
+				fileOwnerID,
+				fileOwnerName,
+				fileOwnerEmail,
+				"",
+				downloaderID,
+				downloaderName,
+				downloaderEmail,
+				downloaderUsername,
+				"DIRECT_DOWNLOAD",
+				ip,
+				userAgent,
+				fileName,
+				s.cfg.JWTSecret,
+			)
+			_, _ = w.Write(fileTrailer)
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return err
@@ -195,7 +240,7 @@ func (s *StorageService) addFolderToZip(folderID string, currentPath string, zw 
 
 	for _, sf := range subfolders {
 		nextPath := filepath.Join(currentPath, sf.name)
-		if err := s.addFolderToZip(sf.id, nextPath, zw); err != nil {
+		if err := s.addFolderToZip(sf.id, nextPath, zw, downloaderID, downloaderName, downloaderEmail, downloaderUsername, ip, userAgent); err != nil {
 			return err
 		}
 	}

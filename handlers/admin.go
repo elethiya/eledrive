@@ -729,21 +729,27 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 		if result.SHA256Checksum == "" && checksum != "" {
 			result.SHA256Checksum = checksum
 		}
-		result.MetadataSummary = fmt.Sprintf("Asset leaked from workspace. Originally uploaded by %s (%s).", uploaderName, uploaderEmail)
 
-		// Fetch download history for this file
+		if result.LeakerIdentified {
+			if result.AccessType == "BROWSER_VIEW" {
+				result.MetadataSummary = fmt.Sprintf("CONFIRMED LEAK: Loaded in browser preview by %s (@%s - %s) on %s and exfiltrated via right-click save or browser tool.", result.LeakerName, result.LeakerUsername, result.LeakerEmail, result.AccessedAt.Format("2006-01-02 15:04:05 MST"))
+			} else if result.AccessType == "DIRECT_DOWNLOAD" {
+				result.MetadataSummary = fmt.Sprintf("CONFIRMED LEAK: Directly downloaded from workspace by %s (@%s - %s) on %s.", result.LeakerName, result.LeakerUsername, result.LeakerEmail, result.AccessedAt.Format("2006-01-02 15:04:05 MST"))
+			}
+		} else {
+			result.MetadataSummary = fmt.Sprintf("Asset registered in workspace (Owner: %s). To pinpoint the exact leaker, upload the suspect leaked file to verify its embedded cryptographic access trailer.", uploaderName)
+			result.ExfiltrationVerdict = "No physical suspect file uploaded for cryptographic trailer extraction. Showing registered workspace details and download/view history."
+		}
+
+		// Fetch download & view history for this file
 		result.DownloadHistory = h.getDownloadHistory(fileID, foundSecretUUID)
 
 		// Record in audit log
-		db.LogActivity(
-			actorID,
-			actorName,
-			"forensic_inspect",
-			"file",
-			fileID,
-			fileName,
-			fmt.Sprintf("Forensic analysis run by @%s: Leaked asset matched! Uploader: %s (@%s), UUID: %s", actorName, uploaderName, uploaderUsername, foundSecretUUID),
-		)
+		logMsg := fmt.Sprintf("Forensic analysis run by @%s: Asset matched! Uploader: %s (@%s), UUID: %s", actorName, uploaderName, uploaderUsername, foundSecretUUID)
+		if result.LeakerIdentified {
+			logMsg = fmt.Sprintf("Forensic analysis run by @%s: EXACT LEAKER IDENTIFIED! User: %s (@%s), Method: %s, Asset: %s, UUID: %s", actorName, result.LeakerName, result.LeakerUsername, result.ExfiltrationMethod, fileName, foundSecretUUID)
+		}
+		db.LogActivity(actorID, actorName, "forensic_inspect", "file", fileID, fileName, logMsg)
 
 		utils.RespondJSON(w, http.StatusOK, result)
 		return
@@ -783,27 +789,28 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 		if result.SHA256Checksum == "" && checksum != "" {
 			result.SHA256Checksum = checksum
 		}
-		result.MetadataSummary = fmt.Sprintf("Folder archive cryptographically verified. Originally created by %s (%s).", fUploaderName, fUploaderEmail)
+
+		if result.LeakerIdentified {
+			result.MetadataSummary = fmt.Sprintf("CONFIRMED LEAK: Folder archive downloaded by %s (@%s - %s) on %s.", result.LeakerName, result.LeakerUsername, result.LeakerEmail, result.AccessedAt.Format("2006-01-02 15:04:05 MST"))
+		} else {
+			result.MetadataSummary = fmt.Sprintf("Folder archive cryptographically verified. Originally created by %s (%s).", fUploaderName, fUploaderEmail)
+			result.ExfiltrationVerdict = "No suspect file uploaded for cryptographic trailer extraction. Showing registered folder details."
+		}
 
 		result.DownloadHistory = h.getDownloadHistory(folderID, foundSecretUUID)
 
-		// Record in audit log
-		db.LogActivity(
-			actorID,
-			actorName,
-			"forensic_inspect",
-			"folder",
-			folderID,
-			folderName,
-			fmt.Sprintf("Forensic analysis run by @%s: Leaked folder matched! Creator: %s (@%s), UUID: %s", actorName, fUploaderName, fUploaderUsername, foundSecretUUID),
-		)
+		logMsg := fmt.Sprintf("Forensic analysis run by @%s: Leaked folder matched! Creator: %s (@%s), UUID: %s", actorName, fUploaderName, fUploaderUsername, foundSecretUUID)
+		if result.LeakerIdentified {
+			logMsg = fmt.Sprintf("Forensic analysis run by @%s: EXACT LEAKER IDENTIFIED for folder! User: %s (@%s), UUID: %s", actorName, result.LeakerName, result.LeakerUsername, foundSecretUUID)
+		}
+		db.LogActivity(actorID, actorName, "forensic_inspect", "folder", folderID, folderName, logMsg)
 
 		utils.RespondJSON(w, http.StatusOK, result)
 		return
 	}
 
 	// 5. If metadata was extracted from file trailer itself even if deleted from DB
-	if result.UploaderEmail != "" {
+	if result.UploaderEmail != "" || result.LeakerEmail != "" {
 		result.Matched = true
 		result.RiskAssessment = "LEAK_IDENTIFIED"
 		if len(suspectBytes) > 0 && result.FileSize == 0 {
@@ -812,7 +819,9 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 		if result.SHA256Checksum == "" && checksum != "" {
 			result.SHA256Checksum = checksum
 		}
-		result.MetadataSummary = fmt.Sprintf("Forensic metadata embedded inside file confirms uploader was %s (%s). (Asset was subsequently removed from workspace database).", result.UploaderName, result.UploaderEmail)
+		if result.MetadataSummary == "" {
+			result.MetadataSummary = fmt.Sprintf("Forensic metadata embedded inside file confirms uploader %s and leaker %s.", result.UploaderName, result.LeakerName)
+		}
 
 		// Record in audit log
 		db.LogActivity(
@@ -822,7 +831,7 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 			"forensic",
 			foundSecretUUID,
 			result.OriginalFilename,
-			fmt.Sprintf("Forensic trailer analysis by @%s: Confirmed uploader %s (%s) [UUID: %s]", actorName, result.UploaderName, result.UploaderEmail, foundSecretUUID),
+			fmt.Sprintf("Forensic trailer analysis by @%s: Confirmed leaker %s (%s) [UUID: %s]", actorName, result.LeakerName, result.LeakerEmail, foundSecretUUID),
 		)
 
 		utils.RespondJSON(w, http.StatusOK, result)
@@ -864,7 +873,7 @@ func (h *AdminHandler) InspectLeak(w http.ResponseWriter, r *http.Request) {
 func (h *AdminHandler) getDownloadHistory(targetID, secretUUID string) []models.DownloadRecord {
 	history := make([]models.DownloadRecord, 0)
 	rows, err := db.DB.Query(`
-		SELECT id, target_type, target_id, COALESCE(secret_uuid, ''), user_id, user_name, user_email, ip_address, user_agent, downloaded_at
+		SELECT id, target_type, target_id, COALESCE(secret_uuid, ''), user_id, user_name, user_email, ip_address, user_agent, COALESCE(access_type, 'download'), downloaded_at
 		FROM download_logs
 		WHERE target_id = ? OR secret_uuid = ?
 		ORDER BY downloaded_at DESC
@@ -874,7 +883,7 @@ func (h *AdminHandler) getDownloadHistory(targetID, secretUUID string) []models.
 		defer rows.Close()
 		for rows.Next() {
 			var rec models.DownloadRecord
-			if err := rows.Scan(&rec.ID, &rec.TargetType, &rec.TargetID, &rec.SecretUUID, &rec.UserID, &rec.UserName, &rec.UserEmail, &rec.IPAddress, &rec.UserAgent, &rec.DownloadedAt); err == nil {
+			if err := rows.Scan(&rec.ID, &rec.TargetType, &rec.TargetID, &rec.SecretUUID, &rec.UserID, &rec.UserName, &rec.UserEmail, &rec.IPAddress, &rec.UserAgent, &rec.AccessType, &rec.DownloadedAt); err == nil {
 				history = append(history, rec)
 			}
 		}

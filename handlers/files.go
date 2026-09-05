@@ -143,23 +143,70 @@ func (h *FileHandler) Download(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
+	if f.SecretUUID == "" {
+		f.SecretUUID = utils.GenerateSecretUUID()
+		_, _ = db.DB.Exec("UPDATE files SET secret_uuid = ? WHERE id = ?", f.SecretUUID, f.ID)
+	}
+
 	// Download as attachment or inline (view in browser)
 	isInline := r.URL.Query().Get("inline") == "1"
 	disposition := "attachment"
+	accessType := "DIRECT_DOWNLOAD"
+	dbAccessType := "download"
 	if isInline {
 		disposition = "inline"
+		accessType = "BROWSER_VIEW"
+		dbAccessType = "view"
+	}
+
+	recipientID := claims.UserID
+	recipientUsername := claims.Username
+	recipientEmail := claims.Email
+	recipientName := claims.Username
+	var uName sql.NullString
+	_ = db.DB.QueryRow("SELECT name FROM users WHERE id = ?", claims.UserID).Scan(&uName)
+	if uName.Valid && uName.String != "" {
+		recipientName = uName.String
+	}
+
+	clientIP := utils.GetClientIP(r)
+	userAgent := r.UserAgent()
+
+	// Build dynamic forensic trailer for this exact recipient and access event
+	_, trailerBytes := utils.BuildAccessForensicTrailer(
+		f.SecretUUID,
+		f.OwnerID,
+		f.OwnerName,
+		f.OwnerEmail,
+		"",
+		recipientID,
+		recipientName,
+		recipientEmail,
+		recipientUsername,
+		accessType,
+		clientIP,
+		userAgent,
+		f.Name,
+		h.cfg.JWTSecret,
+	)
+
+	watermarkedReader, err := utils.NewWatermarkedReadSeeker(file, trailerBytes)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to stream watermarked asset")
+		return
+	}
+
+	utils.LogDownloadEvent(db.DB, "file", f.ID, f.SecretUUID, recipientID, recipientName, recipientEmail, clientIP, userAgent, dbAccessType)
+	if !isInline {
+		db.LogActivity(claims.UserID, claims.Username, "download", "file", f.ID, f.Name, fmt.Sprintf("Downloaded %s [Secret UUID: %s]", f.Name, f.SecretUUID))
+	} else {
+		db.LogActivity(claims.UserID, claims.Username, "view", "file", f.ID, f.Name, fmt.Sprintf("Viewed/Loaded %s in browser [Secret UUID: %s]", f.Name, f.SecretUUID))
 	}
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf("%s; filename=\"%s\"", disposition, f.Name))
 	w.Header().Set("Content-Type", f.MimeType)
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", f.Size))
 
-	if !isInline {
-		utils.LogDownloadEvent(db.DB, "file", f.ID, f.SecretUUID, claims.UserID, claims.Username, claims.Email, r.RemoteAddr, r.UserAgent())
-		db.LogActivity(claims.UserID, claims.Username, "download", "file", f.ID, f.Name, fmt.Sprintf("Downloaded %s [Secret UUID: %s]", f.Name, f.SecretUUID))
-	}
-
-	http.ServeContent(w, r, f.Name, f.UpdatedAt, file)
+	http.ServeContent(w, r, f.Name, f.UpdatedAt, watermarkedReader)
 }
 
 func (h *FileHandler) GetPreview(w http.ResponseWriter, r *http.Request) {
@@ -173,6 +220,45 @@ func (h *FileHandler) GetPreview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filePath := h.storage.GetFilePath(f.StoragePath)
+
+	if f.SecretUUID == "" {
+		f.SecretUUID = utils.GenerateSecretUUID()
+		_, _ = db.DB.Exec("UPDATE files SET secret_uuid = ? WHERE id = ?", f.SecretUUID, f.ID)
+	}
+
+	recipientID := claims.UserID
+	recipientUsername := claims.Username
+	recipientEmail := claims.Email
+	recipientName := claims.Username
+	var uName sql.NullString
+	_ = db.DB.QueryRow("SELECT name FROM users WHERE id = ?", claims.UserID).Scan(&uName)
+	if uName.Valid && uName.String != "" {
+		recipientName = uName.String
+	}
+
+	clientIP := utils.GetClientIP(r)
+	userAgent := r.UserAgent()
+
+	// Build dynamic forensic trailer for browser view
+	_, trailerBytes := utils.BuildAccessForensicTrailer(
+		f.SecretUUID,
+		f.OwnerID,
+		f.OwnerName,
+		f.OwnerEmail,
+		"",
+		recipientID,
+		recipientName,
+		recipientEmail,
+		recipientUsername,
+		"BROWSER_VIEW",
+		clientIP,
+		userAgent,
+		f.Name,
+		h.cfg.JWTSecret,
+	)
+
+	utils.LogDownloadEvent(db.DB, "file", f.ID, f.SecretUUID, recipientID, recipientName, recipientEmail, clientIP, userAgent, "view")
+	db.LogActivity(claims.UserID, claims.Username, "view", "file", f.ID, f.Name, fmt.Sprintf("Previewed %s in browser [Secret UUID: %s]", f.Name, f.SecretUUID))
 
 	// If text or code file and size < 2MB, return text content directly
 	if strings.HasPrefix(f.MimeType, "text/") ||
@@ -194,12 +280,14 @@ func (h *FileHandler) GetPreview(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		contentWithTrailer := string(contentBytes) + string(trailerBytes)
+
 		utils.RespondJSON(w, http.StatusOK, map[string]interface{}{
 			"type":      "text",
 			"mime_type": f.MimeType,
 			"name":      f.Name,
-			"size":      f.Size,
-			"content":   string(contentBytes),
+			"size":      int64(len(contentWithTrailer)),
+			"content":   contentWithTrailer,
 		})
 		return
 	}
@@ -212,9 +300,15 @@ func (h *FileHandler) GetPreview(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
+	watermarkedReader, err := utils.NewWatermarkedReadSeeker(file, trailerBytes)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to stream watermarked asset")
+		return
+	}
+
 	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", f.Name))
 	w.Header().Set("Content-Type", f.MimeType)
-	http.ServeContent(w, r, f.Name, f.UpdatedAt, file)
+	http.ServeContent(w, r, f.Name, f.UpdatedAt, watermarkedReader)
 }
 
 func (h *FileHandler) Rename(w http.ResponseWriter, r *http.Request) {
